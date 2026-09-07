@@ -3,7 +3,9 @@ module.exports = function (api) {
   return {
     presets: ["babel-preset-expo"],
     plugins: [
-      // Reanimated plugin must be listed last.
+      // Required for VisionCamera frame processors + the text-recognition plugin.
+      "react-native-worklets-core/plugin",
+      // Reanimated plugin must be listed LAST.
       "react-native-reanimated/plugin",
     ],
   };

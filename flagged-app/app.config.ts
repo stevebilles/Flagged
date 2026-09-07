@@ -46,6 +46,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermissionText:
           "Flagged uses your camera to read food-label ingredient lists on-device.",
         enableCodeScanner: false,
+        enableFrameProcessors: true, // required for live OCR (docs/14)
+      },
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "Flagged can read a photo of a food label you choose. Images are processed on your device and never uploaded.",
       },
     ],
   ],
