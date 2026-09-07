@@ -8,7 +8,7 @@ import { bootstrap } from "../src/app/init";
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
-  const [fontsLoaded] = useAppFonts();
+  const [fontsLoaded, fontError] = useAppFonts();
 
   useEffect(() => {
     bootstrap()
@@ -16,7 +16,9 @@ export default function RootLayout() {
       .finally(() => setReady(true));
   }, []);
 
-  if (!ready) {
+  // Wait for both app bootstrap and fonts. Don't block forever if a font fails
+  // to load — fall through to the system font rather than hang.
+  if (!ready || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#111827" }}>
         <ActivityIndicator color="#22D3EE" />
