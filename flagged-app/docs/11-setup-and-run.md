@@ -33,16 +33,13 @@ npm run typecheck           # tsc --noEmit → 0 errors
 npm test                    # jest → domain logic tests pass
 ```
 
-## Fonts (do this before capturing screenshots)
+## Fonts
 
-The UI is designed around **Atkinson Hyperlegible** (docs/09). Until the TTFs are present the app
-falls back to the system font.
-
-1. Download from the Atkinson Hyperlegible repo (OFL licensed):
-   `AtkinsonHyperlegible-Regular.ttf`, `-Bold.ttf`, `-Italic.ttf`, `-BoldItalic.ttf`.
-2. Place them under `flagged-app/assets/fonts/`.
-3. Enable the `require(...)` lines in `src/design/useAppFonts.ts` (they're commented with
-   `TODO(assets)`).
+The UI uses **Atkinson Hyperlegible** exclusively (docs/09). The four TTFs are **bundled** in
+`flagged-app/assets/fonts/` (OFL 1.1, © 2020 Braille Institute of America; license in
+`assets/fonts/OFL.txt`) and loaded at launch by `src/design/useAppFonts.ts`. No action needed —
+the root layout waits for fonts before rendering (falling back to the system font only if a font
+fails to load).
 
 ## Build & run the dev client
 
