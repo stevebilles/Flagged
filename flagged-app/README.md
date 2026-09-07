@@ -33,7 +33,9 @@ the moat (on-device OCR, local storage, offline purchase entitlement). See
 | 13 | [`docs/13-testing-strategy.md`](docs/13-testing-strategy.md) | Unit/integration/E2E approach |
 | 14 | [`docs/14-camera-ocr-integration.md`](docs/14-camera-ocr-integration.md) | Wiring VisionCamera + on-device OCR (the one stub) |
 | 15 | [`docs/15-store-listing.md`](docs/15-store-listing.md) | Store metadata, screenshots, App Privacy answers |
+| 16 | [`docs/16-first-build-on-windows.md`](docs/16-first-build-on-windows.md) | **Zero-to-iPhone from Windows** (no Mac) via EAS |
 | — | [`docs/data-schema.md`](docs/data-schema.md) | Seed file shape + **activation rules** |
+| — | [`eas.json`](eas.json) | EAS Build/Submit profiles (development / preview / production) |
 | — | [`legal/`](legal/) | Privacy Policy + Terms of Service drafts (required for submission) |
 
 ## The bundled dictionary

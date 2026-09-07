@@ -32,30 +32,16 @@ eas login
 eas init            # links the project to your Expo account (writes projectId)
 ```
 
-Create `eas.json` (build + submit profiles):
+The build + submit profiles live in **[`eas.json`](../eas.json)** (already committed). Profiles:
 
-```jsonc
-{
-  "cli": { "version": ">= 12.0.0" },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal",
-      "ios": { "simulator": false },
-      "autoIncrement": true
-    },
-    "production": {
-      "autoIncrement": true
-    }
-  },
-  "submit": {
-    "production": {}
-  }
-}
-```
+- **development** — dev client for a physical device (live reload; includes native modules).
+- **development-simulator** — dev client for an iOS Simulator (Mac only).
+- **preview** — internal distribution build (TestFlight / Android internal track).
+- **production** — store submission build.
+
+> **New to EAS / on Windows?** Follow the step-by-step in
+> [`16-first-build-on-windows.md`](16-first-build-on-windows.md) to get the app on an iPhone with
+> no Mac.
 
 ## Secrets (RevenueCat keys)
 
