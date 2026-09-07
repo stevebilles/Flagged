@@ -28,7 +28,13 @@ the moat (on-device OCR, local storage, offline purchase entitlement). See
 | 08 | [`docs/08-monetization.md`](docs/08-monetization.md) | 10-scan trial, paywall, offline entitlement |
 | 09 | [`docs/09-design-system.md`](docs/09-design-system.md) | Colors, typography, components |
 | 10 | [`docs/10-aso-review.md`](docs/10-aso-review.md) | In-app review triggers |
+| 11 | [`docs/11-setup-and-run.md`](docs/11-setup-and-run.md) | Env setup, dev client, running locally |
+| 12 | [`docs/12-build-and-release.md`](docs/12-build-and-release.md) | EAS build/submit, store submission, versioning |
+| 13 | [`docs/13-testing-strategy.md`](docs/13-testing-strategy.md) | Unit/integration/E2E approach |
+| 14 | [`docs/14-camera-ocr-integration.md`](docs/14-camera-ocr-integration.md) | Wiring VisionCamera + on-device OCR (the one stub) |
+| 15 | [`docs/15-store-listing.md`](docs/15-store-listing.md) | Store metadata, screenshots, App Privacy answers |
 | — | [`docs/data-schema.md`](docs/data-schema.md) | Seed file shape + **activation rules** |
+| — | [`legal/`](legal/) | Privacy Policy + Terms of Service drafts (required for submission) |
 
 ## The bundled dictionary
 
