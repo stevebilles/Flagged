@@ -2,19 +2,24 @@ import React, { useMemo, useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
 import { Screen, Text, Button, Card } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
 import { getProfile } from "../../src/db/repositories";
 import { canScan, evaluateScan, scansRemaining } from "../../src/domain/scanService";
+import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
+import { CameraScanner } from "../../src/ocr/CameraScanner";
+import { photoResultToParagraph } from "../../src/ocr/recognition";
 
 /**
  * SCAN — the core action tab (docs/05 Tab 2).
  * State 1 Standby · State 2 Hard paywall lockout · State 3 live scan (camera).
  *
- * The live camera (State 3) uses react-native-vision-camera frame processors +
- * an on-device OCR plugin; that native piece is stubbed here (see runManualScan)
- * so the skeleton runs in any environment. See docs/06 and CAMERA TODO below.
+ * State 3 uses the live CameraScanner (VisionCamera + ML Kit OCR, docs/14). Paste
+ * reads the clipboard; Choose Photo runs on-device OCR on a picked image. All
+ * paths funnel a paragraph string into runScan().
  */
 export default function Scan() {
   const t = useTheme();
@@ -26,6 +31,7 @@ export default function Scan() {
   const remaining = useMemo(() => scansRemaining(), []);
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   function runScan(paragraph: string) {
     setError(null);
@@ -44,12 +50,49 @@ export default function Scan() {
     router.push("/results");
   }
 
-  // TODO(camera): replace with VisionCamera live capture → sortBlocks/assembleParagraph
-  // (src/ocr/stitch.ts) → runScan(paragraph). Stubbed sample for the skeleton:
-  function startCameraScanner() {
-    runScan(
-      "Ingredients: enriched flour, sugar, palm oil, red 40, soy lecithin, salt, natural flavor."
-    );
+  function onCameraCapture(paragraph: string) {
+    setCameraOpen(false);
+    runScan(paragraph);
+  }
+
+  async function onPaste() {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text?.trim()) {
+        setError("Clipboard is empty. Copy an ingredient list first.");
+        return;
+      }
+      runScan(text);
+    } catch {
+      setError("Couldn't read the clipboard.");
+    }
+  }
+
+  async function onChoosePhoto() {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setError("Photo access is needed to scan a saved image.");
+        return;
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+      });
+      if (picked.canceled || !picked.assets?.[0]?.uri) return;
+
+      // On-device OCR on the still image (docs/06/14). Requires a dev/EAS build
+      // (native module) — will not run in Expo Go.
+      const result = await PhotoRecognizer({ uri: picked.assets[0].uri, orientation: "portrait" });
+      runScan(photoResultToParagraph(result as any));
+    } catch (e: any) {
+      setError(e?.message ?? "Couldn't read that photo.");
+    }
+  }
+
+  // State 3 — live camera scan (full-screen).
+  if (cameraOpen) {
+    return <CameraScanner onCapture={onCameraCapture} onCancel={() => setCameraOpen(false)} />;
   }
 
   if (locked) {
@@ -88,9 +131,9 @@ export default function Scan() {
       </View>
 
       <View style={{ flex: 1, gap: t.spacing.sm, justifyContent: "flex-end", paddingBottom: t.spacing.lg }}>
-        <Button title="Start Camera Scanner" onPress={startCameraScanner} />
-        <Button title="Paste" kind="secondary" onPress={() => runScan("Ingredients: water, high fructose corn syrup, citric acid, yellow 5.")} />
-        <Button title="Choose Photo" kind="secondary" onPress={() => runScan("Ingredients: oats, honey, almonds, sea salt.")} />
+        <Button title="Start Camera Scanner" onPress={() => setCameraOpen(true)} />
+        <Button title="Paste" kind="secondary" onPress={onPaste} />
+        <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} />
       </View>
     </Screen>
   );
