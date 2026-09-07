@@ -24,6 +24,7 @@ active color scheme. Define these as theme tokens; never hard-code hex in compon
 | Muted Text | `#9CA3AF` |
 | Safe / Scanning Cyan | `#22D3EE` |
 | Flagged Red | `#EF4444` |
+| Warning Orange | `#F59E0B` |
 
 ### Light Mode (clinical feel)
 | Token | Hex |
@@ -34,13 +35,13 @@ active color scheme. Define these as theme tokens; never hard-code hex in compon
 | Muted Text | `#475569` |
 | Safe Cyan | `#0E7490` |
 | Flagged Red | `#B91C1C` |
+| Warning Orange | `#B45309` |
 
 ### Semantic roles
 - **Cyan** = safe / scanning affordance (bounding boxes `#22D3EE`, clean-result header, meter).
 - **Red** = flagged ingredients + flagged-result header + destructive actions.
-- **Yellow/Orange** = the "Recipe Change Detected" (still-approved) recheck screen (`07`). Add a
-  warning token per mode (e.g., dark `#F59E0B`, light `#B45309` — not a moat requirement, choose
-  accessible values consistent with the palette).
+- **Warning Orange** = the "Recipe Change Detected" (still-approved) recheck screen (`07`).
+  Confirmed tokens: **Dark `#F59E0B`**, **Light `#B45309`** (exposed as `colors.warning`).
 - Cards use `#1F2937` (dark) / `#FFFFFF`+shadow (light).
 
 ## Category classification badges
