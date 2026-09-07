@@ -1,0 +1,1713 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "description": "Bundled Flagged red-flag dictionary. Parsed into the local database on first launch. 100% offline.",
+    "parentGroups": [
+      "Allergens",
+      "Sugars",
+      "Additives",
+      "Dietary"
+    ],
+    "classifications": [
+      "regulated",
+      "advisory",
+      "preference"
+    ],
+    "counts": {
+      "ingredients": 283,
+      "categories": 20,
+      "quickPacks": 11
+    }
+  },
+  "ingredients": [
+    {
+      "id": "ing-ace-k",
+      "term": "ace-k"
+    },
+    {
+      "id": "ing-acesulfame-potassium",
+      "term": "acesulfame potassium"
+    },
+    {
+      "id": "ing-acesulfame-k",
+      "term": "acesulfame-k"
+    },
+    {
+      "id": "ing-advantame",
+      "term": "advantame"
+    },
+    {
+      "id": "ing-agave",
+      "term": "agave"
+    },
+    {
+      "id": "ing-agave-nectar",
+      "term": "agave nectar"
+    },
+    {
+      "id": "ing-albumen",
+      "term": "albumen"
+    },
+    {
+      "id": "ing-albumin",
+      "term": "albumin"
+    },
+    {
+      "id": "ing-allura-red",
+      "term": "allura red"
+    },
+    {
+      "id": "ing-almond",
+      "term": "almond"
+    },
+    {
+      "id": "ing-anchovy",
+      "term": "anchovy"
+    },
+    {
+      "id": "ing-arachis-oil",
+      "term": "arachis oil"
+    },
+    {
+      "id": "ing-artificial-color",
+      "term": "artificial color"
+    },
+    {
+      "id": "ing-aspartame",
+      "term": "aspartame"
+    },
+    {
+      "id": "ing-autolyzed-yeast",
+      "term": "autolyzed yeast"
+    },
+    {
+      "id": "ing-barley",
+      "term": "barley"
+    },
+    {
+      "id": "ing-barley-malt",
+      "term": "barley malt"
+    },
+    {
+      "id": "ing-beer-nut",
+      "term": "beer nut"
+    },
+    {
+      "id": "ing-benne",
+      "term": "benne"
+    },
+    {
+      "id": "ing-bha",
+      "term": "bha"
+    },
+    {
+      "id": "ing-bht",
+      "term": "bht"
+    },
+    {
+      "id": "ing-blue-1",
+      "term": "blue 1"
+    },
+    {
+      "id": "ing-blue-2",
+      "term": "blue 2"
+    },
+    {
+      "id": "ing-brazil-nut",
+      "term": "brazil nut"
+    },
+    {
+      "id": "ing-brewer-s-yeast",
+      "term": "brewer's yeast"
+    },
+    {
+      "id": "ing-brilliant-blue",
+      "term": "brilliant blue"
+    },
+    {
+      "id": "ing-brown-rice-syrup",
+      "term": "brown rice syrup"
+    },
+    {
+      "id": "ing-brown-sugar",
+      "term": "brown sugar"
+    },
+    {
+      "id": "ing-bulgur",
+      "term": "bulgur"
+    },
+    {
+      "id": "ing-butter",
+      "term": "butter"
+    },
+    {
+      "id": "ing-buttermilk",
+      "term": "buttermilk"
+    },
+    {
+      "id": "ing-calcium-caseinate",
+      "term": "calcium caseinate"
+    },
+    {
+      "id": "ing-calcium-diglutamate",
+      "term": "calcium diglutamate"
+    },
+    {
+      "id": "ing-calcium-propionate",
+      "term": "calcium propionate"
+    },
+    {
+      "id": "ing-cane-juice",
+      "term": "cane juice"
+    },
+    {
+      "id": "ing-cane-sugar",
+      "term": "cane sugar"
+    },
+    {
+      "id": "ing-canola-oil",
+      "term": "canola oil"
+    },
+    {
+      "id": "ing-casein",
+      "term": "casein"
+    },
+    {
+      "id": "ing-caseinate",
+      "term": "caseinate"
+    },
+    {
+      "id": "ing-cashew",
+      "term": "cashew"
+    },
+    {
+      "id": "ing-celery-juice",
+      "term": "celery juice"
+    },
+    {
+      "id": "ing-celery-powder",
+      "term": "celery powder"
+    },
+    {
+      "id": "ing-chestnut",
+      "term": "chestnut"
+    },
+    {
+      "id": "ing-citrus-red-2",
+      "term": "citrus red 2"
+    },
+    {
+      "id": "ing-coconut-sugar",
+      "term": "coconut sugar"
+    },
+    {
+      "id": "ing-cod",
+      "term": "cod"
+    },
+    {
+      "id": "ing-color-added",
+      "term": "color added"
+    },
+    {
+      "id": "ing-condensed-milk",
+      "term": "condensed milk"
+    },
+    {
+      "id": "ing-corn-oil",
+      "term": "corn oil"
+    },
+    {
+      "id": "ing-corn-syrup",
+      "term": "corn syrup"
+    },
+    {
+      "id": "ing-corn-syrup-solids",
+      "term": "corn syrup solids"
+    },
+    {
+      "id": "ing-cottonseed-oil",
+      "term": "cottonseed oil"
+    },
+    {
+      "id": "ing-couscous",
+      "term": "couscous"
+    },
+    {
+      "id": "ing-crab",
+      "term": "crab"
+    },
+    {
+      "id": "ing-crawfish",
+      "term": "crawfish"
+    },
+    {
+      "id": "ing-crayfish",
+      "term": "crayfish"
+    },
+    {
+      "id": "ing-cream",
+      "term": "cream"
+    },
+    {
+      "id": "ing-curd",
+      "term": "curd"
+    },
+    {
+      "id": "ing-date-sugar",
+      "term": "date sugar"
+    },
+    {
+      "id": "ing-demerara",
+      "term": "demerara"
+    },
+    {
+      "id": "ing-dextrin",
+      "term": "dextrin"
+    },
+    {
+      "id": "ing-dextrose",
+      "term": "dextrose"
+    },
+    {
+      "id": "ing-disodium-guanylate",
+      "term": "disodium guanylate"
+    },
+    {
+      "id": "ing-disodium-inosinate",
+      "term": "disodium inosinate"
+    },
+    {
+      "id": "ing-dried-egg",
+      "term": "dried egg"
+    },
+    {
+      "id": "ing-durum",
+      "term": "durum"
+    },
+    {
+      "id": "ing-e102",
+      "term": "e102"
+    },
+    {
+      "id": "ing-e110",
+      "term": "e110"
+    },
+    {
+      "id": "ing-e127",
+      "term": "e127"
+    },
+    {
+      "id": "ing-e129",
+      "term": "e129"
+    },
+    {
+      "id": "ing-e132",
+      "term": "e132"
+    },
+    {
+      "id": "ing-e133",
+      "term": "e133"
+    },
+    {
+      "id": "ing-e143",
+      "term": "e143"
+    },
+    {
+      "id": "ing-e202",
+      "term": "e202"
+    },
+    {
+      "id": "ing-e211",
+      "term": "e211"
+    },
+    {
+      "id": "ing-e220",
+      "term": "e220"
+    },
+    {
+      "id": "ing-e221",
+      "term": "e221"
+    },
+    {
+      "id": "ing-e222",
+      "term": "e222"
+    },
+    {
+      "id": "ing-e223",
+      "term": "e223"
+    },
+    {
+      "id": "ing-e224",
+      "term": "e224"
+    },
+    {
+      "id": "ing-e228",
+      "term": "e228"
+    },
+    {
+      "id": "ing-e249",
+      "term": "e249"
+    },
+    {
+      "id": "ing-e250",
+      "term": "e250"
+    },
+    {
+      "id": "ing-e251",
+      "term": "e251"
+    },
+    {
+      "id": "ing-e252",
+      "term": "e252"
+    },
+    {
+      "id": "ing-e282",
+      "term": "e282"
+    },
+    {
+      "id": "ing-e319",
+      "term": "e319"
+    },
+    {
+      "id": "ing-e320",
+      "term": "e320"
+    },
+    {
+      "id": "ing-e321",
+      "term": "e321"
+    },
+    {
+      "id": "ing-e420",
+      "term": "e420"
+    },
+    {
+      "id": "ing-e421",
+      "term": "e421"
+    },
+    {
+      "id": "ing-e620",
+      "term": "e620"
+    },
+    {
+      "id": "ing-e621",
+      "term": "e621"
+    },
+    {
+      "id": "ing-e622",
+      "term": "e622"
+    },
+    {
+      "id": "ing-e623",
+      "term": "e623"
+    },
+    {
+      "id": "ing-e627",
+      "term": "e627"
+    },
+    {
+      "id": "ing-e631",
+      "term": "e631"
+    },
+    {
+      "id": "ing-e950",
+      "term": "e950"
+    },
+    {
+      "id": "ing-e951",
+      "term": "e951"
+    },
+    {
+      "id": "ing-e953",
+      "term": "e953"
+    },
+    {
+      "id": "ing-e954",
+      "term": "e954"
+    },
+    {
+      "id": "ing-e955",
+      "term": "e955"
+    },
+    {
+      "id": "ing-e961",
+      "term": "e961"
+    },
+    {
+      "id": "ing-e965",
+      "term": "e965"
+    },
+    {
+      "id": "ing-e967",
+      "term": "e967"
+    },
+    {
+      "id": "ing-e968",
+      "term": "e968"
+    },
+    {
+      "id": "ing-e969",
+      "term": "e969"
+    },
+    {
+      "id": "ing-edamame",
+      "term": "edamame"
+    },
+    {
+      "id": "ing-edta",
+      "term": "edta"
+    },
+    {
+      "id": "ing-egg",
+      "term": "egg"
+    },
+    {
+      "id": "ing-egg-white",
+      "term": "egg white"
+    },
+    {
+      "id": "ing-egg-yolk",
+      "term": "egg yolk"
+    },
+    {
+      "id": "ing-einkorn",
+      "term": "einkorn"
+    },
+    {
+      "id": "ing-erythritol",
+      "term": "erythritol"
+    },
+    {
+      "id": "ing-erythrosine",
+      "term": "erythrosine"
+    },
+    {
+      "id": "ing-evaporated-cane-juice",
+      "term": "evaporated cane juice"
+    },
+    {
+      "id": "ing-evaporated-milk",
+      "term": "evaporated milk"
+    },
+    {
+      "id": "ing-farina",
+      "term": "farina"
+    },
+    {
+      "id": "ing-farro",
+      "term": "farro"
+    },
+    {
+      "id": "ing-fast-green",
+      "term": "fast green"
+    },
+    {
+      "id": "ing-fd-and-c",
+      "term": "fd&c"
+    },
+    {
+      "id": "ing-filbert",
+      "term": "filbert"
+    },
+    {
+      "id": "ing-fish",
+      "term": "fish"
+    },
+    {
+      "id": "ing-fish-gelatin",
+      "term": "fish gelatin"
+    },
+    {
+      "id": "ing-fish-oil",
+      "term": "fish oil"
+    },
+    {
+      "id": "ing-fish-sauce",
+      "term": "fish sauce"
+    },
+    {
+      "id": "ing-fructose",
+      "term": "fructose"
+    },
+    {
+      "id": "ing-fruit-juice-concentrate",
+      "term": "fruit juice concentrate"
+    },
+    {
+      "id": "ing-ghee",
+      "term": "ghee"
+    },
+    {
+      "id": "ing-gianduja",
+      "term": "gianduja"
+    },
+    {
+      "id": "ing-gingelly",
+      "term": "gingelly"
+    },
+    {
+      "id": "ing-globulin",
+      "term": "globulin"
+    },
+    {
+      "id": "ing-glucose",
+      "term": "glucose"
+    },
+    {
+      "id": "ing-glucose-fructose-syrup",
+      "term": "glucose-fructose syrup"
+    },
+    {
+      "id": "ing-glutamic-acid",
+      "term": "glutamic acid"
+    },
+    {
+      "id": "ing-golden-syrup",
+      "term": "golden syrup"
+    },
+    {
+      "id": "ing-graham",
+      "term": "graham"
+    },
+    {
+      "id": "ing-grapeseed-oil",
+      "term": "grapeseed oil"
+    },
+    {
+      "id": "ing-green-3",
+      "term": "green 3"
+    },
+    {
+      "id": "ing-groundnut",
+      "term": "groundnut"
+    },
+    {
+      "id": "ing-haddock",
+      "term": "haddock"
+    },
+    {
+      "id": "ing-halibut",
+      "term": "halibut"
+    },
+    {
+      "id": "ing-halvah",
+      "term": "halvah"
+    },
+    {
+      "id": "ing-hazelnut",
+      "term": "hazelnut"
+    },
+    {
+      "id": "ing-hfcs",
+      "term": "hfcs"
+    },
+    {
+      "id": "ing-high-fructose-corn-syrup",
+      "term": "high fructose corn syrup"
+    },
+    {
+      "id": "ing-honey",
+      "term": "honey"
+    },
+    {
+      "id": "ing-hydrogenated",
+      "term": "hydrogenated"
+    },
+    {
+      "id": "ing-hydrogenated-oil",
+      "term": "hydrogenated oil"
+    },
+    {
+      "id": "ing-hydrolyzed-protein",
+      "term": "hydrolyzed protein"
+    },
+    {
+      "id": "ing-hydrolyzed-vegetable-protein",
+      "term": "hydrolyzed vegetable protein"
+    },
+    {
+      "id": "ing-indigotine",
+      "term": "indigotine"
+    },
+    {
+      "id": "ing-invert-sugar",
+      "term": "invert sugar"
+    },
+    {
+      "id": "ing-isomalt",
+      "term": "isomalt"
+    },
+    {
+      "id": "ing-kamut",
+      "term": "kamut"
+    },
+    {
+      "id": "ing-krill",
+      "term": "krill"
+    },
+    {
+      "id": "ing-lactalbumin",
+      "term": "lactalbumin"
+    },
+    {
+      "id": "ing-lactitol",
+      "term": "lactitol"
+    },
+    {
+      "id": "ing-lactoglobulin",
+      "term": "lactoglobulin"
+    },
+    {
+      "id": "ing-lactose",
+      "term": "lactose"
+    },
+    {
+      "id": "ing-langoustine",
+      "term": "langoustine"
+    },
+    {
+      "id": "ing-livetin",
+      "term": "livetin"
+    },
+    {
+      "id": "ing-lobster",
+      "term": "lobster"
+    },
+    {
+      "id": "ing-lysozyme",
+      "term": "lysozyme"
+    },
+    {
+      "id": "ing-macadamia",
+      "term": "macadamia"
+    },
+    {
+      "id": "ing-malt",
+      "term": "malt"
+    },
+    {
+      "id": "ing-malt-extract",
+      "term": "malt extract"
+    },
+    {
+      "id": "ing-malt-syrup",
+      "term": "malt syrup"
+    },
+    {
+      "id": "ing-malt-vinegar",
+      "term": "malt vinegar"
+    },
+    {
+      "id": "ing-maltitol",
+      "term": "maltitol"
+    },
+    {
+      "id": "ing-maltodextrin",
+      "term": "maltodextrin"
+    },
+    {
+      "id": "ing-maltose",
+      "term": "maltose"
+    },
+    {
+      "id": "ing-mannitol",
+      "term": "mannitol"
+    },
+    {
+      "id": "ing-maple-syrup",
+      "term": "maple syrup"
+    },
+    {
+      "id": "ing-marzipan",
+      "term": "marzipan"
+    },
+    {
+      "id": "ing-mayonnaise",
+      "term": "mayonnaise"
+    },
+    {
+      "id": "ing-meringue",
+      "term": "meringue"
+    },
+    {
+      "id": "ing-milk",
+      "term": "milk"
+    },
+    {
+      "id": "ing-milk-powder",
+      "term": "milk powder"
+    },
+    {
+      "id": "ing-milk-solids",
+      "term": "milk solids"
+    },
+    {
+      "id": "ing-miso",
+      "term": "miso"
+    },
+    {
+      "id": "ing-molasses",
+      "term": "molasses"
+    },
+    {
+      "id": "ing-monkey-nut",
+      "term": "monkey nut"
+    },
+    {
+      "id": "ing-monopotassium-glutamate",
+      "term": "monopotassium glutamate"
+    },
+    {
+      "id": "ing-monosodium-glutamate",
+      "term": "monosodium glutamate"
+    },
+    {
+      "id": "ing-msg",
+      "term": "msg"
+    },
+    {
+      "id": "ing-muscovado",
+      "term": "muscovado"
+    },
+    {
+      "id": "ing-natto",
+      "term": "natto"
+    },
+    {
+      "id": "ing-neotame",
+      "term": "neotame"
+    },
+    {
+      "id": "ing-nougat",
+      "term": "nougat"
+    },
+    {
+      "id": "ing-nut-butter",
+      "term": "nut butter"
+    },
+    {
+      "id": "ing-ovalbumin",
+      "term": "ovalbumin"
+    },
+    {
+      "id": "ing-ovomucoid",
+      "term": "ovomucoid"
+    },
+    {
+      "id": "ing-palm-oil",
+      "term": "palm oil"
+    },
+    {
+      "id": "ing-panela",
+      "term": "panela"
+    },
+    {
+      "id": "ing-partially-hydrogenated",
+      "term": "partially hydrogenated"
+    },
+    {
+      "id": "ing-peanut",
+      "term": "peanut"
+    },
+    {
+      "id": "ing-peanut-butter",
+      "term": "peanut butter"
+    },
+    {
+      "id": "ing-peanut-flour",
+      "term": "peanut flour"
+    },
+    {
+      "id": "ing-pecan",
+      "term": "pecan"
+    },
+    {
+      "id": "ing-pine-nut",
+      "term": "pine nut"
+    },
+    {
+      "id": "ing-pistachio",
+      "term": "pistachio"
+    },
+    {
+      "id": "ing-pollock",
+      "term": "pollock"
+    },
+    {
+      "id": "ing-potassium-bisulfite",
+      "term": "potassium bisulfite"
+    },
+    {
+      "id": "ing-potassium-metabisulfite",
+      "term": "potassium metabisulfite"
+    },
+    {
+      "id": "ing-potassium-nitrate",
+      "term": "potassium nitrate"
+    },
+    {
+      "id": "ing-potassium-nitrite",
+      "term": "potassium nitrite"
+    },
+    {
+      "id": "ing-potassium-sorbate",
+      "term": "potassium sorbate"
+    },
+    {
+      "id": "ing-praline",
+      "term": "praline"
+    },
+    {
+      "id": "ing-prawn",
+      "term": "prawn"
+    },
+    {
+      "id": "ing-propyl-gallate",
+      "term": "propyl gallate"
+    },
+    {
+      "id": "ing-propylparaben",
+      "term": "propylparaben"
+    },
+    {
+      "id": "ing-rapeseed-oil",
+      "term": "rapeseed oil"
+    },
+    {
+      "id": "ing-red-3",
+      "term": "red 3"
+    },
+    {
+      "id": "ing-red-40",
+      "term": "red 40"
+    },
+    {
+      "id": "ing-rice-bran-oil",
+      "term": "rice bran oil"
+    },
+    {
+      "id": "ing-rice-syrup",
+      "term": "rice syrup"
+    },
+    {
+      "id": "ing-rye",
+      "term": "rye"
+    },
+    {
+      "id": "ing-saccharin",
+      "term": "saccharin"
+    },
+    {
+      "id": "ing-safflower-oil",
+      "term": "safflower oil"
+    },
+    {
+      "id": "ing-salmon",
+      "term": "salmon"
+    },
+    {
+      "id": "ing-seitan",
+      "term": "seitan"
+    },
+    {
+      "id": "ing-semolina",
+      "term": "semolina"
+    },
+    {
+      "id": "ing-sesame",
+      "term": "sesame"
+    },
+    {
+      "id": "ing-sesame-oil",
+      "term": "sesame oil"
+    },
+    {
+      "id": "ing-sesame-seed",
+      "term": "sesame seed"
+    },
+    {
+      "id": "ing-sesamol",
+      "term": "sesamol"
+    },
+    {
+      "id": "ing-shellfish",
+      "term": "shellfish"
+    },
+    {
+      "id": "ing-shortening",
+      "term": "shortening"
+    },
+    {
+      "id": "ing-shrimp",
+      "term": "shrimp"
+    },
+    {
+      "id": "ing-sodium-benzoate",
+      "term": "sodium benzoate"
+    },
+    {
+      "id": "ing-sodium-bisulfite",
+      "term": "sodium bisulfite"
+    },
+    {
+      "id": "ing-sodium-caseinate",
+      "term": "sodium caseinate"
+    },
+    {
+      "id": "ing-sodium-metabisulfite",
+      "term": "sodium metabisulfite"
+    },
+    {
+      "id": "ing-sodium-nitrate",
+      "term": "sodium nitrate"
+    },
+    {
+      "id": "ing-sodium-nitrite",
+      "term": "sodium nitrite"
+    },
+    {
+      "id": "ing-sodium-sulfite",
+      "term": "sodium sulfite"
+    },
+    {
+      "id": "ing-sorbitol",
+      "term": "sorbitol"
+    },
+    {
+      "id": "ing-sorghum-syrup",
+      "term": "sorghum syrup"
+    },
+    {
+      "id": "ing-soy",
+      "term": "soy"
+    },
+    {
+      "id": "ing-soy-lecithin",
+      "term": "soy lecithin"
+    },
+    {
+      "id": "ing-soy-protein",
+      "term": "soy protein"
+    },
+    {
+      "id": "ing-soy-protein-isolate",
+      "term": "soy protein isolate"
+    },
+    {
+      "id": "ing-soya",
+      "term": "soya"
+    },
+    {
+      "id": "ing-soybean",
+      "term": "soybean"
+    },
+    {
+      "id": "ing-soybean-oil",
+      "term": "soybean oil"
+    },
+    {
+      "id": "ing-spelt",
+      "term": "spelt"
+    },
+    {
+      "id": "ing-sucanat",
+      "term": "sucanat"
+    },
+    {
+      "id": "ing-sucralose",
+      "term": "sucralose"
+    },
+    {
+      "id": "ing-sucrose",
+      "term": "sucrose"
+    },
+    {
+      "id": "ing-sugar",
+      "term": "sugar"
+    },
+    {
+      "id": "ing-sulfites",
+      "term": "sulfites"
+    },
+    {
+      "id": "ing-sulfur-dioxide",
+      "term": "sulfur dioxide"
+    },
+    {
+      "id": "ing-sunflower-oil",
+      "term": "sunflower oil"
+    },
+    {
+      "id": "ing-sunset-yellow",
+      "term": "sunset yellow"
+    },
+    {
+      "id": "ing-surimi",
+      "term": "surimi"
+    },
+    {
+      "id": "ing-tahina",
+      "term": "tahina"
+    },
+    {
+      "id": "ing-tahini",
+      "term": "tahini"
+    },
+    {
+      "id": "ing-tamari",
+      "term": "tamari"
+    },
+    {
+      "id": "ing-tartrazine",
+      "term": "tartrazine"
+    },
+    {
+      "id": "ing-tbhq",
+      "term": "tbhq"
+    },
+    {
+      "id": "ing-tempeh",
+      "term": "tempeh"
+    },
+    {
+      "id": "ing-textured-vegetable-protein",
+      "term": "textured vegetable protein"
+    },
+    {
+      "id": "ing-tilapia",
+      "term": "tilapia"
+    },
+    {
+      "id": "ing-tofu",
+      "term": "tofu"
+    },
+    {
+      "id": "ing-treacle",
+      "term": "treacle"
+    },
+    {
+      "id": "ing-triticale",
+      "term": "triticale"
+    },
+    {
+      "id": "ing-tuna",
+      "term": "tuna"
+    },
+    {
+      "id": "ing-turbinado",
+      "term": "turbinado"
+    },
+    {
+      "id": "ing-vegetable-oil",
+      "term": "vegetable oil"
+    },
+    {
+      "id": "ing-vital-wheat-gluten",
+      "term": "vital wheat gluten"
+    },
+    {
+      "id": "ing-walnut",
+      "term": "walnut"
+    },
+    {
+      "id": "ing-wheat",
+      "term": "wheat"
+    },
+    {
+      "id": "ing-wheat-flour",
+      "term": "wheat flour"
+    },
+    {
+      "id": "ing-wheat-protein",
+      "term": "wheat protein"
+    },
+    {
+      "id": "ing-wheat-starch",
+      "term": "wheat starch"
+    },
+    {
+      "id": "ing-whey",
+      "term": "whey"
+    },
+    {
+      "id": "ing-whey-protein",
+      "term": "whey protein"
+    },
+    {
+      "id": "ing-whole-wheat",
+      "term": "whole wheat"
+    },
+    {
+      "id": "ing-xylitol",
+      "term": "xylitol"
+    },
+    {
+      "id": "ing-yeast-extract",
+      "term": "yeast extract"
+    },
+    {
+      "id": "ing-yellow-5",
+      "term": "yellow 5"
+    },
+    {
+      "id": "ing-yellow-6",
+      "term": "yellow 6"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-egg",
+      "name": "Egg",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-egg",
+        "ing-egg-white",
+        "ing-egg-yolk",
+        "ing-dried-egg",
+        "ing-albumin",
+        "ing-albumen",
+        "ing-ovalbumin",
+        "ing-ovomucoid",
+        "ing-globulin",
+        "ing-livetin",
+        "ing-lysozyme",
+        "ing-mayonnaise",
+        "ing-meringue"
+      ]
+    },
+    {
+      "id": "cat-fish",
+      "name": "Fish",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-fish",
+        "ing-anchovy",
+        "ing-cod",
+        "ing-salmon",
+        "ing-tuna",
+        "ing-tilapia",
+        "ing-haddock",
+        "ing-halibut",
+        "ing-pollock",
+        "ing-fish-oil",
+        "ing-fish-gelatin",
+        "ing-fish-sauce",
+        "ing-surimi"
+      ]
+    },
+    {
+      "id": "cat-milk",
+      "name": "Milk",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-milk",
+        "ing-cream",
+        "ing-butter",
+        "ing-buttermilk",
+        "ing-ghee",
+        "ing-casein",
+        "ing-sodium-caseinate",
+        "ing-calcium-caseinate",
+        "ing-caseinate",
+        "ing-whey",
+        "ing-whey-protein",
+        "ing-lactose",
+        "ing-lactalbumin",
+        "ing-lactoglobulin",
+        "ing-milk-solids",
+        "ing-milk-powder",
+        "ing-condensed-milk",
+        "ing-evaporated-milk",
+        "ing-curd",
+        "ing-nougat"
+      ]
+    },
+    {
+      "id": "cat-peanut",
+      "name": "Peanut",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-peanut",
+        "ing-groundnut",
+        "ing-arachis-oil",
+        "ing-peanut-butter",
+        "ing-peanut-flour",
+        "ing-beer-nut",
+        "ing-monkey-nut"
+      ]
+    },
+    {
+      "id": "cat-sesame",
+      "name": "Sesame",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-sesame",
+        "ing-sesame-seed",
+        "ing-sesame-oil",
+        "ing-tahini",
+        "ing-tahina",
+        "ing-sesamol",
+        "ing-benne",
+        "ing-gingelly",
+        "ing-halvah"
+      ]
+    },
+    {
+      "id": "cat-shellfish",
+      "name": "Shellfish",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-shellfish",
+        "ing-crab",
+        "ing-lobster",
+        "ing-shrimp",
+        "ing-prawn",
+        "ing-crawfish",
+        "ing-crayfish",
+        "ing-langoustine",
+        "ing-krill"
+      ]
+    },
+    {
+      "id": "cat-soy",
+      "name": "Soy",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-soy",
+        "ing-soya",
+        "ing-soybean",
+        "ing-soybean-oil",
+        "ing-soy-lecithin",
+        "ing-soy-protein",
+        "ing-soy-protein-isolate",
+        "ing-textured-vegetable-protein",
+        "ing-edamame",
+        "ing-miso",
+        "ing-tempeh",
+        "ing-tofu",
+        "ing-tamari",
+        "ing-natto"
+      ]
+    },
+    {
+      "id": "cat-tree-nuts",
+      "name": "Tree nuts",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-almond",
+        "ing-brazil-nut",
+        "ing-cashew",
+        "ing-chestnut",
+        "ing-hazelnut",
+        "ing-filbert",
+        "ing-macadamia",
+        "ing-pecan",
+        "ing-pine-nut",
+        "ing-pistachio",
+        "ing-walnut",
+        "ing-marzipan",
+        "ing-praline",
+        "ing-gianduja",
+        "ing-nut-butter"
+      ]
+    },
+    {
+      "id": "cat-wheat",
+      "name": "Wheat",
+      "parentGroup": "Allergens",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-wheat",
+        "ing-wheat-flour",
+        "ing-whole-wheat",
+        "ing-durum",
+        "ing-semolina",
+        "ing-spelt",
+        "ing-farro",
+        "ing-farina",
+        "ing-graham",
+        "ing-kamut",
+        "ing-bulgur",
+        "ing-couscous",
+        "ing-einkorn",
+        "ing-seitan",
+        "ing-vital-wheat-gluten",
+        "ing-wheat-starch",
+        "ing-wheat-protein"
+      ]
+    },
+    {
+      "id": "cat-artificial-dyes",
+      "name": "Artificial dyes",
+      "parentGroup": "Additives",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-red-40",
+        "ing-allura-red",
+        "ing-e129",
+        "ing-red-3",
+        "ing-erythrosine",
+        "ing-e127",
+        "ing-yellow-5",
+        "ing-tartrazine",
+        "ing-e102",
+        "ing-yellow-6",
+        "ing-sunset-yellow",
+        "ing-e110",
+        "ing-blue-1",
+        "ing-brilliant-blue",
+        "ing-e133",
+        "ing-blue-2",
+        "ing-indigotine",
+        "ing-e132",
+        "ing-green-3",
+        "ing-fast-green",
+        "ing-e143",
+        "ing-citrus-red-2",
+        "ing-artificial-color",
+        "ing-color-added",
+        "ing-fd-and-c"
+      ]
+    },
+    {
+      "id": "cat-synthetic-preservatives",
+      "name": "Synthetic preservatives",
+      "parentGroup": "Additives",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-bha",
+        "ing-e320",
+        "ing-bht",
+        "ing-e321",
+        "ing-tbhq",
+        "ing-e319",
+        "ing-propyl-gallate",
+        "ing-sodium-benzoate",
+        "ing-e211",
+        "ing-potassium-sorbate",
+        "ing-e202",
+        "ing-calcium-propionate",
+        "ing-e282",
+        "ing-edta",
+        "ing-propylparaben"
+      ]
+    },
+    {
+      "id": "cat-artificial-sweeteners",
+      "name": "Artificial sweeteners",
+      "parentGroup": "Additives",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-aspartame",
+        "ing-e951",
+        "ing-sucralose",
+        "ing-e955",
+        "ing-acesulfame-potassium",
+        "ing-acesulfame-k",
+        "ing-ace-k",
+        "ing-e950",
+        "ing-saccharin",
+        "ing-e954",
+        "ing-neotame",
+        "ing-e961",
+        "ing-advantame",
+        "ing-e969"
+      ]
+    },
+    {
+      "id": "cat-sugar-alcohols",
+      "name": "Sugar alcohols",
+      "parentGroup": "Additives",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-sorbitol",
+        "ing-e420",
+        "ing-xylitol",
+        "ing-e967",
+        "ing-erythritol",
+        "ing-e968",
+        "ing-maltitol",
+        "ing-e965",
+        "ing-mannitol",
+        "ing-e421",
+        "ing-isomalt",
+        "ing-e953",
+        "ing-lactitol"
+      ]
+    },
+    {
+      "id": "cat-msg-and-free-glutamates",
+      "name": "MSG & free glutamates",
+      "parentGroup": "Additives",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-monosodium-glutamate",
+        "ing-msg",
+        "ing-e621",
+        "ing-glutamic-acid",
+        "ing-e620",
+        "ing-monopotassium-glutamate",
+        "ing-e622",
+        "ing-calcium-diglutamate",
+        "ing-e623",
+        "ing-hydrolyzed-vegetable-protein",
+        "ing-hydrolyzed-protein",
+        "ing-autolyzed-yeast",
+        "ing-yeast-extract",
+        "ing-disodium-inosinate",
+        "ing-e631",
+        "ing-disodium-guanylate",
+        "ing-e627"
+      ]
+    },
+    {
+      "id": "cat-nitrates-and-nitrites",
+      "name": "Nitrates & nitrites",
+      "parentGroup": "Additives",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-sodium-nitrite",
+        "ing-e250",
+        "ing-sodium-nitrate",
+        "ing-e251",
+        "ing-potassium-nitrite",
+        "ing-e249",
+        "ing-potassium-nitrate",
+        "ing-e252",
+        "ing-celery-powder",
+        "ing-celery-juice"
+      ]
+    },
+    {
+      "id": "cat-sulfites",
+      "name": "Sulfites",
+      "parentGroup": "Additives",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-sulfur-dioxide",
+        "ing-e220",
+        "ing-sodium-sulfite",
+        "ing-e221",
+        "ing-sodium-bisulfite",
+        "ing-e222",
+        "ing-sodium-metabisulfite",
+        "ing-e223",
+        "ing-potassium-metabisulfite",
+        "ing-e224",
+        "ing-potassium-bisulfite",
+        "ing-e228",
+        "ing-sulfites"
+      ]
+    },
+    {
+      "id": "cat-trans-fats",
+      "name": "Trans fats",
+      "parentGroup": "Additives",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-partially-hydrogenated",
+        "ing-hydrogenated-oil",
+        "ing-hydrogenated",
+        "ing-shortening"
+      ]
+    },
+    {
+      "id": "cat-hidden-sugars",
+      "name": "Hidden sugars",
+      "parentGroup": "Sugars",
+      "classification": "advisory",
+      "ingredientIds": [
+        "ing-sugar",
+        "ing-sucrose",
+        "ing-glucose",
+        "ing-dextrose",
+        "ing-fructose",
+        "ing-maltose",
+        "ing-high-fructose-corn-syrup",
+        "ing-hfcs",
+        "ing-corn-syrup",
+        "ing-corn-syrup-solids",
+        "ing-glucose-fructose-syrup",
+        "ing-cane-sugar",
+        "ing-cane-juice",
+        "ing-evaporated-cane-juice",
+        "ing-invert-sugar",
+        "ing-molasses",
+        "ing-honey",
+        "ing-agave",
+        "ing-agave-nectar",
+        "ing-maple-syrup",
+        "ing-brown-sugar",
+        "ing-coconut-sugar",
+        "ing-date-sugar",
+        "ing-turbinado",
+        "ing-demerara",
+        "ing-muscovado",
+        "ing-barley-malt",
+        "ing-rice-syrup",
+        "ing-brown-rice-syrup",
+        "ing-maltodextrin",
+        "ing-dextrin",
+        "ing-fruit-juice-concentrate",
+        "ing-treacle",
+        "ing-golden-syrup",
+        "ing-panela",
+        "ing-sorghum-syrup",
+        "ing-sucanat"
+      ]
+    },
+    {
+      "id": "cat-gluten-sources",
+      "name": "Gluten Sources",
+      "parentGroup": "Dietary",
+      "classification": "regulated",
+      "ingredientIds": [
+        "ing-wheat",
+        "ing-barley",
+        "ing-malt",
+        "ing-malt-extract",
+        "ing-malt-syrup",
+        "ing-malt-vinegar",
+        "ing-brewer-s-yeast",
+        "ing-rye",
+        "ing-triticale",
+        "ing-spelt",
+        "ing-farro",
+        "ing-kamut",
+        "ing-semolina",
+        "ing-durum",
+        "ing-seitan"
+      ]
+    },
+    {
+      "id": "cat-seed-oils",
+      "name": "Seed oils",
+      "parentGroup": "Dietary",
+      "classification": "preference",
+      "ingredientIds": [
+        "ing-canola-oil",
+        "ing-rapeseed-oil",
+        "ing-soybean-oil",
+        "ing-corn-oil",
+        "ing-cottonseed-oil",
+        "ing-safflower-oil",
+        "ing-sunflower-oil",
+        "ing-grapeseed-oil",
+        "ing-rice-bran-oil",
+        "ing-vegetable-oil",
+        "ing-palm-oil"
+      ]
+    }
+  ],
+  "quickPacks": [
+    {
+      "id": "pack-artificial-dyes",
+      "name": "Artificial dyes",
+      "type": "simple",
+      "categoryIds": [
+        "cat-artificial-dyes"
+      ]
+    },
+    {
+      "id": "pack-big-9-allergens",
+      "name": "Big-9 Allergens",
+      "type": "composite",
+      "categoryIds": [
+        "cat-egg",
+        "cat-fish",
+        "cat-milk",
+        "cat-peanut",
+        "cat-sesame",
+        "cat-shellfish",
+        "cat-soy",
+        "cat-tree-nuts",
+        "cat-wheat"
+      ]
+    },
+    {
+      "id": "pack-focus-and-adhd",
+      "name": "Focus & ADHD",
+      "type": "composite",
+      "categoryIds": [
+        "cat-artificial-dyes",
+        "cat-synthetic-preservatives"
+      ]
+    },
+    {
+      "id": "pack-gluten-free",
+      "name": "Gluten Free",
+      "type": "simple",
+      "categoryIds": [
+        "cat-gluten-sources"
+      ]
+    },
+    {
+      "id": "pack-gut-health",
+      "name": "Gut Health",
+      "type": "composite",
+      "categoryIds": [
+        "cat-artificial-sweeteners",
+        "cat-hidden-sugars",
+        "cat-sugar-alcohols"
+      ]
+    },
+    {
+      "id": "pack-hidden-sugars",
+      "name": "Hidden sugars",
+      "type": "simple",
+      "categoryIds": [
+        "cat-hidden-sugars"
+      ]
+    },
+    {
+      "id": "pack-msg-and-free-glutamates",
+      "name": "MSG & free glutamates",
+      "type": "simple",
+      "categoryIds": [
+        "cat-msg-and-free-glutamates"
+      ]
+    },
+    {
+      "id": "pack-preservatives",
+      "name": "Preservatives",
+      "type": "composite",
+      "categoryIds": [
+        "cat-nitrates-and-nitrites",
+        "cat-sulfites",
+        "cat-synthetic-preservatives"
+      ]
+    },
+    {
+      "id": "pack-seed-oils",
+      "name": "Seed oils",
+      "type": "simple",
+      "categoryIds": [
+        "cat-seed-oils"
+      ]
+    },
+    {
+      "id": "pack-sweeteners-and-polyols",
+      "name": "Sweeteners & Polyols",
+      "type": "composite",
+      "categoryIds": [
+        "cat-artificial-sweeteners",
+        "cat-sugar-alcohols"
+      ]
+    },
+    {
+      "id": "pack-trans-fats",
+      "name": "Trans fats",
+      "type": "simple",
+      "categoryIds": [
+        "cat-trans-fats"
+      ]
+    }
+  ]
+}
