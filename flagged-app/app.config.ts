@@ -20,7 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic", // supports the dynamic dark/light system, docs/09
   ios: {
     supportsTablet: false,
-    bundleIdentifier: "com.flagged.app",
+    bundleIdentifier: "com.billesappcoinc.flaggedingredientscanner",
     // iOS 17.0+ deployment target is set via expo-build-properties (see plugins).
     infoPlist: {
       NSCameraUsageDescription:
@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
-    package: "com.flagged.app",
+    package: "com.billesappcoinc.flaggedingredientscanner",
     permissions: ["android.permission.CAMERA"],
   },
   plugins: [

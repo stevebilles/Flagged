@@ -9,8 +9,10 @@ import { getMetaValue, setMetaValue } from "../db/appMeta";
  * Configure API keys via app config / EAS secrets before shipping.
  */
 
-export const PREMIUM_ENTITLEMENT = "premium";
-export const LIFETIME_PRODUCT_ID = "flagged_lifetime"; // configure in stores + RevenueCat
+// These three identifiers must match your RevenueCat / store dashboard config.
+export const PREMIUM_ENTITLEMENT = "premium"; // RevenueCat → Entitlements identifier
+export const LIFETIME_PRODUCT_ID = "flagged_lifetime"; // App Store Connect + Play + RevenueCat product ID
+export const CURRENT_OFFERING = "default"; // RevenueCat → Offerings (recommended fetch path)
 const CACHED_PREMIUM_KEY = "cachedPremium";
 
 // TODO(secrets): replace with real RevenueCat public SDK keys (do not commit real keys).
@@ -59,12 +61,90 @@ export async function refreshEntitlement(): Promise<boolean> {
 
 export async function purchaseLifetime(): Promise<boolean> {
   if (!configured) throw new Error("Purchases not configured (missing API key).");
+
+  // Preferred path: buy the package from the current Offering (RevenueCat's
+  // recommended pattern — lets you swap products/pricing from the dashboard
+  // without an app update).
+  const offerings = await Purchases.getOfferings();
+  const offering = offerings.current ?? offerings.all[CURRENT_OFFERING];
+  const pkg = offering?.availablePackages?.[0];
+  if (pkg) {
+    const { customerInfo } = await Purchases.purchasePackage(pkg);
+    const active = hasPremium(customerInfo);
+    cachePremium(active);
+    return active;
+  }
+
+  // Fallback: fetch the product directly by ID if no Offering is configured.
   const products = await Purchases.getProducts([LIFETIME_PRODUCT_ID]);
-  if (!products.length) throw new Error("Lifetime product not found.");
+  if (!products.length) {
+    throw new Error(
+      `No Offering package and product "${LIFETIME_PRODUCT_ID}" not found. Check RevenueCat + store setup.`
+    );
+  }
   const { customerInfo } = await Purchases.purchaseStoreProduct(products[0]);
   const active = hasPremium(customerInfo);
   cachePremium(active);
   return active;
+}
+
+/**
+ * One-shot connection diagnostic. Call from a dev build to confirm store setup.
+ * Surfaces the usual gotchas: missing key, agreements not "Active", product ID
+ * typos, entitlement not attached. Logs a report and returns it.
+ */
+export interface PurchasesDiagnostic {
+  configured: boolean;
+  offeringFound: boolean;
+  packagesInOffering: number;
+  productFoundById: boolean;
+  entitlementActive: boolean;
+  notes: string[];
+}
+
+export async function diagnosePurchases(): Promise<PurchasesDiagnostic> {
+  const d: PurchasesDiagnostic = {
+    configured,
+    offeringFound: false,
+    packagesInOffering: 0,
+    productFoundById: false,
+    entitlementActive: isPremiumCached(),
+    notes: [],
+  };
+  if (!configured) {
+    d.notes.push(
+      "SDK not configured — set EXPO_PUBLIC_RC_IOS_KEY / EXPO_PUBLIC_RC_ANDROID_KEY (public SDK key)."
+    );
+    console.log("[Purchases diagnostic]", d);
+    return d;
+  }
+  try {
+    const offerings = await Purchases.getOfferings();
+    const offering = offerings.current ?? offerings.all[CURRENT_OFFERING];
+    d.offeringFound = !!offering;
+    d.packagesInOffering = offering?.availablePackages?.length ?? 0;
+    if (!d.offeringFound) d.notes.push('No current Offering — create one in RevenueCat (id "default").');
+
+    const products = await Purchases.getProducts([LIFETIME_PRODUCT_ID]);
+    d.productFoundById = products.length > 0;
+    if (!d.productFoundById) {
+      d.notes.push(
+        `Product "${LIFETIME_PRODUCT_ID}" not returned by the store — check the product ID, that it's approved/active, and (iOS) that Agreements/Tax/Banking is Active.`
+      );
+    }
+
+    const info = await Purchases.getCustomerInfo();
+    d.entitlementActive = hasPremium(info);
+    if (!d.entitlementActive) {
+      d.notes.push(
+        `Entitlement "${PREMIUM_ENTITLEMENT}" not active for this user (expected until a purchase/restore). Ensure the product is attached to it in RevenueCat.`
+      );
+    }
+  } catch (e: any) {
+    d.notes.push(`Network/SDK error: ${e?.message ?? e}. Falling back to cached status offline.`);
+  }
+  console.log("[Purchases diagnostic]", d);
+  return d;
 }
 
 export async function restorePurchases(): Promise<boolean> {
