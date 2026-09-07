@@ -9,6 +9,31 @@ result on your phone via a link/QR code.
 
 ---
 
+## How will I actually SEE my app? (read this first)
+
+**There is no simulator on Windows.** The iPhone Simulator is Mac-only. That's not a problem here —
+**your real iPhone is the preview screen**, which is the correct setup for this app anyway:
+Flagged's whole job is scanning food labels with the camera, and a simulator has no real camera.
+
+So the flow is:
+
+1. The build runs in **Expo's cloud** (no Mac, no simulator).
+2. When it finishes you get a **QR code**.
+3. **Scan it with your iPhone** → the Flagged app installs on your phone like any other app.
+4. **Open it on your iPhone** and use it — point the camera at a real cereal box or can.
+5. While you run `npm start` on your PC, the app on your phone **live-reloads** when code changes.
+
+Two "levels" of build, so you know the difference:
+- **Development build** (what you do first): installed on your iPhone, connected to your PC for live
+  reload. Best for testing + fixing.
+- **Production build** (later): a standalone app that runs on any iPhone with no computer attached —
+  that's the version you eventually submit to the App Store.
+
+**Bottom line:** you won't see a phone window on your PC. You'll hold the app in your hand on your
+own iPhone.
+
+---
+
 ## 0. What you need first
 
 - [ ] **Node.js 18+** installed on Windows ([nodejs.org](https://nodejs.org)).
