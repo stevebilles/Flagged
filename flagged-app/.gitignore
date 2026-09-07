@@ -1,0 +1,42 @@
+# Node / Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Native build artifacts
+ios/build/
+ios/Pods/
+android/.gradle/
+android/build/
+android/app/build/
+*.xcworkspace/xcuserdata/
+
+# EAS / secrets
+.easignore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python (tools/)
+__pycache__/
+*.pyc
+.venv/
