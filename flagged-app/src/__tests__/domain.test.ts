@@ -1,5 +1,5 @@
 import { levenshtein, similarity } from "../matching/levenshtein";
-import { normalizeParagraph, tokenize } from "../matching/normalize";
+import { normalizeParagraph, tokenize, looksLikeIngredientList } from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
@@ -27,6 +27,23 @@ describe("normalize + tokenize", () => {
     expect(p).toContain("sugar");
     const toks = tokenize(p);
     expect(toks).toContain("red 40");
+  });
+});
+
+describe("looksLikeIngredientList", () => {
+  it("accepts a clean or garbled header, and the French spelling", () => {
+    expect(looksLikeIngredientList("INGREDIENTS: water, salt")).toBe(true);
+    expect(looksLikeIngredientList("dients: water, salt")).toBe(true);
+    expect(looksLikeIngredientList("Contains: milk")).toBe(true);
+    expect(looksLikeIngredientList("Ingrédients : eau, sel")).toBe(true);
+  });
+  it("accepts a long comma-dense capture when the header OCR'd away", () => {
+    expect(
+      looksLikeIngredientList("water, skim milk, monterey jack cheese, vegetable oil, corn starch, salt")
+    ).toBe(true);
+  });
+  it("rejects a short scrap of label art", () => {
+    expect(looksLikeIngredientList("MEDIUM SALSA CON QUESO")).toBe(false);
   });
 });
 

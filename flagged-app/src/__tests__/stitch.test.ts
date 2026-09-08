@@ -30,13 +30,25 @@ describe("pickBestFrameText", () => {
     expect(pickBestFrameText(frames)).toBe(good);
   });
 
-  it("returns '' when no frame looks like an ingredient list (caller stitches instead)", () => {
-    expect(pickBestFrameText([[b("a", "TOSTITOS MEDIUM SALSA")], [b("b", "SALSA AU FROMAGE")]])).toBe("");
+  it("returns '' when frames are all short fragments (caller stitches instead)", () => {
+    expect(pickBestFrameText([[b("a", "TOSTITOS MEDIUM")], [b("b", "SALSA AU")]])).toBe("");
+  });
+
+  it("falls back to the fullest frame when the header OCR'd badly", () => {
+    const garbledHeader =
+      "dients: Water, Skim milk, Monterey jack cheese, able oil, Modified corn starch, Diced tomatoes, Maltodextrin, Salt";
+    const frames = [[b("a", "TOSTITOS MEDIUM SALSA CON QUESO")], [b("b", garbledHeader)]];
+    expect(pickBestFrameText(frames)).toBe(garbledHeader);
   });
 
   it("matches the French header too", () => {
     const fr = "Ingredients : Eau, Lait ecreme, Fromage monterey jack, Huile vegetale";
     expect(pickBestFrameText([[b("a", fr)]])).toBe(fr);
+  });
+
+  it("uses the fullest substantial frame even with no header word at all", () => {
+    const noHeader = "Water, Skim milk, Monterey jack cheese, Vegetable oil, Modified corn starch, Salt";
+    expect(pickBestFrameText([[b("a", "MEDIUM SALSA")], [b("b", noHeader)]])).toBe(noHeader);
   });
 });
 

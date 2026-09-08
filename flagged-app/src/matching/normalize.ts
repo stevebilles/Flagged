@@ -35,5 +35,9 @@ export function tokenize(normalized: string): string[] {
 
 /** True if the capture looks like an ingredient list (docs/06 validation). */
 export function looksLikeIngredientList(raw: string): boolean {
-  return /ingredient/i.test(raw);
+  // The header word, tolerant of OCR garble and French ("ingrédients").
+  if (/ingr[ée]?d|dients|contains|contient/i.test(raw)) return true;
+  // Header may have OCR'd badly — accept a long, comma-dense capture too.
+  const commas = (raw.match(/,/g) ?? []).length;
+  return raw.trim().length >= 60 && commas >= 5;
 }

@@ -3,6 +3,7 @@ import { View, TextInput, Linking } from "react-native";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { getMetaValue, setMetaValue } from "../../src/db/appMeta";
+import { getStats, saveStats } from "../../src/db/repositories";
 import { useAppStore } from "../../src/state/appStore";
 import { restorePurchases } from "../../src/purchases/purchases";
 
@@ -13,6 +14,7 @@ export default function Settings() {
   const setPremium = useAppStore((s) => s.setPremium);
   const [name, setName] = useState(getMetaValue("firstName") ?? "");
   const [restoring, setRestoring] = useState(false);
+  const [devNote, setDevNote] = useState<string | null>(null);
 
   function saveName(v: string) {
     setName(v);
@@ -63,6 +65,31 @@ export default function Settings() {
           <Button title="Privacy Policy" kind="secondary" onPress={() => Linking.openURL("https://flagged.app/privacy")} />
           <Button title="Terms of Service" kind="secondary" onPress={() => Linking.openURL("https://flagged.app/terms")} />
         </View>
+
+        {__DEV__ && (
+          <View style={{ gap: t.spacing.sm }}>
+            <Text tone="muted" variant="caption">DEVELOPER (dev builds only)</Text>
+            <Card style={{ gap: t.spacing.sm }}>
+              <Button
+                title="Reset free scan count"
+                kind="secondary"
+                onPress={() => {
+                  saveStats({ ...getStats(), freeScansUsed: 0 });
+                  setDevNote("Free scans reset to 10.");
+                }}
+              />
+              <Button
+                title={isPremium ? "Turn OFF Premium" : "Turn ON Premium"}
+                kind="secondary"
+                onPress={() => {
+                  setPremium(!isPremium);
+                  setDevNote(isPremium ? "Premium off." : "Premium on — unlimited scans.");
+                }}
+              />
+              {devNote && <Text tone="cyan" variant="caption">{devNote}</Text>}
+            </Card>
+          </View>
+        )}
       </View>
     </Screen>
   );

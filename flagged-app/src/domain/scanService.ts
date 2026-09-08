@@ -17,11 +17,13 @@ export type ScanEvaluation =
 
 /** Evaluate a captured paragraph for a profile. Pure (no stats writes). */
 export function evaluateScan(rawParagraph: string, profile: Profile): ScanEvaluation {
-  if (!looksLikeIngredientList(rawParagraph)) {
-    return { status: "aborted", reason: "illegible" };
-  }
   const terms = effectiveRedFlagTerms(profile, getCategories(), getIngredientTermMap());
   const result = matchParagraph(rawParagraph, terms);
+  // A match means it's unambiguously a label. Otherwise fall back to the
+  // heuristic — a garbled header shouldn't discard an otherwise-clean scan.
+  if (result.matches.length === 0 && !looksLikeIngredientList(rawParagraph)) {
+    return { status: "aborted", reason: "illegible" };
+  }
   return { status: "result", result };
 }
 

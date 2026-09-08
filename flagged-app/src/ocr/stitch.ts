@@ -67,17 +67,22 @@ export function frameText(frame: RecognizedBlock[]): string {
  * looks like a real ingredient list — the caller then falls back to
  * `assembleParagraph` for the curved-surface (panning) case.
  */
-const INGREDIENT_HINT = /ingredient|ingr[ée]dient|contains|contient/i;
+const INGREDIENT_HINT = /ingr[ée]?d|dients|contains|contient/i;
 
 export function pickBestFrameText(frames: RecognizedBlock[][]): string {
-  let best = "";
+  let hinted = "";
+  let longest = "";
   for (const frame of frames) {
     const text = frameText(frame);
-    if (text.length > best.length && INGREDIENT_HINT.test(text)) {
-      best = text;
-    }
+    if (text.length > longest.length) longest = text;
+    if (INGREDIENT_HINT.test(text) && text.length > hinted.length) hinted = text;
   }
-  return best;
+  // A frame that clearly saw a list header wins. Otherwise the fullest frame,
+  // as long as it's substantial — ML Kit returns a frame's text already in
+  // reading order, so one good frame beats stitching dozens. Too short → "" so
+  // the caller stitches (genuinely fragmented curved-surface capture).
+  if (hinted) return hinted;
+  return longest.length >= 60 ? longest : "";
 }
 
 /** Merge a set of frames' sorted, deduped blocks into a single paragraph. */
