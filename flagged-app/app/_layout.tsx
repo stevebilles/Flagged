@@ -4,7 +4,7 @@ import { View, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider } from "../src/design/ThemeProvider";
 import { useAppFonts } from "../src/design/useAppFonts";
-import { bootstrap } from "../src/app/init";
+import { bootstrap } from "../src/bootstrap/init";
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
