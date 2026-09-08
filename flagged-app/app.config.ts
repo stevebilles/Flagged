@@ -14,6 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Flagged",
   slug: "flagged",
+  owner: "steverbillesberger",
   scheme: "flagged",
   version: "0.1.0",
   orientation: "portrait",
@@ -59,5 +60,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   experiments: {
     typedRoutes: true,
+  },
+  extra: {
+    eas: {
+      projectId: "7551b8ea-18ba-48d2-9636-9ca8cfc1e2eb",
+    },
   },
 });
