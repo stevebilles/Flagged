@@ -90,6 +90,29 @@ eas init
 
 ---
 
+## 3b. (Optional but recommended) Link GitHub to Expo
+
+Expo can build **directly from your GitHub repo** instead of from your PC. For a non-developer on
+Windows this is worth doing — it means fewer things have to be set up perfectly on your own machine,
+and after the first build you can trigger new builds from the **expo.dev website with a button**.
+
+**Set it up:**
+1. Go to [expo.dev](https://expo.dev) → your **Flagged** project → **GitHub** (or Project settings →
+   GitHub) → **Connect** and authorize Expo for the `stevebilles/Flagged` repository.
+2. ⚠️ **Set the base/root directory to `flagged-app`.** The app is in that subfolder, not the repo
+   root. If this is wrong, the build fails with "can't find the app / package.json." (Look for a
+   "base directory" or "root directory" field in the GitHub build settings.)
+
+**Important — what this does and doesn't do:**
+- ✅ Makes builds **#2, #3, #4…** easy (trigger from the website; code pulled from GitHub).
+- ❌ Does **not** skip the **first** build's Apple signing setup. The first iOS build is interactive
+  (EAS creates and stores your Apple certificate). So do the **first** build with Claude Code driving
+  the terminal (Step 5); after that, GitHub-triggered builds reuse the stored credentials.
+
+**Bottom line:** link it now for easy future builds, but still do your first build via Step 5.
+
+---
+
 ## 4. Register your iPhone as a test device
 
 A "development" build can only install on devices Apple knows about. Run:
