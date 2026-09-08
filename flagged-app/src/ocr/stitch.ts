@@ -50,6 +50,36 @@ export function sortBlocks(blocks: RecognizedBlock[]): RecognizedBlock[] {
   });
 }
 
+/** Text of a single frame in reading order (sorted blocks joined). */
+export function frameText(frame: RecognizedBlock[]): string {
+  return sortBlocks(frame)
+    .map((b) => b.text)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Choose the single most complete frame that clearly saw an ingredient list.
+ * For a flat label held roughly steady, one good frame beats stitching dozens
+ * of partial, noisy ones (docs/06 assumed dedup would keep the pile-up small;
+ * real OCR text drifts frame-to-frame so it doesn't). Returns "" when no frame
+ * looks like a real ingredient list — the caller then falls back to
+ * `assembleParagraph` for the curved-surface (panning) case.
+ */
+const INGREDIENT_HINT = /ingredient|ingr[ée]dient|contains|contient/i;
+
+export function pickBestFrameText(frames: RecognizedBlock[][]): string {
+  let best = "";
+  for (const frame of frames) {
+    const text = frameText(frame);
+    if (text.length > best.length && INGREDIENT_HINT.test(text)) {
+      best = text;
+    }
+  }
+  return best;
+}
+
 /** Merge a set of frames' sorted, deduped blocks into a single paragraph. */
 export function assembleParagraph(frames: RecognizedBlock[][]): string {
   const seen = new Set<string>();

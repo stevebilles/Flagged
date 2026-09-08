@@ -5,12 +5,13 @@ import {
   useCameraDevice,
   useCameraPermission,
   useFrameProcessor,
+  runAtTargetFps,
 } from "react-native-vision-camera";
 import { useTextRecognition } from "react-native-vision-camera-text-recognition";
 import { useRunOnJS } from "react-native-worklets-core";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
-import { assembleParagraph, RecognizedBlock } from "./stitch";
+import { assembleParagraph, pickBestFrameText, RecognizedBlock } from "./stitch";
 import { toRecognizedBlocks, MLKitText } from "./recognition";
 
 /**
@@ -48,10 +49,13 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  // Called from the worklet on each processed frame (marshaled to JS).
-  const onFrameBlocks = useRunOnJS(
-    (blocks: RecognizedBlock[]) => {
+  // Called from the worklet with the raw ML Kit result. The tuple→block adapter
+  // (`toRecognizedBlocks`) is plain JS — it can't run on the worklet thread — so
+  // the worklet just marshals the raw result over and we convert here on JS.
+  const onFrameResult = useRunOnJS(
+    (result: MLKitText[]) => {
       if (finishedRef.current) return;
+      const blocks = toRecognizedBlocks(result);
       framesRef.current.push(blocks);
       setOverlay(blocks);
     },
@@ -61,19 +65,24 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   const frameProcessor = useFrameProcessor(
     (frame) => {
       "worklet";
-      const result = scanText(frame) as unknown as MLKitText[];
-      // Keep worklet work light: convert + hand back to JS.
-      const blocks = toRecognizedBlocks(result);
-      onFrameBlocks(blocks);
+      // ~3 fps is plenty for a label and keeps CPU + frame-to-frame noise down.
+      runAtTargetFps(3, () => {
+        "worklet";
+        const result = scanText(frame) as unknown as MLKitText[];
+        onFrameResult(result);
+      });
     },
-    [scanText, onFrameBlocks]
+    [scanText, onFrameResult]
   );
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     setScanning(false);
-    const paragraph = assembleParagraph(framesRef.current);
+    // A single well-framed capture beats stitching many noisy ones; fall back to
+    // stitching only when no frame clearly saw an ingredient list (curved cans).
+    const best = pickBestFrameText(framesRef.current);
+    const paragraph = best || assembleParagraph(framesRef.current);
     framesRef.current = [];
     onCapture(paragraph);
   }, [onCapture]);

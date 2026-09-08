@@ -25,7 +25,7 @@ export default function Results() {
   }, []);
 
   const flaggedTerms = useMemo(
-    () => new Set((lastScan?.matches ?? []).map((m) => m.token.toLowerCase())),
+    () => (lastScan?.matches ?? []).map((m) => m.token.toLowerCase().trim()).filter(Boolean),
     [lastScan]
   );
 
@@ -65,7 +65,8 @@ export default function Results() {
         <Card>
           <Text style={{ lineHeight: 24 }}>
             {lastScan.paragraph.split(/([,()])/).map((seg, idx) => {
-              const isFlag = flaggedTerms.has(seg.trim().toLowerCase());
+              const segLower = seg.toLowerCase();
+              const isFlag = flaggedTerms.some((f) => segLower.includes(f));
               return (
                 <Text key={idx} tone={isFlag ? "red" : "primary"} bold={isFlag}>
                   {seg}

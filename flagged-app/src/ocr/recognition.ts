@@ -4,10 +4,24 @@ import type { RecognizedBlock } from "./stitch";
  * Adapter between `react-native-vision-camera-text-recognition` (ML Kit, v3) and
  * our pure-TS OCR pipeline (`src/ocr/stitch.ts`).
  *
- * The plugin does NOT export its result types, so we mirror them structurally
- * here (verified against the installed v3.1.1 type defs). Each recognized
- * `MLKitText` has a `resultText` and a `blocks` tuple whose first element is the
- * block frame (x/y/width/height). We map each into our `RecognizedBlock`.
+ * Shape verified on-device (iOS, plugin v3.x). `useTextRecognition().scanText`
+ * hands back a single object:
+ *
+ *   {
+ *     resultText?: string,
+ *     blocks: [
+ *       {
+ *         blockText: string,
+ *         blockFrame: { x, y, width, height, boundingCenterX, boundingCenterY },
+ *         blockCornerPoints: [{ x, y }, ...],
+ *         lines: [ { elements: [ { elementText, elementFrame, ... } ], ... } ]
+ *       },
+ *       ...
+ *     ]
+ *   }
+ *
+ * `PhotoRecognizer` returns the same shape for a still image. Older docs assumed
+ * a positional tuple / an array of these — we read defensively so either works.
  */
 
 /** The block frame reported by ML Kit (origin + size in frame coordinates). */
@@ -20,31 +34,77 @@ export interface MLKitFrame {
   boundingCenterY: number;
 }
 
-/**
- * The plugin returns `blocks` as a positional tuple:
- *   [blockFrame, blockCornerPoints, lines, blockLanguages, blockText]
- * We only need index 0 (frame) and index 4 (text) — but we read defensively in
- * case a future version returns an object instead of a tuple.
- */
+/** A single recognized block. Fields are read defensively (see `textOf`/`frameOf`). */
 export type MLKitBlock = any;
 
+/** One OCR result object. `scanText`/`PhotoRecognizer` return this (not an array). */
 export interface MLKitText {
-  blocks: MLKitBlock[] | MLKitBlock;
-  resultText: string;
+  blocks?: MLKitBlock[] | MLKitBlock;
+  resultText?: string;
 }
 
-function frameOf(block: MLKitBlock): MLKitFrame | null {
-  // Tuple form: index 0 is the block frame.
-  const candidate = Array.isArray(block) ? block[0] : block?.frame ?? block?.blockFrame;
-  if (candidate && typeof candidate.x === "number" && typeof candidate.y === "number") {
-    return candidate as MLKitFrame;
+/** What `scanText` may hand us: the object, an array of them, or a bare block list. */
+type RawResult = MLKitText | MLKitText[] | MLKitBlock[] | null | undefined;
+
+/** Flatten whatever shape we got into a flat list of block objects. */
+function collectBlocks(result: RawResult): MLKitBlock[] {
+  if (!result) return [];
+  const items: any[] = Array.isArray(result) ? result : [result];
+  const out: MLKitBlock[] = [];
+  for (const item of items) {
+    if (!item) continue;
+    if (Array.isArray(item.blocks)) {
+      out.push(...item.blocks);
+    } else if (item.blocks) {
+      out.push(item.blocks);
+    } else if (textOf(item)) {
+      // `item` is itself a block (bare block list, or tuple form).
+      out.push(item);
+    }
   }
-  return null;
+  return out;
 }
 
+/** Best-effort block text. Handles v3 objects and the older tuple form. */
 function textOf(block: MLKitBlock): string {
-  if (Array.isArray(block)) return typeof block[4] === "string" ? block[4] : "";
-  return block?.blockText ?? block?.text ?? "";
+  if (Array.isArray(block)) {
+    return typeof block[4] === "string" ? block[4].trim() : "";
+  }
+  const t = block?.blockText ?? block?.text ?? "";
+  return typeof t === "string" ? t.trim() : "";
+}
+
+/** Best-effort block frame. Falls back to the bounding centre when x/y are absent. */
+function frameOf(block: MLKitBlock): MLKitFrame | null {
+  const f = Array.isArray(block) ? block[0] : block?.blockFrame ?? block?.frame;
+  if (!f) return null;
+  const x = typeof f.x === "number" ? f.x : f.boundingCenterX;
+  const y = typeof f.y === "number" ? f.y : f.boundingCenterY;
+  if (typeof x !== "number" || typeof y !== "number") return null;
+  return {
+    x,
+    y,
+    width: typeof f.width === "number" ? f.width : 0,
+    height: typeof f.height === "number" ? f.height : 0,
+    boundingCenterX: typeof f.boundingCenterX === "number" ? f.boundingCenterX : x,
+    boundingCenterY: typeof f.boundingCenterY === "number" ? f.boundingCenterY : y,
+  };
+}
+
+/** Top-level `resultText`, or the block texts joined, as a last resort. */
+function resultTextOf(result: RawResult): string {
+  if (!result) return "";
+  const items: any[] = Array.isArray(result) ? result : [result];
+  const joined = items
+    .map((i) => (typeof i?.resultText === "string" ? i.resultText : ""))
+    .join("\n")
+    .trim();
+  if (joined) return joined;
+  return collectBlocks(result)
+    .map(textOf)
+    .filter(Boolean)
+    .join("\n")
+    .trim();
 }
 
 /**
@@ -61,39 +121,39 @@ function blockId(frame: MLKitFrame | null, text: string): string {
 }
 
 /**
- * Convert a single frame's `scanText` result (MLKitText[]) into our
- * RecognizedBlock[]. Empty/whitespace blocks are dropped.
+ * Convert a single frame's `scanText` result into our RecognizedBlock[].
+ * Empty/whitespace blocks are dropped; if no usable blocks, fall back to the
+ * flat result text so a paragraph can still be assembled.
  */
-export function toRecognizedBlocks(result: MLKitText[] | null | undefined): RecognizedBlock[] {
-  if (!result || !Array.isArray(result)) return [];
+export function toRecognizedBlocks(result: RawResult): RecognizedBlock[] {
   const out: RecognizedBlock[] = [];
-  for (const item of result) {
-    const blocks: MLKitBlock[] = Array.isArray(item.blocks) ? item.blocks : [item.blocks];
-    if (blocks.length > 0 && (Array.isArray(blocks[0]) || typeof blocks[0] === "object")) {
-      // Per-block granularity (better for spatial sort of a multi-line paragraph).
-      for (const b of blocks) {
-        const text = textOf(b).trim();
-        if (!text) continue;
-        const frame = frameOf(b);
-        out.push({
-          id: blockId(frame, text),
-          text,
-          x: frame?.x ?? 0,
-          y: frame?.y ?? 0,
-        });
-      }
-    } else if (item.resultText?.trim()) {
-      // Fallback: only the full resultText is usable.
-      out.push({ id: blockId(null, item.resultText), text: item.resultText.trim(), x: 0, y: 0 });
-    }
+  for (const b of collectBlocks(result)) {
+    const text = textOf(b);
+    if (!text) continue;
+    const frame = frameOf(b);
+    out.push({
+      id: blockId(frame, text),
+      text,
+      x: frame?.x ?? 0,
+      y: frame?.y ?? 0,
+    });
+  }
+  if (out.length === 0) {
+    const fallback = resultTextOf(result);
+    if (fallback) out.push({ id: blockId(null, fallback), text: fallback, x: 0, y: 0 });
   }
   return out;
 }
 
 /**
- * Convert a still-photo result (PhotoRecognizer returns a single MLKitText) into
- * a paragraph string. Used by the "Choose Photo" path (docs/06/14).
+ * Convert a still-photo result (PhotoRecognizer) into a paragraph string.
+ * Used by the "Choose Photo" path (docs/06/14).
  */
-export function photoResultToParagraph(result: MLKitText): string {
-  return (result?.resultText ?? "").trim();
+export function photoResultToParagraph(result: MLKitText | MLKitText[]): string {
+  const direct = resultTextOf(result as RawResult);
+  if (direct) return direct;
+  return toRecognizedBlocks(result as RawResult)
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
 }

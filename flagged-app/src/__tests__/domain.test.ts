@@ -41,6 +41,38 @@ describe("matcher", () => {
     const r = matchParagraph("Ingredients: oats, honey, almonds.", terms);
     expect(r.isClean).toBe(true);
   });
+
+  it("matches a term inside a longer label phrase", () => {
+    // real label: "milk" appears inside "skim milk" / "contains: milk"
+    const r = matchParagraph("Ingredients: water, skim milk, cheese. Contains: milk", ["milk"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches.map((m) => m.term)).toEqual(["milk"]);
+  });
+
+  it("matches a multi-word term even when OCR glues punctuation to it", () => {
+    const r = matchParagraph("Water, vegetable oil. tomato juice, salt", ["vegetable oil"]);
+    expect(r.matches.some((m) => m.term === "vegetable oil")).toBe(true);
+  });
+
+  it("does not match across a word boundary (buttermilk is not butter)", () => {
+    const r = matchParagraph("Ingredients: buttermilk, salt", ["butter"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("longer phrase wins: peanut butter does not also report butter", () => {
+    const r = matchParagraph("Ingredients: peanut butter, sugar", ["butter", "peanut butter"]);
+    expect(r.matches.map((m) => m.term)).toEqual(["peanut butter"]);
+  });
+
+  it("reports each matched term once", () => {
+    const r = matchParagraph("milk, water, milk solids, more milk", ["milk"]);
+    expect(r.matches).toHaveLength(1);
+  });
+
+  it("recovers a fuzzy single-word match from OCR garble", () => {
+    const r = matchParagraph("Ingredients: water, aspertame, salt", ["aspartame"]);
+    expect(r.matches.some((m) => m.term === "aspartame" && m.kind === "fuzzy")).toBe(true);
+  });
 });
 
 describe("pack activation + shared categories", () => {

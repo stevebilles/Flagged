@@ -1,12 +1,12 @@
 import { similarity } from "./levenshtein";
-import { normalizeParagraph, regexClean, tokenize } from "./normalize";
+import { normalizeParagraph, regexClean } from "./normalize";
 
-/** Hybrid matcher: regex clean → exact → fuzzy (docs/06 Step 3). */
+/** Hybrid matcher: normalize → whole-word/phrase presence → fuzzy (docs/06 Step 3). */
 
 export const FUZZY_THRESHOLD = 0.85; // 85%+ similarity triggers a flag (docs/06)
 
 export interface Match {
-  token: string; // the offending token from the label
+  token: string; // the offending text from the label
   term: string; // the red-flag term it matched
   kind: "exact" | "fuzzy";
   score: number; // 1 for exact, similarity ratio for fuzzy
@@ -18,47 +18,79 @@ export interface ScanResult {
   isClean: boolean;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Run a normalized paragraph's tokens against the profile's effective red-flag
- * terms (all lowercase). Returns every match found.
+ * A term is "present" if it appears as a whole word / phrase in `haystack`
+ * (case-insensitive). Boundaries are non-alphanumeric so "milk" hits "skim milk"
+ * and "contains: milk" but NOT "buttermilk"; "vegetable oil" hits even when an
+ * OCR stop glued it to the next word ("vegetable oil. tomato").
+ */
+function findPresence(term: string, haystack: string): { index: number; text: string } | null {
+  const re = new RegExp(`(?<![a-z0-9])${escapeRegExp(term)}(?![a-z0-9])`, "i");
+  const m = re.exec(haystack);
+  return m ? { index: m.index, text: m[0] } : null;
+}
+
+/**
+ * Run a normalized paragraph against the profile's effective red-flag terms.
+ * Returns one match per matched term. Longer phrases win: if "peanut butter"
+ * matches, the "butter" inside it is not also reported.
  */
 export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): ScanResult {
   const normalized = normalizeParagraph(rawParagraph);
-  const tokens = tokenize(normalized);
-  const terms = redFlagTerms.map((t) => t.toLowerCase());
-  const termSet = new Set(terms);
+  // Digit→letter cleanup recovers OCR garble ("0ils" → "oils") but corrupts
+  // dye codes ("red 40" → "red 4o"), so only use it for digit-free terms.
+  const cleaned = regexClean(normalized);
+  const words = normalized.split(/[^a-z0-9]+/i).filter(Boolean);
 
-  const matches: Match[] = [];
-  for (const rawToken of tokens) {
-    const token = rawToken.trim();
-    if (!token) continue;
-    // Cleaned variant recovers from genuine OCR garble. It must NOT replace the
-    // raw token, because digit substitutions (0->o, 1->l) would corrupt valid
-    // terms like "red 40" / "yellow 5". We try the raw token first, then the
-    // cleaned token as a fallback.
-    const cleaned = regexClean(token);
+  const terms = [...new Set(redFlagTerms.map((t) => t.toLowerCase().trim()))].filter(Boolean);
 
-    // Exact match — raw first, then cleaned fallback.
-    if (termSet.has(token)) {
-      matches.push({ token: rawToken, term: token, kind: "exact", score: 1 });
+  type Hit = Match & { start: number; end: number };
+  const hits: Hit[] = [];
+
+  for (const term of terms) {
+    const hasDigit = /\d/.test(term);
+    const found =
+      findPresence(term, normalized) ?? (hasDigit ? null : findPresence(term, cleaned));
+    if (found) {
+      hits.push({
+        token: found.text,
+        term,
+        kind: "exact",
+        score: 1,
+        start: found.index,
+        end: found.index + term.length,
+      });
       continue;
     }
-    if (cleaned !== token && termSet.has(cleaned)) {
-      matches.push({ token: rawToken, term: cleaned, kind: "exact", score: 1 });
-      continue;
-    }
 
-    // Fuzzy match (Levenshtein similarity >= threshold). Take the best term over
-    // both the raw and cleaned variants.
-    let best: Match | null = null;
-    for (const term of terms) {
-      const score = Math.max(similarity(token, term), similarity(cleaned, term));
+    // Fuzzy — single-word terms only, against individual label words.
+    if (term.includes(" ") || term.length < 4) continue;
+    let best: Hit | null = null;
+    for (const w of words) {
+      if (Math.abs(w.length - term.length) > 2) continue;
+      const score = similarity(w, term);
       if (score >= FUZZY_THRESHOLD && (!best || score > best.score)) {
-        best = { token: rawToken, term, kind: "fuzzy", score };
+        const at = normalized.indexOf(w);
+        best = { token: w, term, kind: "fuzzy", score, start: at, end: at + w.length };
       }
     }
-    if (best) matches.push(best);
+    if (best) hits.push(best);
   }
 
-  return { tokens, matches, isClean: matches.length === 0 };
+  // Drop hits fully covered by a longer hit ("butter" inside "peanut butter").
+  const matches: Match[] = hits
+    .filter(
+      (a) =>
+        !hits.some(
+          (b) => b !== a && b.start <= a.start && b.end >= a.end && b.end - b.start > a.end - a.start
+        )
+    )
+    .sort((a, b) => a.start - b.start)
+    .map(({ token, term, kind, score }) => ({ token, term, kind, score }));
+
+  return { tokens: words, matches, isClean: matches.length === 0 };
 }
