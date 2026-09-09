@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
+import { getProfile } from "../src/db/repositories";
 import { commitScanStats, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 
@@ -18,6 +19,11 @@ export default function Results() {
   const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
   const lastScan = useAppStore((s) => s.lastScan);
+  const activeProfileId = useAppStore((s) => s.activeProfileId);
+  const profileName = useMemo(
+    () => (activeProfileId ? getProfile(activeProfileId)?.name ?? "" : ""),
+    [activeProfileId]
+  );
 
   useEffect(() => {
     if (lastScan) commitScanStats({ tokens: [], matches: lastScan.matches, isClean: lastScan.isClean }, isPremium);
@@ -79,11 +85,17 @@ export default function Results() {
         {!clean && (
           <Card>
             <Text bold>Why it was flagged</Text>
-            {lastScan.matches.map((m, i) => (
-              <Text key={i} tone="muted" variant="caption">
-                • "{m.token}" matches your filter for "{m.term}" ({m.kind}, {(m.score * 100).toFixed(0)}%)
-              </Text>
-            ))}
+            {lastScan.matches.map((m, i) => {
+              const filter = m.categoryName ?? m.term;
+              const who = profileName ? `${profileName}'s ` : "your ";
+              return (
+                <Text key={i} tone="muted" variant="caption">
+                  • "{m.token}" — matches {who}
+                  {filter} filter
+                  {m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}% match)` : ""}
+                </Text>
+              );
+            })}
           </Card>
         )}
 

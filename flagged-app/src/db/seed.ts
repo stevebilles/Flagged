@@ -1,5 +1,5 @@
 import { randomUUID } from "expo-crypto";
-import { sqlite, ensureTables } from "./client";
+import { sqlite, ensureTables, runMigrations } from "./client";
 import type { SeedFile } from "../domain/types";
 import { FREE_SCAN_LIMIT } from "../domain/types";
 
@@ -34,6 +34,7 @@ export function setMeta(key: string, value: string): void {
  */
 export function initializeDatabase(): void {
   ensureTables();
+  runMigrations();
 
   const storedVersion = Number(getMeta(META_SCHEMA_VERSION) ?? "0");
   if (storedVersion < seed.schemaVersion) {
@@ -91,7 +92,7 @@ function ensureStatsSingleton(): void {
   const row = s.getFirstSync<{ c: number }>("SELECT COUNT(*) as c FROM stats");
   if (!row || row.c === 0) {
     s.runSync(
-      "INSERT INTO stats (stats_id, free_scans_used, total_labels_read, total_red_flags_caught, total_clean_scans) VALUES (?, 0, 0, 0, 0)",
+      "INSERT INTO stats (stats_id, free_scans_used, total_labels_read, total_red_flags_caught, total_clean_scans, total_skimpflation_caught, total_reformulations_caught) VALUES (?, 0, 0, 0, 0, 0, 0)",
       [randomUUID()]
     );
   }

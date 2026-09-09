@@ -10,6 +10,12 @@ export interface Match {
   term: string; // the red-flag term it matched
   kind: "exact" | "fuzzy";
   score: number; // 1 for exact, similarity ratio for fuzzy
+  /**
+   * The filter that caught this term (category name, or "Custom ingredient").
+   * Populated by the scan/recheck layer (see attributeMatches); the pure matcher
+   * leaves it undefined.
+   */
+  categoryName?: string;
 }
 
 export interface ScanResult {

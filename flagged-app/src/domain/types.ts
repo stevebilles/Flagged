@@ -67,6 +67,10 @@ export interface Stats {
   totalLabelsRead: number;
   totalRedFlagsCaught: number;
   totalCleanScans: number;
+  /** Pantry rechecks where the surviving ingredients changed order (docs/07). */
+  totalSkimpflationCaught: number;
+  /** Pantry rechecks where an ingredient was added or removed (docs/07). */
+  totalReformulationsCaught: number;
 }
 
 export const FREE_SCAN_LIMIT = 10;

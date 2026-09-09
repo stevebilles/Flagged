@@ -106,3 +106,42 @@ export function effectiveRedFlagTerms(
   for (const custom of profile.customIngredients) terms.add(custom.toLowerCase());
   return [...terms];
 }
+
+/** Which filter caught a term — used to explain a flag on the results screen (docs/07). */
+export interface RedFlagMeta {
+  /** Owning dictionary category id, or null for a user's custom ingredient. */
+  categoryId: string | null;
+  /** Display name of the filter: the category name, or "Custom ingredient". */
+  categoryName: string;
+}
+
+/**
+ * Same effective set as `effectiveRedFlagTerms`, but keyed by lowercase term and
+ * carrying the filter each term belongs to. When a term appears in more than one
+ * active category the first one wins (stable by category iteration order).
+ */
+export function effectiveRedFlagMeta(
+  profile: Profile,
+  categories: Category[],
+  ingredientTermById: Map<string, string>
+): Map<string, RedFlagMeta> {
+  const excluded = new Set(profile.excludedIngredientIds);
+  const active = new Set(profile.activeCategoryIds);
+  const map = new Map<string, RedFlagMeta>();
+
+  for (const cat of categories) {
+    if (!active.has(cat.id)) continue;
+    for (const ingId of cat.ingredientIds) {
+      if (excluded.has(ingId)) continue;
+      const term = ingredientTermById.get(ingId);
+      if (!term) continue;
+      const key = term.toLowerCase();
+      if (!map.has(key)) map.set(key, { categoryId: cat.id, categoryName: cat.name });
+    }
+  }
+  for (const custom of profile.customIngredients) {
+    const key = custom.toLowerCase();
+    if (!map.has(key)) map.set(key, { categoryId: null, categoryName: "Custom ingredient" });
+  }
+  return map;
+}

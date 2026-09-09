@@ -138,6 +138,11 @@ export function getActivePantryItems(): PantryItem[] {
     .map(mapPantry);
 }
 
+export function getPantryItem(itemId: string): PantryItem | null {
+  const r = sqlite().getFirstSync<any>("SELECT * FROM pantry_items WHERE item_id = ?", [itemId]);
+  return r ? mapPantry(r) : null;
+}
+
 export function getRecentlyDeleted(): PantryItem[] {
   return sqlite()
     .getAllSync<any>(
@@ -209,12 +214,22 @@ export function getStats(): Stats {
     totalLabelsRead: r.total_labels_read,
     totalRedFlagsCaught: r.total_red_flags_caught,
     totalCleanScans: r.total_clean_scans,
+    totalSkimpflationCaught: r.total_skimpflation_caught ?? 0,
+    totalReformulationsCaught: r.total_reformulations_caught ?? 0,
   };
 }
 
 export function saveStats(s: Stats): void {
   sqlite().runSync(
-    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ? WHERE stats_id = ?",
-    [s.freeScansUsed, s.totalLabelsRead, s.totalRedFlagsCaught, s.totalCleanScans, s.statsId]
+    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?, total_skimpflation_caught = ?, total_reformulations_caught = ? WHERE stats_id = ?",
+    [
+      s.freeScansUsed,
+      s.totalLabelsRead,
+      s.totalRedFlagsCaught,
+      s.totalCleanScans,
+      s.totalSkimpflationCaught,
+      s.totalReformulationsCaught,
+      s.statsId,
+    ]
   );
 }

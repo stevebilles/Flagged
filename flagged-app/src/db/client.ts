@@ -77,11 +77,37 @@ export function ensureTables(): void {
       free_scans_used INTEGER NOT NULL DEFAULT 0,
       total_labels_read INTEGER NOT NULL DEFAULT 0,
       total_red_flags_caught INTEGER NOT NULL DEFAULT 0,
-      total_clean_scans INTEGER NOT NULL DEFAULT 0
+      total_clean_scans INTEGER NOT NULL DEFAULT 0,
+      total_skimpflation_caught INTEGER NOT NULL DEFAULT 0,
+      total_reformulations_caught INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS app_meta (
       key TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL
     );
   `);
+}
+
+/**
+ * Additive, non-destructive schema migrations for installs created before a
+ * column existed. Each step is guarded by a PRAGMA check so it is idempotent.
+ * In a production build these would be drizzle-kit migrations; kept inline so
+ * the app boots without a migration runner.
+ */
+export function runMigrations(): void {
+  const s = sqlite();
+  const statsCols = s
+    .getAllSync<{ name: string }>("PRAGMA table_info(stats)")
+    .map((c) => c.name);
+
+  if (!statsCols.includes("total_skimpflation_caught")) {
+    s.execSync(
+      "ALTER TABLE stats ADD COLUMN total_skimpflation_caught INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+  if (!statsCols.includes("total_reformulations_caught")) {
+    s.execSync(
+      "ALTER TABLE stats ADD COLUMN total_reformulations_caught INTEGER NOT NULL DEFAULT 0"
+    );
+  }
 }
