@@ -86,13 +86,20 @@ Exactly **one** row per device install.
 
 ```ts
 stats {
-  statsId: text PK,            // UUID (single row)
-  freeScansUsed: int,          // starts 0, caps at 10, triggers hard paywall
-  totalLabelsRead: int,        // +1 per successful scan
-  totalRedFlagsCaught: int,    // += number of highlighted ingredients on flagged scans
-  totalCleanScans: int         // +1 per clean result
+  statsId: text PK,                  // UUID (single row)
+  freeScansUsed: int,                // starts 0, caps at 10, triggers hard paywall
+  totalLabelsRead: int,              // +1 per successful scan
+  totalRedFlagsCaught: int,          // += number of highlighted ingredients on flagged scans
+  totalCleanScans: int,              // +1 per clean result
+  totalSkimpflationCaught: int,      // +1 per recheck that detects a surviving-ingredient order shift (07)
+  totalReformulationsCaught: int     // +1 per recheck that detects an ingredient added or removed (07)
 }
 ```
+
+> `totalSkimpflationCaught` and `totalReformulationsCaught` are driven by the Pantry recheck
+> diff engine (`07`). A single recheck may increment **both** (a recipe that both reorders and
+> adds/removes ingredients). They increment on the diff result itself, independent of whether
+> the change also trips a red flag.
 
 > **What counts as a scan (critical):** `freeScansUsed` increments **only** when a scan successfully
 > extracts text and routes to a Results Screen. An aborted/illegible scan does **not** consume a

@@ -1,7 +1,7 @@
-# 04 — The 6-Screen Onboarding Flow
+# 04 — The 7-Screen Onboarding Flow
 
-**Logic:** Problem → The Tech/Moat → Interactive Setup → Navigation Overview → The Fully Unlocked
-Trial → Lifetime Upsell Intro.
+**Logic:** Problem → The Tech/Moat → Interactive Setup → Name (Personalization) → Navigation
+Overview → The Fully Unlocked Trial → Lifetime Upsell Intro.
 
 Onboarding runs once (persist a `hasOnboarded` flag locally). All copy below is **exact** — use
 verbatim.
@@ -30,19 +30,37 @@ verbatim.
   first profile (see activation rules in `data-schema.md`). This writes to the default profile
   created during onboarding.
 
-## Screen 4 — The 4-Tab Hub (Navigation Overview)
+## Screen 4 — What Should We Call You? (Name / Personalization)
+- **Visual:** A single clean text field, friendly and low-friction. Keyboard opens automatically.
+- **Copy (heading):**
+  > "What should we call you?"
+- **Copy (subtext):**
+  > "We use your first name to personalize the app — like your Home greeting. It stays on this
+  > device and is never uploaded anywhere."
+- **Field:** First Name (single line). Placeholder: "First name".
+- **Action buttons:**
+  - `[ Continue ]` (primary) — saves the name if entered, advances.
+  - `[ Skip ]` (text button) — advances without a name.
+- **Behavior:**
+  - A name entered here is saved as **Settings → First Name** (feeds the Home header, `05`)
+    **and** used as the label of the default profile chip created during onboarding.
+  - Blank / skipped is allowed: onboarding still completes, the Home greeting uses its
+    graceful fallback, and the user can set a name later in **Settings**.
+  - No validation beyond trimming whitespace. No scan consumed.
+
+## Screen 5 — The 4-Tab Hub (Navigation Overview)
 - **Visual:** A sleek graphic highlighting the bottom menu.
 - **Copy:**
   > "Your command center: Home, Scan, Pantry, and Settings."
 
-## Screen 5 — The 10-Scan Trial (The Hook)
+## Screen 6 — The 10-Scan Trial (The Hook)
 - **Visual:** A large graphic of a battery or scanner charging up to "10".
 - **Copy:**
   > "You're all set! You have 10 free scans to test Flagged in the real world. We've unlocked every
   > feature—including Custom Ingredients and Multiple Family Profiles—so you can see the magic for
   > yourself."
 
-## Screen 6 — The "Founding Member" Transparent Pricing (The Climax)
+## Screen 7 — The "Founding Member" Transparent Pricing (The Climax)
 - **Visual:** A clean, high-contrast pricing card.
 - **Copy:**
   > "Ditch the $40/year subscriptions. After your 10 free scans, unlock unlimited scanning for life
@@ -55,6 +73,7 @@ verbatim.
 
 ## Implementation notes
 - Persist `hasOnboarded=true` on completion; never show onboarding again on that install.
-- The default profile created here is later renamable via **Settings → First Name** and **Home →
-  profile chips** (`05`).
+- The default profile created here is named from **Screen 4** if a name was given, and is later
+  renamable via **Settings → First Name** and **Home → profile chips** (`05`).
+- Screen 4 (name) is **skippable**; a blank name must not block completion.
 - No scan is consumed during onboarding.
