@@ -194,14 +194,23 @@ export function markVerified(itemId: string): void {
   ]);
 }
 
-/** Permanently purge items whose 24h undo window has elapsed (docs/03/05). */
-export function purgeExpiredDeletions(nowMs = Date.now()): number {
+/**
+ * Permanently purge items whose 24h undo window has elapsed (docs/03/05).
+ * Returns the thumbnail URIs of the purged rows so the caller can delete the
+ * files too. `nowMs` is passed straight through — a rewound clock only makes
+ * the cutoff earlier, i.e. purges fewer items, never more.
+ */
+export function purgeExpiredDeletions(nowMs = Date.now()): string[] {
   const cutoff = nowMs - 24 * 60 * 60 * 1000;
-  const res = sqlite().runSync(
+  const doomed = sqlite().getAllSync<{ image_file_path: string }>(
+    "SELECT image_file_path FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+    [cutoff]
+  );
+  sqlite().runSync(
     "DELETE FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
     [cutoff]
   );
-  return res.changes ?? 0;
+  return doomed.map((d) => d.image_file_path).filter(Boolean);
 }
 
 // ---------------- Stats (singleton) ----------------

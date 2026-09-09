@@ -90,6 +90,23 @@ describe("matcher", () => {
     const r = matchParagraph("Ingredients: water, aspertame, salt", ["aspartame"]);
     expect(r.matches.some((m) => m.term === "aspartame" && m.kind === "fuzzy")).toBe(true);
   });
+
+  it("regression: regexClean never corrupts a digit-bearing term (red 40 ↛ red 4o)", () => {
+    // The '0'→'o' OCR cleanup must not be applied to terms containing digits,
+    // or a real dye code would stop matching. See docs/13 (earlier bug).
+    const clean = matchParagraph("Ingredients: sugar, red 40, citric acid", ["red 40"]);
+    expect(clean.matches.map((m) => m.term)).toEqual(["red 40"]);
+
+    // And a label whose "40" was OCR'd as "4o" should NOT false-match "red 40"
+    // (we don't invent digits); it just stays clean.
+    const garbled = matchParagraph("Ingredients: sugar, red 4o, citric acid", ["red 40"]);
+    expect(garbled.isClean).toBe(true);
+  });
+
+  it("digit dye codes match independently (yellow 5, blue 1)", () => {
+    const r = matchParagraph("color added (yellow 5, blue 1)", ["yellow 5", "blue 1", "red 40"]);
+    expect(r.matches.map((m) => m.term).sort()).toEqual(["blue 1", "yellow 5"]);
+  });
 });
 
 describe("pack activation + shared categories", () => {

@@ -50,12 +50,21 @@ export default function Home() {
           )}
         </View>
 
-        {/* Protection Summary — 3 pillars (docs/05) */}
+        {/* Protection Summary — the pillars of value (docs/05) */}
         <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
           <Pillar label="Labels Read" value={stats.totalLabelsRead} />
           <Pillar label="Red Flags Caught" value={stats.totalRedFlagsCaught} />
           <Pillar label="Clean Scans" value={stats.totalCleanScans} />
         </View>
+
+        {/* Recheck pillars — meaningful once the user has a pantry (docs/05).
+            Shown only once at least one is non-zero to avoid clutter early. */}
+        {(stats.totalSkimpflationCaught > 0 || stats.totalReformulationsCaught > 0) && (
+          <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+            <Pillar label="Skimpflation Caught" value={stats.totalSkimpflationCaught} />
+            <Pillar label="Reformulations Caught" value={stats.totalReformulationsCaught} />
+          </View>
+        )}
       </ScrollView>
     </Screen>
   );
