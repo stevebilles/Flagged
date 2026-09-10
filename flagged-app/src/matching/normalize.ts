@@ -1,4 +1,5 @@
 /** OCR normalization + tokenization (docs/06 Step 2 & Step 3.1). */
+import { similarity } from "./levenshtein";
 
 /** Regex cleaning of common OCR confusions. Conservative to avoid false positives. */
 export function regexClean(token: string): string {
@@ -48,8 +49,27 @@ export function tokenize(normalized: string): string[] {
  *      "." — a lowercase word followed by a Title-Case word starts a new item).
  * Falls back to the raw text when no header is found or the result is too short.
  */
-const HEADER_RE = /ingr[eé]?[a-z]{0,3}ients?\s*:?\s*/gi;
 const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR garble
+
+/**
+ * Every position that looks like an ingredient header. OCR mangles the word
+ * badly ("Ingredlents:", "Ihgrédients:", "lnaredients:", "Ionredients:"), so any
+ * 7–14 letter word before a colon that is ≥60% similar to "ingredients" /
+ * "ingrédients" counts.
+ */
+function findHeaders(text: string): { at: number; after: number }[] {
+  const heads: { at: number; after: number }[] = [];
+  const re = /(^|[^a-zà-ÿ])([a-zà-ÿ]{7,14})\s*:/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const w = m[2].toLowerCase();
+    if (similarity(w, "ingredients") >= 0.6 || similarity(w, "ingrédients") >= 0.6) {
+      const at = m.index + m[1].length;
+      heads.push({ at, after: at + (m[0].length - m[1].length) });
+    }
+  }
+  return heads;
+}
 
 // A nutrient label immediately followed by an amount, or another "we've left the
 // list" marker. Nutrient words are only a stop when a number follows — so
@@ -90,16 +110,14 @@ export function extractIngredientList(raw: string): string {
   const text = (raw ?? "").replace(/\s+/g, " ").trim();
   if (!text) return text;
 
-  const heads: { at: number; after: number }[] = [];
-  let m: RegExpExecArray | null;
-  const re = new RegExp(HEADER_RE.source, "gi");
-  while ((m = re.exec(text))) heads.push({ at: m.index, after: m.index + m[0].length });
-  if (heads.length === 0) return text;
+  const heads = findHeaders(text);
 
   // Prefer the header whose following text is least accented (English section).
   const accents = (s: string) => (s.match(/[éèêàâçëïôûùî]/gi) ?? []).length;
-  let chosen = heads[0];
-  if (heads.length > 1) {
+  let chosen: { at: number; after: number };
+  let headerFound = true;
+  if (heads.length > 0) {
+    chosen = heads[0];
     let best = Infinity;
     for (const h of heads) {
       const a = accents(text.slice(h.after, h.after + 220));
@@ -108,6 +126,15 @@ export function extractIngredientList(raw: string): string {
         chosen = h;
       }
     }
+  } else {
+    // No recognizable header (OCR wrecked it). Best effort: anchor a window that
+    // ends at the "Contains:" allergen line; if there is no Contains line either,
+    // give up and return the raw text rather than a bad guess.
+    headerFound = false;
+    const cont = CONTAINS_RE.exec(text);
+    if (!cont) return text;
+    const start = Math.max(0, cont.index - 1100);
+    chosen = { at: start, after: start };
   }
 
   // End of the list, in priority order:
@@ -129,13 +156,22 @@ export function extractIngredientList(raw: string): string {
 
   let body = text.slice(chosen.after, cut).replace(INLINE_NOISE_RE, " ");
 
+  if (!headerFound) {
+    // No header to anchor on — trim the leading prose (recipe / marketing) by
+    // starting at the last sentence break before the first bullet.
+    const bullet = body.search(/[•·∙‣▪]/);
+    const scan = bullet > 0 ? body.slice(0, bullet) : body;
+    const lastDot = scan.lastIndexOf(". ");
+    if (lastDot > 0) body = body.slice(lastDot + 2);
+  }
+
   // Is this a Title-Case label (every word capitalised)? Measure on the list
   // itself, not the ALL-CAPS-ish "Contains:" line.
   const head = body.split(CONTAINS_RE)[0] || body;
   const hw = head.split(/\s+/).filter(Boolean);
   const capRatio = hw.length ? hw.filter((w) => /^[A-Z]/.test(w)).length / hw.length : 0;
 
-  body = body.replace(/\s*[•·∙‣▪]\s*/g, ", "); // real bullets → commas
+  body = body.replace(/\s*[•·∙‣▪«»]\s*/g, ", "); // real bullets (and OCR "«") → commas
   if (capRatio < 0.6) {
     // Sentence-case list ("Enriched wheat flour • Yeast • Salt"): a Title-Case
     // word after a lowercase word or ")" begins a new item, so re-insert the
@@ -143,8 +179,10 @@ export function extractIngredientList(raw: string): string {
     body = body
       .replace(/(\S)\s+[o.]\s+(?=[A-Z])/g, "$1, ") // bullet misread as "o" / "."
       .replace(/\)\s+(?=[A-Z])/g, "), ")
-      .replace(/([a-zâàäéèêëïîôùûü])(?=[A-Z][a-z])/g, "$1, ") // items OCR ran together ("flourCorn")
-      .replace(/([a-zâàäéèêëïîôùûü])\s+(?=[A-Z][a-zA-Z])/g, "$1, "); // dropped separator
+      // two words the OCR ran together ("flourCorn meal"); needs ≥2 letters each
+      // side so "fructoSe" / "dextroSe" (mis-capitalised) are left alone
+      .replace(/([a-zà-ÿ]{2})(?=[A-ZÀ-Þ][a-zà-ÿ]{2})/g, "$1, ")
+      .replace(/([a-zà-ÿ])\s+(?=[A-ZÀ-Þ][a-zA-Zà-ÿ])/g, "$1, "); // dropped separator
   }
   body = body
     .replace(/\s*,\s*(?:,\s*)+/g, ", ")

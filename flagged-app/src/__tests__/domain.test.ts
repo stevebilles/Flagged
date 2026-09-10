@@ -60,6 +60,19 @@ describe("extractIngredientList", () => {
     expect(out).not.toMatch(/210\s*mg|5\s*%\s*or less/i); // nutrition panel gone
   });
 
+  it("recovers when OCR mangles the header word itself ('Ingredlents:')", () => {
+    const raw =
+      "Dip fish, dip in beaten egg then Bread Crumbs. Fry a few minutes per side. " +
+      "MEAT BM CASSEROLED BOU Ingredlents: Enriched wheat flour• Sugars (glucose-fructose) • " +
+      "Yeast• Salt Soybean oil • Wheat gluten • Whey • Egg. Contains: Wheat • Milk • Soy • Sesame. " +
+      "Ihgrédients: Farine de blé enrichie• Sucres • Levure • Sel " +
+      "*5% or less is a little, 15% or more is a lot % Daily Value* Cholesterol / Cholestérol 0mg Sodium 210mg";
+    const out = extractIngredientList(raw);
+    expect(out).toMatch(/^Enriched wheat flour/);
+    expect(out).not.toMatch(/Dip fish|CASSEROLED|Farine|Cholesterol/);
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy, Sesame\.$/);
+  });
+
   it("re-inserts separators the OCR dropped between items", () => {
     const runOn =
       "Ingredients: Enriched wheat flour Sugars (glucose-fructose, sugar) Yeast Salt " +
