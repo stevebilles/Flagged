@@ -36,30 +36,55 @@ describe("normalize + tokenize", () => {
 });
 
 describe("extractIngredientList", () => {
-  it("keeps only the English list from a bilingual bread label", () => {
-    const raw =
-      "SUCre, dextrose, Huile de soya, de coton et/ou de canola Gluten de ble melasse " +
-      "Farine d'orge maltee Levure Sel Lactoserum Lecithine Farine de mais Son de ble " +
-      "Ingredients: Enriched wheat flour, Sugars (glucose-fructose, Sugar, dextrose, fancy molasses, honey), " +
-      "Yeast, Salt, Soybean oil, cottonseed and/or canola oil, Wheat gluten, Soy flour, Malted barley flour, " +
-      "Whey, Soy lecithin, Skim milk powder, Calcium propionate, Sesame seeds, Caraway seeds, Egg. " +
-      "*5% or less is a little, 15% or more is a lot " +
-      "Contains: Wheat, Milk, Soy, Barley, Rye, Oats, Egg, Sesame " +
-      "Ingredients: Farine de ble enrichie, Sucres (glucose-fructose), Levure, Sel";
-    const out = extractIngredientList(raw);
+  // The real back panel of a bilingual bread-crumb can: nutrition panel + "5%"
+  // disclaimer above, English list, allergen line, French list, serving note.
+  const breadCan =
+    "Protein / Protéines 4g Cholesterol / Cholestérol 0mg Sodium 210mg 9% " +
+    "Potassium 60mg 1% Calcium 50mg 4% Iron / Fer 1.25mg 7% " +
+    "*5% or less is a little, 15% or more is a lot *5% ou moins c'est peu, 15% ou plus c'est beaucoup " +
+    "Ingredients: Enriched wheat flour • Sugars (glucose-fructose, sugar, dextrose, fancy molasses, honey) • " +
+    "Yeast • Salt • Soybean oil, cottonseed and/or canola oil • Wheat gluten • Soy flour • Malted barley flour • " +
+    "Whey • Soy lecithin • Whole wheat flour • Corn flour • Corn meal • Citric acid • Grain vinegar • " +
+    "Potato flour • Rice flour • Wheat bran • Oat bran • Rye flour • Skim milk powder • Calcium propionate • " +
+    "Sesame seeds • Caraway seeds • Egg. Contains: Wheat • Milk • Soy • Barley • Rye • Oats • Egg • Sesame. " +
+    "Ingrédients: Farine de blé enrichie • Sucres (glucose-fructose, sucre) • Levure • Sel " +
+    "Serving Suggestion Présentation suggérée";
+
+  it("keeps only the English list + allergen line from a bilingual label", () => {
+    const out = extractIngredientList(breadCan);
     expect(out).toMatch(/^Enriched wheat flour/);
-    expect(out).toContain("Soybean oil");
-    expect(out).toContain("Contains: Wheat, Milk, Soy");
-    expect(out).not.toContain("Farine"); // French block dropped
-    expect(out).not.toMatch(/5\s*%\s*or less/i); // nutrition footnote stripped
+    expect(out).toContain("Soybean oil, cottonseed and/or canola oil");
+    expect(out).toContain("Calcium propionate");
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy, Barley, Rye, Oats, Egg, Sesame\.$/);
+    expect(out).not.toMatch(/Farine|Serving Suggestion/); // French + marketing gone
+    expect(out).not.toMatch(/210\s*mg|5\s*%\s*or less/i); // nutrition panel gone
   });
 
-  it("converts bullet separators to commas", () => {
-    expect(extractIngredientList("Ingredients: water • sugar • salt")).toBe("water, sugar, salt");
+  it("re-inserts separators the OCR dropped between items", () => {
+    const runOn =
+      "Ingredients: Enriched wheat flour Sugars (glucose-fructose, sugar) Yeast Salt " +
+      "Soybean oil Wheat gluten Soy lecithin Egg. Contains: Wheat Milk Soy.";
+    const out = extractIngredientList(runOn);
+    expect(out).toContain("wheat flour, Sugars");
+    expect(out).toContain("Yeast, Salt, Soybean oil, Wheat gluten, Soy lecithin");
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy\.$/);
   });
 
-  it("stops at a nutrition-facts terminator", () => {
-    const out = extractIngredientList("Ingredients: oats, honey, salt Nutrition Facts per 40 g ...");
+  it("does NOT split a Title-Case label into single words", () => {
+    const out = extractIngredientList("Ingredients: Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");
+    expect(out).toBe("Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");
+  });
+
+  it("keeps nutrient words that are real ingredients (Sodium phosphate)", () => {
+    const out = extractIngredientList(
+      "Ingredients: water, maltodextrin, salt, sodium phosphate, mono- and diglycerides, spices"
+    );
+    expect(out).toContain("sodium phosphate");
+    expect(out).toContain("spices");
+  });
+
+  it("stops at a nutrition amount when there is no allergen line", () => {
+    const out = extractIngredientList("Ingredients: oats, honey, salt Sodium 210mg 9% Potassium 60mg");
     expect(out).toBe("oats, honey, salt");
   });
 
