@@ -12,10 +12,11 @@ import {
   getPantryItem,
   getProfile,
 } from "../src/db/repositories";
-import { normalizeParagraph, tokenize } from "../src/matching/normalize";
+import { normalizeParagraph, tokenize, extractIngredientList } from "../src/matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagTerms } from "../src/domain/activation";
 import { evaluateRecheck } from "../src/domain/diffEngine";
 import { attributeMatches } from "../src/domain/scanService";
+import { logScanDebug } from "../src/domain/scanDebug";
 import { CameraScanner } from "../src/ocr/CameraScanner";
 
 /**
@@ -34,12 +35,13 @@ export default function RecheckCapture() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function runRecheck(paragraph: string) {
+  function runRecheck(rawParagraph: string) {
     setError(null);
     if (!item) {
       setError("That pantry item no longer exists.");
       return;
     }
+    const paragraph = extractIngredientList(rawParagraph);
     const profile = activeProfileId ? getProfile(activeProfileId) : null;
     if (!profile) {
       setError("No active profile.");
@@ -55,6 +57,7 @@ export default function RecheckCapture() {
     if (outcome.kind === "changed_flagged") {
       outcome.matches = attributeMatches(outcome.matches, meta);
     }
+    logScanDebug("recheck", rawParagraph, paragraph, `recheck → ${outcome.kind}`);
 
     setLastRecheck({
       itemId: item.itemId,

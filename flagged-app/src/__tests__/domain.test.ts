@@ -1,5 +1,10 @@
 import { levenshtein, similarity } from "../matching/levenshtein";
-import { normalizeParagraph, tokenize, looksLikeIngredientList } from "../matching/normalize";
+import {
+  normalizeParagraph,
+  tokenize,
+  looksLikeIngredientList,
+  extractIngredientList,
+} from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
@@ -27,6 +32,45 @@ describe("normalize + tokenize", () => {
     expect(p).toContain("sugar");
     const toks = tokenize(p);
     expect(toks).toContain("red 40");
+  });
+});
+
+describe("extractIngredientList", () => {
+  it("keeps only the English list from a bilingual bread label", () => {
+    const raw =
+      "SUCre, dextrose, Huile de soya, de coton et/ou de canola Gluten de ble melasse " +
+      "Farine d'orge maltee Levure Sel Lactoserum Lecithine Farine de mais Son de ble " +
+      "Ingredients: Enriched wheat flour, Sugars (glucose-fructose, Sugar, dextrose, fancy molasses, honey), " +
+      "Yeast, Salt, Soybean oil, cottonseed and/or canola oil, Wheat gluten, Soy flour, Malted barley flour, " +
+      "Whey, Soy lecithin, Skim milk powder, Calcium propionate, Sesame seeds, Caraway seeds, Egg. " +
+      "*5% or less is a little, 15% or more is a lot " +
+      "Contains: Wheat, Milk, Soy, Barley, Rye, Oats, Egg, Sesame " +
+      "Ingredients: Farine de ble enrichie, Sucres (glucose-fructose), Levure, Sel";
+    const out = extractIngredientList(raw);
+    expect(out).toMatch(/^Enriched wheat flour/);
+    expect(out).toContain("Soybean oil");
+    expect(out).toContain("Contains: Wheat, Milk, Soy");
+    expect(out).not.toContain("Farine"); // French block dropped
+    expect(out).not.toMatch(/5\s*%\s*or less/i); // nutrition footnote stripped
+  });
+
+  it("converts bullet separators to commas", () => {
+    expect(extractIngredientList("Ingredients: water • sugar • salt")).toBe("water, sugar, salt");
+  });
+
+  it("stops at a nutrition-facts terminator", () => {
+    const out = extractIngredientList("Ingredients: oats, honey, salt Nutrition Facts per 40 g ...");
+    expect(out).toBe("oats, honey, salt");
+  });
+
+  it("returns the raw text unchanged when there is no header", () => {
+    expect(extractIngredientList("just some words, no header here")).toBe(
+      "just some words, no header here"
+    );
+  });
+
+  it("handles empty input", () => {
+    expect(extractIngredientList("")).toBe("");
   });
 });
 
