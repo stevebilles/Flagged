@@ -80,5 +80,9 @@ Triggered when the user re-scans a **newly purchased** box from the Pantry "Rech
 ### Notes
 - The recheck also updates stats consistently with a normal scan (it is a successful scan → counts
   as a label read; red flags caught increment on Outcome 3).
+- **Recheck-specific stats (`03`):** on any recheck that is not "Identical & Safe",
+  increment `totalReformulationsCaught` when the Reformulation check found an add/remove, and
+  `totalSkimpflationCaught` when the Skimpflation check found an order shift. Both can increment
+  on the same recheck. These are independent of the Red Flag Check outcome.
 - Order-shift detection should compare the sequence of the **surviving** ingredients (ignore pure
   additions/removals when assessing "order shift," which the Reformulation check already reports).

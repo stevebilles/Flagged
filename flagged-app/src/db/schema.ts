@@ -74,6 +74,9 @@ export const stats = sqliteTable("stats", {
   totalLabelsRead: integer("total_labels_read").notNull().default(0),
   totalRedFlagsCaught: integer("total_red_flags_caught").notNull().default(0),
   totalCleanScans: integer("total_clean_scans").notNull().default(0),
+  // Pantry-recheck outcomes (docs/03, docs/07). A single recheck may bump both.
+  totalSkimpflationCaught: integer("total_skimpflation_caught").notNull().default(0),
+  totalReformulationsCaught: integer("total_reformulations_caught").notNull().default(0),
 });
 
 // app-level key/value for flags like schemaVersion, hasOnboarded

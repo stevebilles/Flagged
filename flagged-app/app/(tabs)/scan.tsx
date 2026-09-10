@@ -9,6 +9,8 @@ import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
 import { getProfile } from "../../src/db/repositories";
 import { canScan, evaluateScan, scansRemaining } from "../../src/domain/scanService";
+import { extractIngredientList } from "../../src/matching/normalize";
+import { logScanDebug } from "../../src/domain/scanDebug";
 import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
 import { CameraScanner } from "../../src/ocr/CameraScanner";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
@@ -33,26 +35,41 @@ export default function Scan() {
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  function runScan(paragraph: string) {
+  function runScan(rawParagraph: string, source: "camera" | "paste" | "photo" = "camera") {
     setError(null);
     const profile = activeProfileId ? getProfile(activeProfileId) : null;
     if (!profile) {
       setError("No active profile.");
       return;
     }
+    // Strip everything that isn't the ingredient list (2nd language, nutrition
+    // panel, marketing) before it reaches the matcher or the results screen.
+    const paragraph = extractIngredientList(rawParagraph);
     const evaln = evaluateScan(paragraph, profile);
     if (evaln.status === "aborted") {
+      logScanDebug(source, rawParagraph, paragraph, "ABORTED (illegible)");
       // Illegible does NOT consume a free scan (docs/06/08).
       setError("Couldn't read an ingredient list. Try again — this won't use a free scan.");
       return;
     }
+    logScanDebug(
+      source,
+      rawParagraph,
+      paragraph,
+      evaln.result.isClean
+        ? "CLEAN"
+        : `FLAGGED (${evaln.result.matches.length}) — ` +
+            evaln.result.matches
+              .map((mm) => mm.term + (mm.categoryName ? ` [${mm.categoryName}]` : ""))
+              .join(", ")
+    );
     setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean });
     router.push("/results");
   }
 
   function onCameraCapture(paragraph: string) {
     setCameraOpen(false);
-    runScan(paragraph);
+    runScan(paragraph, "camera");
   }
 
   async function onPaste() {
@@ -62,7 +79,7 @@ export default function Scan() {
         setError("Clipboard is empty. Copy an ingredient list first.");
         return;
       }
-      runScan(text);
+      runScan(text, "paste");
     } catch {
       setError("Couldn't read the clipboard.");
     }
@@ -84,7 +101,7 @@ export default function Scan() {
       // On-device OCR on the still image (docs/06/14). Requires a dev/EAS build
       // (native module) — will not run in Expo Go.
       const result = await PhotoRecognizer({ uri: picked.assets[0].uri, orientation: "portrait" });
-      runScan(photoResultToParagraph(result as any));
+      runScan(photoResultToParagraph(result as any), "photo");
     } catch (e: any) {
       setError(e?.message ?? "Couldn't read that photo.");
     }

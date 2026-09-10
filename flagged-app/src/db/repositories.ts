@@ -138,6 +138,11 @@ export function getActivePantryItems(): PantryItem[] {
     .map(mapPantry);
 }
 
+export function getPantryItem(itemId: string): PantryItem | null {
+  const r = sqlite().getFirstSync<any>("SELECT * FROM pantry_items WHERE item_id = ?", [itemId]);
+  return r ? mapPantry(r) : null;
+}
+
 export function getRecentlyDeleted(): PantryItem[] {
   return sqlite()
     .getAllSync<any>(
@@ -189,14 +194,23 @@ export function markVerified(itemId: string): void {
   ]);
 }
 
-/** Permanently purge items whose 24h undo window has elapsed (docs/03/05). */
-export function purgeExpiredDeletions(nowMs = Date.now()): number {
+/**
+ * Permanently purge items whose 24h undo window has elapsed (docs/03/05).
+ * Returns the thumbnail URIs of the purged rows so the caller can delete the
+ * files too. `nowMs` is passed straight through — a rewound clock only makes
+ * the cutoff earlier, i.e. purges fewer items, never more.
+ */
+export function purgeExpiredDeletions(nowMs = Date.now()): string[] {
   const cutoff = nowMs - 24 * 60 * 60 * 1000;
-  const res = sqlite().runSync(
+  const doomed = sqlite().getAllSync<{ image_file_path: string }>(
+    "SELECT image_file_path FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+    [cutoff]
+  );
+  sqlite().runSync(
     "DELETE FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
     [cutoff]
   );
-  return res.changes ?? 0;
+  return doomed.map((d) => d.image_file_path).filter(Boolean);
 }
 
 // ---------------- Stats (singleton) ----------------
@@ -209,12 +223,22 @@ export function getStats(): Stats {
     totalLabelsRead: r.total_labels_read,
     totalRedFlagsCaught: r.total_red_flags_caught,
     totalCleanScans: r.total_clean_scans,
+    totalSkimpflationCaught: r.total_skimpflation_caught ?? 0,
+    totalReformulationsCaught: r.total_reformulations_caught ?? 0,
   };
 }
 
 export function saveStats(s: Stats): void {
   sqlite().runSync(
-    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ? WHERE stats_id = ?",
-    [s.freeScansUsed, s.totalLabelsRead, s.totalRedFlagsCaught, s.totalCleanScans, s.statsId]
+    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?, total_skimpflation_caught = ?, total_reformulations_caught = ? WHERE stats_id = ?",
+    [
+      s.freeScansUsed,
+      s.totalLabelsRead,
+      s.totalRedFlagsCaught,
+      s.totalCleanScans,
+      s.totalSkimpflationCaught,
+      s.totalReformulationsCaught,
+      s.statsId,
+    ]
   );
 }

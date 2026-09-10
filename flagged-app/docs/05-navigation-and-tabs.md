@@ -27,11 +27,19 @@ A horizontal row of **Profile Chips**.
 - **Adding:** a functional `[ Add Profile + ]` button creates a new profile (all users, during
   trial and after purchase).
 
-### Protection Summary (the 3 pillars of value)
+### Protection Summary (the pillars of value)
 Read from the Stats singleton (`03`):
 - **Labels Read** (`totalLabelsRead`) — volume of text processed / time saved.
 - **Red Flags Caught** (`totalRedFlagsCaught`) — danger avoided.
 - **Clean Scans** (`totalCleanScans`) — peace of mind delivered.
+- **Skimpflation Caught** (`totalSkimpflationCaught`) — pantry rechecks where the surviving
+  ingredients changed order (`07`).
+- **Reformulations Caught** (`totalReformulationsCaught`) — pantry rechecks where an ingredient
+  was added or removed (`07`).
+
+> The first three are the "core" pillars from the brief; the two recheck totals only become
+> meaningful once the user has a pantry and rechecks running. Design may present them as a
+> secondary row or reveal them once non-zero — but all five are tracked from day one.
 
 ---
 

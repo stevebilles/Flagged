@@ -1,5 +1,6 @@
 import { initializeDatabase } from "../db/seed";
 import { purgeExpiredDeletions } from "../db/repositories";
+import { deleteThumbnail } from "../domain/pantryImage";
 import { configurePurchases, refreshEntitlement } from "../purchases/purchases";
 import { useAppStore } from "../state/appStore";
 
@@ -12,7 +13,9 @@ import { useAppStore } from "../state/appStore";
  */
 export async function bootstrap(): Promise<void> {
   initializeDatabase();
-  purgeExpiredDeletions();
+  const purgedThumbnails = purgeExpiredDeletions();
+  // Fire-and-forget: thumbnails are regenerable, don't block startup on file IO.
+  void Promise.all(purgedThumbnails.map(deleteThumbnail)).catch(() => undefined);
 
   useAppStore.getState().hydrate();
 

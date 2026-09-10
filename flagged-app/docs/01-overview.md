@@ -58,7 +58,7 @@ See `08-monetization.md`.
 |-----|----------|
 | `02-architecture.md` | Tech stack, RN/Expo rationale, native→RN mapping, folder structure |
 | `03-data-models.md` | Local DB schemas (Profile, PantryItem, Stats) + seed loading |
-| `04-onboarding.md` | The 6-screen onboarding flow with exact copy |
+| `04-onboarding.md` | The 7-screen onboarding flow with exact copy |
 | `05-navigation-and-tabs.md` | The 4-tab hub and every screen state |
 | `06-ocr-engine.md` | Capture, frame stitching, normalization, hybrid matching |
 | `07-results-and-rescan.md` | Clean/Flagged results + the Pantry recheck diff engine |

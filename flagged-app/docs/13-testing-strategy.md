@@ -45,6 +45,8 @@ native deps and run in the sandbox. Extend them as the source of truth.
 - **Stats/trial math (`src/domain/scanService.ts`)**
   - `freeScansUsed` increments only on a successful result; illegible aborts don't.
   - Caps at 10; premium never increments; clean/flagged counters update correctly.
+  - Recheck stats: `totalReformulationsCaught` +1 on add/remove, `totalSkimpflationCaught`
+    +1 on survivor order-shift, both +1 when a recheck has both, neither on "identical".
 
 ## Integration tests
 

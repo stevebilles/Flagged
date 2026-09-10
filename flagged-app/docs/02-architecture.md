@@ -67,7 +67,7 @@ For printed food labels this is not a meaningful difference. **No cloud OCR API 
 ```
 flagged-app/
 ├── app/                      # expo-router routes
-│   ├── onboarding/           # 6-screen flow (04)
+│   ├── onboarding/           # 7-screen flow (04)
 │   ├── (tabs)/               # Home, Scan, Pantry, Settings (05)
 │   │   ├── index.tsx         # Home
 │   │   ├── scan.tsx

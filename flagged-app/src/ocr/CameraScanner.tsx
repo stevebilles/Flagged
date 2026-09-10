@@ -39,10 +39,10 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
 
   const [countdown, setCountdown] = useState(SCAN_SECONDS);
   const [scanning, setScanning] = useState(true);
+  const [sawText, setSawText] = useState(false);
 
-  // Frames accumulated during the window, and the latest blocks for the overlay.
+  // Frames accumulated during the 3-second window.
   const framesRef = useRef<RecognizedBlock[][]>([]);
-  const [overlay, setOverlay] = useState<RecognizedBlock[]>([]);
   const finishedRef = useRef(false);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       if (finishedRef.current) return;
       const blocks = toRecognizedBlocks(result);
       framesRef.current.push(blocks);
-      setOverlay(blocks);
+      if (blocks.length > 0) setSawText(true);
     },
     []
   );
@@ -129,23 +129,20 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
         pixelFormat="yuv"
       />
 
-      {/* Live cyan bounding boxes (transparent fill) over recognized blocks. */}
-      {overlay.map((b, i) => (
+      {/* Centre framing guide — aim the ingredient list inside it. */}
+      <View style={styles.guideWrap} pointerEvents="none">
         <View
-          key={`${b.id}-${i}`}
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: b.x,
-            top: b.y,
-            width: 120,
-            height: 28,
-            borderColor: t.colors.cyan,
-            borderWidth: 2,
-            borderRadius: 4,
-          }}
+          style={[
+            styles.guide,
+            { borderColor: sawText ? t.colors.cyan : "rgba(255,255,255,0.6)" },
+          ]}
         />
-      ))}
+        <View style={[styles.pill, { backgroundColor: t.colors.card }]}>
+          <Text tone={sawText ? "cyan" : "muted"} bold>
+            {sawText ? "Reading label…" : "Point at the ingredient list"}
+          </Text>
+        </View>
+      </View>
 
       {/* Countdown pill + cancel */}
       <View style={styles.hud} pointerEvents="box-none">
@@ -163,6 +160,19 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   center: { alignItems: "center", justifyContent: "center", padding: 24 },
+  guideWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  guide: {
+    width: "82%",
+    height: "44%",
+    borderWidth: 2,
+    borderRadius: 16,
+    borderStyle: "dashed",
+  },
   hud: {
     position: "absolute",
     bottom: 40,

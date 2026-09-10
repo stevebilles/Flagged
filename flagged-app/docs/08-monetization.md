@@ -23,7 +23,7 @@ unrestricted trial of the technology, followed by a **hard usage gate**.
 ## Pricing display
 - Price: **$24.99** one-time. Show **$39.99 struck through** on paywall surfaces.
 - Paywall entry points: Scan tab **State 2** lock screen (`05`), and the Results secondary button
-  that flips to `[ Unlock Unlimited Scans ]` after the 10th scan (`07`), and onboarding Screen 6
+  that flips to `[ Unlock Unlimited Scans ]` after the 10th scan (`07`), and onboarding Screen 7
   intro (`04`, informational only — no purchase there).
 
 ## Entitlement handling (offline-first — critical)

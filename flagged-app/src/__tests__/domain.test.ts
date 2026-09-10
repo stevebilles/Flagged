@@ -1,5 +1,10 @@
 import { levenshtein, similarity } from "../matching/levenshtein";
-import { normalizeParagraph, tokenize, looksLikeIngredientList } from "../matching/normalize";
+import {
+  normalizeParagraph,
+  tokenize,
+  looksLikeIngredientList,
+  extractIngredientList,
+} from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
@@ -27,6 +32,88 @@ describe("normalize + tokenize", () => {
     expect(p).toContain("sugar");
     const toks = tokenize(p);
     expect(toks).toContain("red 40");
+  });
+});
+
+describe("extractIngredientList", () => {
+  // The real back panel of a bilingual bread-crumb can: nutrition panel + "5%"
+  // disclaimer above, English list, allergen line, French list, serving note.
+  const breadCan =
+    "Protein / Protéines 4g Cholesterol / Cholestérol 0mg Sodium 210mg 9% " +
+    "Potassium 60mg 1% Calcium 50mg 4% Iron / Fer 1.25mg 7% " +
+    "*5% or less is a little, 15% or more is a lot *5% ou moins c'est peu, 15% ou plus c'est beaucoup " +
+    "Ingredients: Enriched wheat flour • Sugars (glucose-fructose, sugar, dextrose, fancy molasses, honey) • " +
+    "Yeast • Salt • Soybean oil, cottonseed and/or canola oil • Wheat gluten • Soy flour • Malted barley flour • " +
+    "Whey • Soy lecithin • Whole wheat flour • Corn flour • Corn meal • Citric acid • Grain vinegar • " +
+    "Potato flour • Rice flour • Wheat bran • Oat bran • Rye flour • Skim milk powder • Calcium propionate • " +
+    "Sesame seeds • Caraway seeds • Egg. Contains: Wheat • Milk • Soy • Barley • Rye • Oats • Egg • Sesame. " +
+    "Ingrédients: Farine de blé enrichie • Sucres (glucose-fructose, sucre) • Levure • Sel " +
+    "Serving Suggestion Présentation suggérée";
+
+  it("keeps only the English list + allergen line from a bilingual label", () => {
+    const out = extractIngredientList(breadCan);
+    expect(out).toMatch(/^Enriched wheat flour/);
+    expect(out).toContain("Soybean oil, cottonseed and/or canola oil");
+    expect(out).toContain("Calcium propionate");
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy, Barley, Rye, Oats, Egg, Sesame\.$/);
+    expect(out).not.toMatch(/Farine|Serving Suggestion/); // French + marketing gone
+    expect(out).not.toMatch(/210\s*mg|5\s*%\s*or less/i); // nutrition panel gone
+  });
+
+  it("recovers when OCR mangles the header word itself ('Ingredlents:')", () => {
+    const raw =
+      "Dip fish, dip in beaten egg then Bread Crumbs. Fry a few minutes per side. " +
+      "MEAT BM CASSEROLED BOU Ingredlents: Enriched wheat flour• Sugars (glucose-fructose) • " +
+      "Yeast• Salt Soybean oil • Wheat gluten • Whey • Egg. Contains: Wheat • Milk • Soy • Sesame. " +
+      "Ihgrédients: Farine de blé enrichie• Sucres • Levure • Sel " +
+      "*5% or less is a little, 15% or more is a lot % Daily Value* Cholesterol / Cholestérol 0mg Sodium 210mg";
+    const out = extractIngredientList(raw);
+    expect(out).toMatch(/^Enriched wheat flour/);
+    expect(out).not.toMatch(/Dip fish|CASSEROLED|Farine|Cholesterol/);
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy, Sesame\.$/);
+  });
+
+  it("re-inserts separators the OCR dropped between items", () => {
+    const runOn =
+      "Ingredients: Enriched wheat flour Sugars (glucose-fructose, sugar) Yeast Salt " +
+      "Soybean oil Wheat gluten Soy lecithin Egg. Contains: Wheat Milk Soy.";
+    const out = extractIngredientList(runOn);
+    expect(out).toContain("wheat flour, Sugars");
+    expect(out).toContain("Yeast, Salt, Soybean oil, Wheat gluten, Soy lecithin");
+    expect(out).toMatch(/Contains: Wheat, Milk, Soy\.$/);
+  });
+
+  it("splits items the OCR ran together with no space ('flourCorn meal')", () => {
+    const out = extractIngredientList("Ingredients: whole wheat flourCorn meal, citric acid, salt");
+    expect(out).toContain("wheat flour, Corn meal");
+  });
+
+  it("does NOT split a Title-Case label into single words", () => {
+    const out = extractIngredientList("Ingredients: Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");
+    expect(out).toBe("Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");
+  });
+
+  it("keeps nutrient words that are real ingredients (Sodium phosphate)", () => {
+    const out = extractIngredientList(
+      "Ingredients: water, maltodextrin, salt, sodium phosphate, mono- and diglycerides, spices"
+    );
+    expect(out).toContain("sodium phosphate");
+    expect(out).toContain("spices");
+  });
+
+  it("stops at a nutrition amount when there is no allergen line", () => {
+    const out = extractIngredientList("Ingredients: oats, honey, salt Sodium 210mg 9% Potassium 60mg");
+    expect(out).toBe("oats, honey, salt");
+  });
+
+  it("returns the raw text unchanged when there is no header", () => {
+    expect(extractIngredientList("just some words, no header here")).toBe(
+      "just some words, no header here"
+    );
+  });
+
+  it("handles empty input", () => {
+    expect(extractIngredientList("")).toBe("");
   });
 });
 
@@ -89,6 +176,23 @@ describe("matcher", () => {
   it("recovers a fuzzy single-word match from OCR garble", () => {
     const r = matchParagraph("Ingredients: water, aspertame, salt", ["aspartame"]);
     expect(r.matches.some((m) => m.term === "aspartame" && m.kind === "fuzzy")).toBe(true);
+  });
+
+  it("regression: regexClean never corrupts a digit-bearing term (red 40 ↛ red 4o)", () => {
+    // The '0'→'o' OCR cleanup must not be applied to terms containing digits,
+    // or a real dye code would stop matching. See docs/13 (earlier bug).
+    const clean = matchParagraph("Ingredients: sugar, red 40, citric acid", ["red 40"]);
+    expect(clean.matches.map((m) => m.term)).toEqual(["red 40"]);
+
+    // And a label whose "40" was OCR'd as "4o" should NOT false-match "red 40"
+    // (we don't invent digits); it just stays clean.
+    const garbled = matchParagraph("Ingredients: sugar, red 4o, citric acid", ["red 40"]);
+    expect(garbled.isClean).toBe(true);
+  });
+
+  it("digit dye codes match independently (yellow 5, blue 1)", () => {
+    const r = matchParagraph("color added (yellow 5, blue 1)", ["yellow 5", "blue 1", "red 40"]);
+    expect(r.matches.map((m) => m.term).sort()).toEqual(["blue 1", "yellow 5"]);
   });
 });
 
