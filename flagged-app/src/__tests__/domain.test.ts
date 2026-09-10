@@ -70,6 +70,11 @@ describe("extractIngredientList", () => {
     expect(out).toMatch(/Contains: Wheat, Milk, Soy\.$/);
   });
 
+  it("splits items the OCR ran together with no space ('flourCorn meal')", () => {
+    const out = extractIngredientList("Ingredients: whole wheat flourCorn meal, citric acid, salt");
+    expect(out).toContain("wheat flour, Corn meal");
+  });
+
   it("does NOT split a Title-Case label into single words", () => {
     const out = extractIngredientList("Ingredients: Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");
     expect(out).toBe("Enriched Wheat Flour, Water, Sugar, Yeast, Soybean Oil");

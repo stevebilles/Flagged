@@ -143,7 +143,8 @@ export function extractIngredientList(raw: string): string {
     body = body
       .replace(/(\S)\s+[o.]\s+(?=[A-Z])/g, "$1, ") // bullet misread as "o" / "."
       .replace(/\)\s+(?=[A-Z])/g, "), ")
-      .replace(/([a-zâàäéèêëïîôùûü])\s+(?=[A-Z][a-zA-Z])/g, "$1, ");
+      .replace(/([a-zâàäéèêëïîôùûü])(?=[A-Z][a-z])/g, "$1, ") // items OCR ran together ("flourCorn")
+      .replace(/([a-zâàäéèêëïîôùûü])\s+(?=[A-Z][a-zA-Z])/g, "$1, "); // dropped separator
   }
   body = body
     .replace(/\s*,\s*(?:,\s*)+/g, ", ")
