@@ -15,7 +15,7 @@ import {
 import {
   addCustomIngredient,
   isPackActive,
-  packsSharingActiveCategory,
+  linkedActivePacks,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
@@ -92,18 +92,16 @@ export default function ProfileEdit() {
                 selected={isPackActive(profile, p)}
                 onPress={() => {
                   const wasActive = isPackActive(profile, p);
-                  const sharing = wasActive ? packsSharingActiveCategory(profile, p, packs) : [];
-                  const next = togglePack(profile, p, packs);
-                  persist(next);
-                  // A deselect that shares a category with another still-active
-                  // pack can't turn that category off — explain it instead of
-                  // letting the pill silently stay lit with no feedback.
-                  const names = sharing.map((s) => s.name).join(" & ");
+                  // Packs sharing a category are turned off together as one
+                  // unit (see linkedActivePacks) — name them so a tap that
+                  // also switches off other packs is never a silent surprise.
+                  const linked = wasActive ? linkedActivePacks(profile, p, packs) : [];
+                  persist(togglePack(profile, p, packs));
                   setPackNote(
-                    wasActive && sharing.length > 0 && isPackActive(next, p)
-                      ? `${p.name} is being used by ${names}, which ${
-                          sharing.length === 1 ? "is" : "are"
-                        } still active. If you'd like to turn off ${p.name} then you must turn off ${names} first.`
+                    linked.length > 0
+                      ? `${p.name} shares a filter with ${linked.map((l) => l.name).join(" & ")}, so turning it off also turns ${
+                          linked.length === 1 ? "that one" : "those"
+                        } off.`
                       : null
                   );
                 }}

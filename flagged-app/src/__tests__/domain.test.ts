@@ -10,6 +10,7 @@ import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
   deselectPack,
   isPackActive,
+  linkedActivePacks,
   selectPack,
   effectiveRedFlagTerms,
   effectiveRedFlagMetaForAll,
@@ -208,8 +209,10 @@ describe("matcher", () => {
 
 describe("pack activation + shared categories", () => {
   const packs: QuickPack[] = [
+    { id: "dyes-pack", name: "Artificial Dyes", type: "simple", categoryIds: ["dyes"] },
     { id: "focus", name: "Focus & ADHD", type: "composite", categoryIds: ["dyes", "synth"] },
     { id: "pres", name: "Preservatives", type: "composite", categoryIds: ["nitrates", "sulfites", "synth"] },
+    { id: "gluten", name: "Gluten Free", type: "simple", categoryIds: ["gluten"] },
   ];
   const base: Profile = {
     profileId: "p1", name: "x", activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
@@ -217,19 +220,53 @@ describe("pack activation + shared categories", () => {
   };
 
   it("selecting a pack activates all its categories", () => {
-    const p = selectPack(base, packs[0]);
+    const p = selectPack(base, packs[1]);
     expect(new Set(p.activeCategoryIds)).toEqual(new Set(["dyes", "synth"]));
-    expect(isPackActive(p, packs[0])).toBe(true);
+    expect(isPackActive(p, packs[1])).toBe(true);
   });
 
-  it("deselecting a pack keeps a shared category needed by another active pack", () => {
-    let p = selectPack(base, packs[0]); // dyes, synth
-    p = selectPack(p, packs[1]); // + nitrates, sulfites
-    p = deselectPack(p, packs[1], packs); // remove Preservatives
-    // synth is shared with Focus & ADHD (still active) → must remain
-    expect(p.activeCategoryIds).toContain("synth");
-    expect(p.activeCategoryIds).not.toContain("nitrates");
-    expect(p.activeCategoryIds).not.toContain("sulfites");
+  it("deselecting a pack cascades to every active pack sharing a category with it, even transitively", () => {
+    let p = selectPack(base, packs[0]); // Artificial Dyes: dyes
+    p = selectPack(p, packs[1]); // Focus & ADHD: dyes, synth
+    p = selectPack(p, packs[2]); // Preservatives: nitrates, sulfites, synth
+    // Artificial Dyes → Focus & ADHD (shares dyes) → Preservatives (shares synth):
+    // deselecting the first link has to take the whole chain down together,
+    // or a sibling pack still active would just put the shared category back.
+    p = deselectPack(p, packs[0], packs);
+    expect(p.activeCategoryIds).toEqual([]);
+    expect(isPackActive(p, packs[0])).toBe(false);
+    expect(isPackActive(p, packs[1])).toBe(false);
+    expect(isPackActive(p, packs[2])).toBe(false);
+  });
+
+  it("deselecting a pack leaves a genuinely unrelated active pack alone", () => {
+    let p = selectPack(base, packs[0]); // Artificial Dyes: dyes
+    p = selectPack(p, packs[3]); // Gluten Free: gluten (no category overlap with anything)
+    p = deselectPack(p, packs[0], packs);
+    expect(p.activeCategoryIds).toEqual(["gluten"]);
+    expect(isPackActive(p, packs[3])).toBe(true);
+  });
+
+  it("cascades through a pack that is only incidentally active (not directly tapped), since the app treats it as active either way", () => {
+    // Artificial Dyes (dyes) + Preservatives (nitrates, sulfites, synth) together
+    // happen to cover both of Focus & ADHD's categories, even though nobody
+    // selected Focus & ADHD directly — the app has no separate "manually
+    // selected" state, so it's active by the same rule the pill display uses,
+    // and a deselect has to treat it that way too rather than leaving it
+    // invisibly stuck on.
+    let p = selectPack(base, packs[0]);
+    p = selectPack(p, packs[2]);
+    expect(isPackActive(p, packs[1])).toBe(true); // Focus & ADHD, never tapped, is active
+    p = deselectPack(p, packs[0], packs);
+    expect(p.activeCategoryIds).toEqual([]);
+  });
+
+  it("linkedActivePacks reports the transitive chain, not just direct sharing", () => {
+    let p = selectPack(base, packs[0]);
+    p = selectPack(p, packs[1]);
+    p = selectPack(p, packs[2]);
+    const linked = linkedActivePacks(p, packs[0], packs).map((x) => x.id).sort();
+    expect(linked).toEqual(["focus", "pres"]);
   });
 });
 

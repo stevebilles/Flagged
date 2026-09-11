@@ -4,8 +4,10 @@ import type { Category, Profile, QuickPack } from "./types";
  * Quick Pack activation rules (authoritative: docs/data-schema.md).
  *
  * - Selecting a pack turns ON all its categories (and, by default, their ingredients).
- * - Deselecting a pack turns its categories OFF *unless another still-active pack
- *   also needs that category* (shared categories stay on while any active pack needs them).
+ * - Deselecting a pack turns OFF every pack transitively linked to it via a shared
+ *   category (see `linkedActivePacks`) — a partial deselect that left a shared
+ *   category re-added by a sibling pack looked like the tap did nothing, so
+ *   linked packs are turned off together as one unit instead.
  * - Category / individual-ingredient toggles are handled separately below.
  */
 
@@ -28,53 +30,50 @@ export function selectPack(profile: Profile, pack: QuickPack): Profile {
 }
 
 /**
- * Deselect a pack → remove its categories, except any still needed by another
- * pack that remains fully active after removal.
+ * Every other currently-active pack transitively linked to `pack` by a shared
+ * category (docs/data-schema.md §"Shared categories"). "Focus & ADHD" shares
+ * its dyes category with "Artificial Dyes" and its preservatives category with
+ * "Preservatives" — so deselecting any one of the three has to take all three
+ * down together, or the shared category would just get put back by whichever
+ * sibling pack is still active, making the tap look like it did nothing.
  */
-export function deselectPack(profile: Profile, pack: QuickPack, allPacks: QuickPack[]): Profile {
-  const original = new Set(profile.activeCategoryIds);
+export function linkedActivePacks(profile: Profile, pack: QuickPack, allPacks: QuickPack[]): QuickPack[] {
+  const activePacks = allPacks.filter((p) => isPackActive(profile, p));
+  const linked: QuickPack[] = [];
+  const seen = new Set([pack.id]);
+  const queue = [pack];
 
-  // Start by removing the deselected pack's categories.
-  const kept = new Set(original);
-  for (const c of pack.categoryIds) kept.delete(c);
-
-  // Re-add categories required by any OTHER pack that was fully active BEFORE
-  // this deselection (evaluated against the original active set, so a shared
-  // category isn't wrongly considered inactive just because we stripped it).
-  for (const other of allPacks) {
-    if (other.id === pack.id) continue;
-    const otherWasActive = other.categoryIds.every((c) => original.has(c));
-    if (otherWasActive) {
-      for (const c of other.categoryIds) kept.add(c);
+  while (queue.length) {
+    const current = queue.shift()!;
+    const cats = new Set(current.categoryIds);
+    for (const other of activePacks) {
+      if (seen.has(other.id)) continue;
+      if (other.categoryIds.some((c) => cats.has(c))) {
+        seen.add(other.id);
+        linked.push(other);
+        queue.push(other);
+      }
     }
   }
-  return { ...profile, activeCategoryIds: [...kept] };
+  return linked;
+}
+
+/**
+ * Deselect a pack → remove its categories, plus the categories of every pack
+ * linked to it (see `linkedActivePacks`), all in one step. Since the whole
+ * linked group comes off together, no other active pack is left needing any
+ * of these categories, so nothing has to be added back.
+ */
+export function deselectPack(profile: Profile, pack: QuickPack, allPacks: QuickPack[]): Profile {
+  const group = [pack, ...linkedActivePacks(profile, pack, allPacks)];
+  const toRemove = new Set(group.flatMap((p) => p.categoryIds));
+  return { ...profile, activeCategoryIds: profile.activeCategoryIds.filter((c) => !toRemove.has(c)) };
 }
 
 export function togglePack(profile: Profile, pack: QuickPack, allPacks: QuickPack[]): Profile {
   return isPackActive(profile, pack)
     ? deselectPack(profile, pack, allPacks)
     : selectPack(profile, pack);
-}
-
-/**
- * Other currently-active packs that share at least one category with `pack`
- * (docs/data-schema.md §"Shared categories") — the reason a deselect can look
- * like it did nothing: tapping "Artificial Dyes" off can't turn off the dyes
- * category while "Focus & ADHD" (which also needs it) is still on.
- */
-export function packsSharingActiveCategory(
-  profile: Profile,
-  pack: QuickPack,
-  allPacks: QuickPack[]
-): QuickPack[] {
-  const packCats = new Set(pack.categoryIds);
-  return allPacks.filter(
-    (other) =>
-      other.id !== pack.id &&
-      isPackActive(profile, other) &&
-      other.categoryIds.some((c) => packCats.has(c))
-  );
 }
 
 /** Toggle a single category on/off (row switch). */
