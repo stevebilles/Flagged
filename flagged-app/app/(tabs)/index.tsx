@@ -61,9 +61,7 @@ export default function Home() {
                 }}
               />
             ))}
-            {profiles.length > 1 && (
-              <AllChip selected={viewingAll} onPress={() => setViewingAll(true)} />
-            )}
+            <AllChip selected={viewingAll} onPress={() => setViewingAll(true)} />
             <Pill label="+ Add" onPress={() => router.push("/profile-edit?new=1")} />
           </ScrollView>
         </View>

@@ -191,11 +191,17 @@ export default function Scan() {
       <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
         Hold steady over the ingredient list
       </Text>
-      {activeProfileName && (
-        <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
-          Profile: <Text tone="cyan" bold>{activeProfileName}</Text>
-        </Text>
-      )}
+      <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+        {activeProfileName ? (
+          <>
+            Profile: <Text tone="cyan" bold>{activeProfileName}</Text>
+          </>
+        ) : (
+          <Text tone="warning" bold>
+            No profile selected — add one from Home before scanning
+          </Text>
+        )}
+      </Text>
       {error && (
         <Text tone="red" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
           {error}

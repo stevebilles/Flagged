@@ -134,13 +134,17 @@ export default function Results() {
           </Card>
         </View>
 
-        {!clean && (
-          <View style={{ gap: t.spacing.sm }}>
-            <Text tone="muted" variant="caption">
-              MATCHES — {lastScan.matches.length} FOUND
-            </Text>
-            <Card style={{ gap: t.spacing.md }}>
-              {lastScan.matches.map((m, i) => (
+        <View style={{ gap: t.spacing.sm }}>
+          <Text tone="muted" variant="caption">
+            MATCHES — {lastScan.matches.length} FOUND
+          </Text>
+          <Card style={{ gap: t.spacing.md }}>
+            {clean ? (
+              <Text tone="muted">
+                Nothing matched {profileName ? `${profileName}'s` : "your"} filters in this label.
+              </Text>
+            ) : (
+              lastScan.matches.map((m, i) => (
                 <View
                   key={i}
                   style={{
@@ -162,13 +166,19 @@ export default function Results() {
                   </View>
                   <Badge classification={m.classification ?? "preference"} />
                 </View>
-              ))}
-            </Card>
-          </View>
-        )}
+              ))
+            )}
+          </Card>
+        </View>
 
         <View style={{ gap: t.spacing.sm }}>
-          {clean && <Button title="Save to Pantry" onPress={() => router.push("/save-to-pantry")} />}
+          {clean ? (
+            <Button title="Save to Pantry" onPress={() => router.push("/save-to-pantry")} />
+          ) : (
+            <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
+              Flagged items can't be saved to your Pantry — only clean scans can.
+            </Text>
+          )}
           {justHitLimit ? (
             <Button title="Unlock Unlimited Scans" onPress={() => router.push("/paywall")} />
           ) : (
