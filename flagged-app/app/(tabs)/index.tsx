@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
-import { getProfiles, getStats, getActivePantryItems } from "../../src/db/repositories";
+import { getProfiles, getStats, getActivePantryItems, getQuickPacks } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
+import { activePackIds } from "../../src/domain/activation";
 import { profileColor, initials } from "../../src/design/avatar";
 import type { Profile } from "../../src/domain/types";
 
@@ -29,8 +30,14 @@ export default function Home() {
   const profiles = useMemo(() => getProfiles(), [activeProfileId]);
   const stats = useMemo(() => getStats(), []);
   const savedCount = useMemo(() => getActivePantryItems().length, []);
+  const quickPacks = useMemo(() => getQuickPacks(), []);
   const firstName = getMetaValue("firstName") ?? "";
   const activeProfile = profiles.find((p) => p.profileId === activeProfileId);
+  const activePackNames = useMemo(() => {
+    if (!activeProfile) return [];
+    const ids = new Set(activePackIds(activeProfile, quickPacks));
+    return quickPacks.filter((p) => ids.has(p.id)).map((p) => p.name);
+  }, [activeProfile, quickPacks]);
 
   return (
     <Screen>
@@ -83,18 +90,34 @@ export default function Home() {
               ))}
             </>
           ) : activeProfile ? (
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: profileColor(activeProfile.profileId) }} />
-                <Text bold>{activeProfile.name}</Text>
-                <Text tone="muted"> · {activeProfile.activeCategoryIds.length} filters active</Text>
+            <>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <AvatarDot color="rgba(34,211,238,0.18)">
+                    <Ionicons name="shield-checkmark" size={13} color={t.colors.cyan} />
+                  </AvatarDot>
+                  <Text bold>{activeProfile.name}'s Red Flags</Text>
+                </View>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => router.push(`/profile-edit?id=${activeProfile.profileId}`)}
+                >
+                  <Text tone="cyan" bold>Edit →</Text>
+                </Pressable>
               </View>
-              <Button
-                title="Edit"
-                kind="secondary"
-                onPress={() => router.push(`/profile-edit?id=${activeProfile.profileId}`)}
-              />
-            </View>
+              {activePackNames.length > 0 ? (
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  {activePackNames.map((name) => (
+                    <View key={name} style={{ width: "50%", flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.colors.cyan }} />
+                      <Text variant="caption" style={{ flexShrink: 1 }}>{name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text tone="muted">No Quick Packs active yet — tap Edit to choose filters.</Text>
+              )}
+            </>
           ) : (
             <Text tone="muted">Add a profile to start scanning.</Text>
           )}
