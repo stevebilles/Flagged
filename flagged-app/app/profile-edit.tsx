@@ -97,11 +97,14 @@ export default function ProfileEdit() {
                   // also switches off other packs is never a silent surprise.
                   const linked = wasActive ? linkedActivePacks(profile, p, packs) : [];
                   persist(togglePack(profile, p, packs));
+                  const names = linked.map((l) => l.name).join(" & ");
                   setPackNote(
                     linked.length > 0
-                      ? `${p.name} shares a filter with ${linked.map((l) => l.name).join(" & ")}, so turning it off also turns ${
+                      ? `${p.name} shares a filter with ${names}, so turning it off also turns ${
                           linked.length === 1 ? "that one" : "those"
-                        } off.`
+                        } off. You can turn ${names} back on individually if you'd like to keep ${
+                          linked.length === 1 ? "it" : "them"
+                        } on.`
                       : null
                   );
                 }}
