@@ -98,11 +98,12 @@ export default function ProfileEdit() {
                   // A deselect that shares a category with another still-active
                   // pack can't turn that category off — explain it instead of
                   // letting the pill silently stay lit with no feedback.
+                  const names = sharing.map((s) => s.name).join(" & ");
                   setPackNote(
                     wasActive && sharing.length > 0 && isPackActive(next, p)
-                      ? `${p.name} stays on — it shares a filter with ${sharing.map((s) => s.name).join(" & ")}, which ${
+                      ? `${p.name} is being used by ${names}, which ${
                           sharing.length === 1 ? "is" : "are"
-                        } still active. Turn that off too if you want ${p.name} fully off.`
+                        } still active. If you'd like to turn off ${p.name} then you must turn off ${names} first.`
                       : null
                   );
                 }}
