@@ -46,8 +46,8 @@ chosen to avoid.
 • Your Safe List (Pantry). Save approved products, and get reminded to re-check items in case a
   brand quietly changes the recipe.
 
-Try it free: 10 full scans with every feature unlocked. Then unlock unlimited scanning for life for
-a one-time $24.99 — no subscriptions.
+Try it free: 10 full scans with every feature unlocked. Then unlock unlimited scanning for
+$24.99/year — less than $0.07 a day.
 
 Flagged helps you read labels faster; it is not medical advice and does not replace reading the
 packaging yourself.
@@ -72,7 +72,7 @@ looks final). Do NOT fabricate.
 3. A **Clean** result — "No red flags detected."
 4. Profile editor — Quick Packs + category toggles with classification badges.
 5. Pantry / Safe List.
-6. Pricing card — $24.99 lifetime, "no subscriptions."
+6. Pricing card — $24.99/year.
 
 **IAP review screenshot (App Store Connect → the in-app purchase):** a real capture of the
 **paywall screen** (`app/paywall.tsx`). Same size rules as above.
@@ -123,5 +123,5 @@ Wire the same URLs into the Settings tab links (docs/05 Tab 4).
 - [ ] IAP review screenshot = the paywall
 - [ ] Privacy Policy + Terms hosted at public HTTPS URLs; linked in Settings
 - [ ] App Privacy / Data safety completed ("no data collected", camera on-device)
-- [ ] IAP `flagged_lifetime` attached to the version; iOS Agreements Active (docs/08/12)
+- [ ] IAP `flagged_annual` attached to the version; iOS Agreements Active (docs/08/12)
 - [ ] Description avoids medical/safety guarantees

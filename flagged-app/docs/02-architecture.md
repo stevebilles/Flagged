@@ -40,8 +40,8 @@ For printed food labels this is not a meaningful difference. **No cloud OCR API 
 - **Local database:** `expo-sqlite` with **Drizzle ORM**. All persistence is local. See `03`.
 - **Camera + OCR:** `react-native-vision-camera` (camera + frame processors) with an on-device
   text-recognition frame processor (ML Kit / VisionCamera OCR). No network calls.
-- **Purchases:** `react-native-purchases` (RevenueCat), configured for a **non-consumable**
-  one-time purchase, with **offline entitlement caching**. See `08`.
+- **Purchases:** `react-native-purchases` (RevenueCat), configured for an **auto-renewing annual
+  subscription**, with **offline entitlement caching** (grace window, not indefinite — see `08`).
 - **State:** Lightweight — Zustand or React Context for the active profile + trial state; the DB is
   the source of truth. Keep global state minimal.
 - **Fonts:** `expo-font` loading Atkinson Hyperlegible.

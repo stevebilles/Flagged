@@ -1,7 +1,7 @@
 # 04 — The 7-Screen Onboarding Flow
 
 **Logic:** Problem → The Tech/Moat → Interactive Setup → Name (Personalization) → Navigation
-Overview → The Fully Unlocked Trial → Lifetime Upsell Intro.
+Overview → The Fully Unlocked Trial → Annual Upsell Intro.
 
 Onboarding runs once (persist a `hasOnboarded` flag locally). All copy below is **exact** — use
 verbatim.
@@ -63,8 +63,8 @@ verbatim.
 ## Screen 7 — The "Founding Member" Transparent Pricing (The Climax)
 - **Visual:** A clean, high-contrast pricing card.
 - **Copy:**
-  > "Ditch the $40/year subscriptions. After your 10 free scans, unlock unlimited scanning for life
-  > for a one-time fee of $24.99. No hidden fees. Pay once, own it forever."
+  > "After your 10 free scans, unlock unlimited scanning for $24.99/year — less than $0.07 a day,
+  > for every profile in your house. Cancel anytime."
 - **Action button (primary):** `[ Start My 10 Free Scans ]`
   - Tapping completes onboarding and drops the user into the **Home** tab. It does **not** trigger a
     purchase — the trial begins.

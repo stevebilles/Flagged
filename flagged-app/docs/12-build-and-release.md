@@ -9,7 +9,7 @@ How to produce store-ready builds and submit Flagged to the App Store and Google
 |---|---|
 | iOS bundle identifier | `com.billesappcoinc.flaggedingredientscanner` |
 | Android package | `com.billesappcoinc.flaggedingredientscanner` |
-| IAP product ID | `flagged_lifetime` (non-consumable, $24.99) |
+| IAP product ID | `flagged_annual` (auto-renewing subscription, $24.99/yr) |
 | RevenueCat entitlement | `premium` |
 | RevenueCat offering | `default` |
 
@@ -79,7 +79,7 @@ Builds run in the cloud; the CLI prints a URL to download the artifact / view lo
 Prereqs (done once in App Store Connect):
 - App record created with bundle ID `com.billesappcoinc.flaggedingredientscanner`.
 - **Agreements, Tax, and Banking** = Active (required for paid IAP — docs/08).
-- IAP `flagged_lifetime` created (Non-Consumable, $24.99) and submitted with the app.
+- IAP `flagged_annual` created (auto-renewing subscription, 1-year, $24.99) and submitted with the app.
 - Store listing metadata + screenshots (see `15-store-listing.md`).
 
 ```bash
@@ -93,7 +93,7 @@ Then in App Store Connect: attach the build, complete **App Privacy** answers (s
 
 Prereqs:
 - App created in Play Console with package `com.billesappcoinc.flaggedingredientscanner`.
-- In-app product `flagged_lifetime` created + activated ($24.99).
+- Subscription product `flagged_annual` created + activated ($24.99/yr).
 - A **Google service account JSON** with Play Developer API access (for `eas submit`).
 - Data safety form completed (on-device; no collection).
 
@@ -109,7 +109,7 @@ production.
 - [ ] `npm run typecheck` and `npm test` pass
 - [ ] `version` bumped in `app.config.ts`
 - [ ] Atkinson Hyperlegible fonts present (docs/11) — UI renders as designed
-- [ ] RevenueCat keys set as EAS env; entitlement `premium` maps to `flagged_lifetime`
+- [ ] RevenueCat keys set as EAS env; entitlement `premium` maps to `flagged_annual`
 - [ ] IAP created + priced in both stores; iOS Agreements Active
 - [ ] `diagnosePurchases()` run on a device build → offering found, product resolves, entitlement OK
 - [ ] Store listings complete (`15-store-listing.md`), Privacy Policy + Terms URLs live (`legal/`)

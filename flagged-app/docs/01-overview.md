@@ -33,8 +33,8 @@ allergies / celiac).
 
 ## Business model
 
-A **metered trial** of **10 free scans** leading to a **one-time lifetime fee of $24.99**.
-Designed to combat subscription fatigue and prove the technology works before asking for the sale.
+A **metered trial** of **10 free scans** leading to an **auto-renewing annual subscription at
+$24.99/year**. Designed to prove the technology works before asking for the sale.
 See `08-monetization.md`.
 
 ## Non-negotiable product principles

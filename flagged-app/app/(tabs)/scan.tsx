@@ -122,10 +122,10 @@ export default function Scan() {
             You've used all 10 free scans
           </Text>
           <Text tone="muted" style={{ textAlign: "center" }}>
-            Ditch the $40/year subscriptions. Unlock unlimited, offline label reading for life.
+            Unlock unlimited, offline label reading for every profile in your house.
           </Text>
-          <Text tone="muted" style={{ textDecorationLine: "line-through" }}>$39.99</Text>
-          <Button title="Unlock Unlimited Scans - $24.99" onPress={() => router.push("/paywall")} />
+          <Text tone="cyan" bold>$24.99/yr · $0.07/day</Text>
+          <Button title="Unlock Unlimited Scans - $24.99/yr" onPress={() => router.push("/paywall")} />
         </View>
       </Screen>
     );
