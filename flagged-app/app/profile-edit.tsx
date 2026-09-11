@@ -16,6 +16,7 @@ import {
   addCustomIngredient,
   isPackActive,
   linkedActivePacks,
+  packSelectionNote,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
@@ -92,21 +93,30 @@ export default function ProfileEdit() {
                 selected={isPackActive(profile, p)}
                 onPress={() => {
                   const wasActive = isPackActive(profile, p);
-                  // Packs sharing a category are turned off together as one
-                  // unit (see linkedActivePacks) — name them so a tap that
-                  // also switches off other packs is never a silent surprise.
-                  const linked = wasActive ? linkedActivePacks(profile, p, packs) : [];
-                  persist(togglePack(profile, p, packs));
-                  const names = linked.map((l) => l.name).join(" & ");
-                  setPackNote(
-                    linked.length > 0
-                      ? `${p.name} shares a filter with ${names}, so turning it off also turns ${
-                          linked.length === 1 ? "that one" : "those"
-                        } off. You can turn ${names} back on individually if you'd like to keep ${
-                          linked.length === 1 ? "it" : "them"
-                        } on.`
-                      : null
-                  );
+                  if (wasActive) {
+                    // Packs sharing a category are turned off together as one
+                    // unit (see linkedActivePacks) — name them so a tap that
+                    // also switches off other packs is never a silent surprise.
+                    const linked = linkedActivePacks(profile, p, packs);
+                    persist(togglePack(profile, p, packs));
+                    const names = linked.map((l) => l.name).join(" & ");
+                    setPackNote(
+                      linked.length > 0
+                        ? `${p.name} shares a filter with ${names}, so turning it off also turns ${
+                            linked.length === 1 ? "that one" : "those"
+                          } off. You can turn ${names} back on individually if you'd like to keep ${
+                            linked.length === 1 ? "it" : "them"
+                          } on.`
+                        : null
+                    );
+                  } else {
+                    // Re-selecting can bring a linked pack fully back on (if this
+                    // pack alone covers everything it needs) or leave it short —
+                    // explain either way instead of a silent partial restore.
+                    const next = togglePack(profile, p, packs);
+                    persist(next);
+                    setPackNote(packSelectionNote(profile, next, p, packs));
+                  }
                 }}
               />
             ))}

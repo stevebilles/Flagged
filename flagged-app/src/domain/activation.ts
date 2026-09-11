@@ -76,6 +76,70 @@ export function togglePack(profile: Profile, pack: QuickPack, allPacks: QuickPac
     : selectPack(profile, pack);
 }
 
+/**
+ * Every other pack transitively linked to `pack` by a shared category —
+ * unlike `linkedActivePacks`, this ignores current on/off state (it's the
+ * static shape of the shared-category graph, docs/data-schema.md). Used to
+ * explain *select* side effects: re-selecting "Focus & ADHD" only restores
+ * "Artificial Dyes" (whose one category it fully covers), not "Preservatives"
+ * (which also needs Nitrates & Sulfites) — so callers can say so instead of
+ * leaving Preservatives silently short with no explanation.
+ */
+export function linkedPackGroup(pack: QuickPack, allPacks: QuickPack[]): QuickPack[] {
+  const linked: QuickPack[] = [];
+  const seen = new Set([pack.id]);
+  const queue = [pack];
+
+  while (queue.length) {
+    const current = queue.shift()!;
+    const cats = new Set(current.categoryIds);
+    for (const other of allPacks) {
+      if (seen.has(other.id)) continue;
+      if (other.categoryIds.some((c) => cats.has(c))) {
+        seen.add(other.id);
+        linked.push(other);
+        queue.push(other);
+      }
+    }
+  }
+  return linked;
+}
+
+/**
+ * Explains what happened to `pack`'s linked packs after selecting it: which
+ * ones came fully back on as a side effect, and which are still short some
+ * categories `pack` doesn't provide. Returns null when nothing needs saying
+ * (pack has no linked packs, or none of them changed / are affected).
+ */
+export function packSelectionNote(
+  before: Profile,
+  after: Profile,
+  pack: QuickPack,
+  allPacks: QuickPack[]
+): string | null {
+  const group = linkedPackGroup(pack, allPacks);
+  if (group.length === 0) return null;
+
+  const turnedOnToo = group.filter((o) => !isPackActive(before, o) && isPackActive(after, o));
+  const stillShort = group.filter((o) => !isPackActive(after, o));
+  if (turnedOnToo.length === 0 && stillShort.length === 0) return null;
+
+  const parts: string[] = [];
+  if (turnedOnToo.length > 0) {
+    const names = turnedOnToo.map((o) => o.name).join(" & ");
+    parts.push(`${names} turned on too, since ${turnedOnToo.length === 1 ? "it" : "they"} only needed this filter.`);
+  }
+  if (stillShort.length > 0) {
+    const names = stillShort.map((o) => o.name).join(" & ");
+    parts.push(
+      `${names} need${stillShort.length === 1 ? "s" : ""} more than this filter — turn ${
+        stillShort.length === 1 ? "it" : "them"
+      } on separately if you'd like ${stillShort.length === 1 ? "it" : "them"} back on.`
+    );
+  }
+  return parts.join(" ");
+}
+
 /** Toggle a single category on/off (row switch). */
 export function toggleCategory(profile: Profile, categoryId: string): Profile {
   const set = new Set(profile.activeCategoryIds);

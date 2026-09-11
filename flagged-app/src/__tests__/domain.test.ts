@@ -11,7 +11,9 @@ import {
   deselectPack,
   isPackActive,
   linkedActivePacks,
+  packSelectionNote,
   selectPack,
+  togglePack,
   effectiveRedFlagTerms,
   effectiveRedFlagMetaForAll,
 } from "../domain/activation";
@@ -267,6 +269,30 @@ describe("pack activation + shared categories", () => {
     p = selectPack(p, packs[2]);
     const linked = linkedActivePacks(p, packs[0], packs).map((x) => x.id).sort();
     expect(linked).toEqual(["focus", "pres"]);
+  });
+
+  it("re-selecting the pack that caused a cascade explains an asymmetric restore", () => {
+    // Reproduces Steve's report: Artificial Dyes + Focus & ADHD + Preservatives
+    // all active, deselect Focus & ADHD (cascades all three off), then
+    // reselect Focus & ADHD — it only owns "dyes" + "synth", so Artificial
+    // Dyes (needs only dyes) comes back fully, but Preservatives (needs
+    // nitrates + sulfites too) can't, and that needs explaining.
+    let p = selectPack(base, packs[0]); // Artificial Dyes
+    p = selectPack(p, packs[1]); // Focus & ADHD
+    p = selectPack(p, packs[2]); // Preservatives
+    p = deselectPack(p, packs[1], packs); // turn Focus & ADHD off — cascades all three off
+    expect(p.activeCategoryIds).toEqual([]);
+
+    const before = p;
+    const after = togglePack(p, packs[1], packs); // reselect Focus & ADHD
+    expect(isPackActive(after, packs[0])).toBe(true); // Artificial Dyes: fully restored
+    expect(isPackActive(after, packs[2])).toBe(false); // Preservatives: still short
+
+    const note = packSelectionNote(before, after, packs[1], packs)!;
+    expect(note).toContain("Artificial Dyes");
+    expect(note).toContain("turned on too");
+    expect(note).toContain("Preservatives");
+    expect(note).toContain("turn it on separately");
   });
 });
 
