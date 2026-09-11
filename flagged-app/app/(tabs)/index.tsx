@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, ScrollView, Pressable, Text as RNText } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
@@ -9,7 +9,7 @@ import { getProfiles, getStats, getActivePantryItems, getQuickPacks } from "../.
 import { getMetaValue } from "../../src/db/appMeta";
 import { activePackIds } from "../../src/domain/activation";
 import { profileColor, initials } from "../../src/design/avatar";
-import type { Profile } from "../../src/domain/types";
+import type { Profile, QuickPack, Stats } from "../../src/domain/types";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -27,10 +27,23 @@ export default function Home() {
   // "All" is a Home-screen view only — it doesn't change which profile Scan uses.
   const [viewingAll, setViewingAll] = useState(false);
 
-  const profiles = useMemo(() => getProfiles(), [activeProfileId]);
-  const stats = useMemo(() => getStats(), []);
-  const savedCount = useMemo(() => getActivePantryItems().length, []);
-  const quickPacks = useMemo(() => getQuickPacks(), []);
+  // Re-read from the DB every time Home gains focus (not just on first mount) —
+  // a rename in the profile editor, a completed scan, or a Pantry save all
+  // happen on other screens and wouldn't otherwise show up here.
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [stats, setStats] = useState<Stats>(() => getStats());
+  const [savedCount, setSavedCount] = useState(0);
+  const [quickPacks, setQuickPacks] = useState<QuickPack[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setProfiles(getProfiles());
+      setStats(getStats());
+      setSavedCount(getActivePantryItems().length);
+      setQuickPacks(getQuickPacks());
+    }, [])
+  );
+
   const firstName = getMetaValue("firstName") ?? "";
   const activeProfile = profiles.find((p) => p.profileId === activeProfileId);
   const activePackNames = useMemo(() => {

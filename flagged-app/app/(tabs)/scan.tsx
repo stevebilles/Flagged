@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
@@ -30,7 +30,14 @@ export default function Scan() {
   const activeProfileId = useAppStore((s) => s.activeProfileId);
   const setLastScan = useAppStore((s) => s.setLastScan);
 
-  const remaining = useMemo(() => scansRemaining(), []);
+  // Re-read on every focus, not just first mount — a scan completed elsewhere
+  // (or the dev "reset free scans" button) must update this immediately.
+  const [remaining, setRemaining] = useState(() => scansRemaining());
+  useFocusEffect(
+    useCallback(() => {
+      setRemaining(scansRemaining());
+    }, [])
+  );
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
