@@ -15,6 +15,7 @@ import {
 import {
   addCustomIngredient,
   isPackActive,
+  packsSharingActiveCategory,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
@@ -45,6 +46,7 @@ export default function ProfileEdit() {
   });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [custom, setCustom] = useState("");
+  const [packNote, setPackNote] = useState<string | null>(null);
 
   const activeSet = new Set(profile.activeCategoryIds);
   const excludedSet = new Set(profile.excludedIngredientIds);
@@ -88,10 +90,30 @@ export default function ProfileEdit() {
                 key={p.id}
                 label={p.name}
                 selected={isPackActive(profile, p)}
-                onPress={() => persist(togglePack(profile, p, packs))}
+                onPress={() => {
+                  const wasActive = isPackActive(profile, p);
+                  const sharing = wasActive ? packsSharingActiveCategory(profile, p, packs) : [];
+                  const next = togglePack(profile, p, packs);
+                  persist(next);
+                  // A deselect that shares a category with another still-active
+                  // pack can't turn that category off — explain it instead of
+                  // letting the pill silently stay lit with no feedback.
+                  setPackNote(
+                    wasActive && sharing.length > 0 && isPackActive(next, p)
+                      ? `${p.name} stays on — it shares a filter with ${sharing.map((s) => s.name).join(" & ")}, which ${
+                          sharing.length === 1 ? "is" : "are"
+                        } still active. Turn that off too if you want ${p.name} fully off.`
+                      : null
+                  );
+                }}
               />
             ))}
           </View>
+          {packNote && (
+            <Text tone="warning" variant="caption">
+              {packNote}
+            </Text>
+          )}
         </View>
 
         {/* CUSTOM */}

@@ -57,6 +57,26 @@ export function togglePack(profile: Profile, pack: QuickPack, allPacks: QuickPac
     : selectPack(profile, pack);
 }
 
+/**
+ * Other currently-active packs that share at least one category with `pack`
+ * (docs/data-schema.md §"Shared categories") — the reason a deselect can look
+ * like it did nothing: tapping "Artificial Dyes" off can't turn off the dyes
+ * category while "Focus & ADHD" (which also needs it) is still on.
+ */
+export function packsSharingActiveCategory(
+  profile: Profile,
+  pack: QuickPack,
+  allPacks: QuickPack[]
+): QuickPack[] {
+  const packCats = new Set(pack.categoryIds);
+  return allPacks.filter(
+    (other) =>
+      other.id !== pack.id &&
+      isPackActive(profile, other) &&
+      other.categoryIds.some((c) => packCats.has(c))
+  );
+}
+
 /** Toggle a single category on/off (row switch). */
 export function toggleCategory(profile: Profile, categoryId: string): Profile {
   const set = new Set(profile.activeCategoryIds);
