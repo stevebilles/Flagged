@@ -5,11 +5,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
-import { getProfiles, getStats, getActivePantryItems, getQuickPacks } from "../../src/db/repositories";
+import { getProfiles, getActivePantryItems, getQuickPacks } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
 import { activePackIds } from "../../src/domain/activation";
 import { profileColor, initials } from "../../src/design/avatar";
-import type { Profile, QuickPack, Stats } from "../../src/domain/types";
+import type { Profile, QuickPack, PantryItem } from "../../src/domain/types";
+
+const ZERO_DASHBOARD_STATS = {
+  totalLabelsRead: 0,
+  totalRedFlagsCaught: 0,
+  totalSkimpflationCaught: 0,
+  totalReformulationsCaught: 0,
+};
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -33,15 +40,13 @@ export default function Home() {
   // a rename in the profile editor, a completed scan, or a Pantry save all
   // happen on other screens and wouldn't otherwise show up here.
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [stats, setStats] = useState<Stats>(() => getStats());
-  const [savedCount, setSavedCount] = useState(0);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [quickPacks, setQuickPacks] = useState<QuickPack[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       setProfiles(getProfiles());
-      setStats(getStats());
-      setSavedCount(getActivePantryItems().length);
+      setPantryItems(getActivePantryItems());
       setQuickPacks(getQuickPacks());
     }, [])
   );
@@ -53,6 +58,23 @@ export default function Home() {
     const ids = new Set(activePackIds(activeProfile, quickPacks));
     return quickPacks.filter((p) => ids.has(p.id)).map((p) => p.name);
   }, [activeProfile, quickPacks]);
+
+  // Dashboard numbers are per-profile (docs/17): "All" sums every profile's
+  // own counters, a specific profile shows just its own.
+  const dashboardStats = viewingAll
+    ? profiles.reduce(
+        (sum, p) => ({
+          totalLabelsRead: sum.totalLabelsRead + p.totalLabelsRead,
+          totalRedFlagsCaught: sum.totalRedFlagsCaught + p.totalRedFlagsCaught,
+          totalSkimpflationCaught: sum.totalSkimpflationCaught + p.totalSkimpflationCaught,
+          totalReformulationsCaught: sum.totalReformulationsCaught + p.totalReformulationsCaught,
+        }),
+        ZERO_DASHBOARD_STATS
+      )
+    : activeProfile ?? ZERO_DASHBOARD_STATS;
+  const savedCount = viewingAll
+    ? pantryItems.length
+    : pantryItems.filter((i) => i.profileId === activeProfileId).length;
 
   return (
     <Screen>
@@ -138,15 +160,15 @@ export default function Home() {
           )}
         </Card>
 
-        {/* Protection Summary — the pillars of value */}
+        {/* Protection Summary — the pillars of value. Per-profile; "All" sums them. */}
         <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-          <Pillar label="Scans" value={stats.totalLabelsRead} tone="cyan" />
+          <Pillar label="Scans" value={dashboardStats.totalLabelsRead} tone="cyan" />
           <Pillar label="Saved" value={savedCount} tone="primary" />
-          <Pillar label="Flags" value={stats.totalRedFlagsCaught} tone="red" />
+          <Pillar label="Flags" value={dashboardStats.totalRedFlagsCaught} tone="red" />
         </View>
         <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-          <Pillar label="Skimpflation Caught" value={stats.totalSkimpflationCaught} tone="warning" />
-          <Pillar label="Reformulation Caught" value={stats.totalReformulationsCaught} tone="warning" />
+          <Pillar label="Skimpflation Caught" value={dashboardStats.totalSkimpflationCaught} tone="warning" />
+          <Pillar label="Reformulation Caught" value={dashboardStats.totalReformulationsCaught} tone="warning" />
         </View>
 
         <Button title="📷  Scan a label" onPress={() => router.push("/(tabs)/scan")} />

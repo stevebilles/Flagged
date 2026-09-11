@@ -60,10 +60,16 @@ export function ensureTables(): void {
       active_category_ids TEXT NOT NULL DEFAULT '[]',
       excluded_ingredient_ids TEXT NOT NULL DEFAULT '[]',
       custom_ingredients TEXT NOT NULL DEFAULT '[]',
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      total_labels_read INTEGER NOT NULL DEFAULT 0,
+      total_red_flags_caught INTEGER NOT NULL DEFAULT 0,
+      total_clean_scans INTEGER NOT NULL DEFAULT 0,
+      total_skimpflation_caught INTEGER NOT NULL DEFAULT 0,
+      total_reformulations_caught INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS pantry_items (
       item_id TEXT PRIMARY KEY NOT NULL,
+      profile_id TEXT NOT NULL DEFAULT '',
       brand_name TEXT NOT NULL,
       product_name TEXT NOT NULL,
       image_file_path TEXT NOT NULL DEFAULT '',
@@ -109,5 +115,32 @@ export function runMigrations(): void {
     s.execSync(
       "ALTER TABLE stats ADD COLUMN total_reformulations_caught INTEGER NOT NULL DEFAULT 0"
     );
+  }
+
+  // Per-profile dashboard counters (docs/17) — additive for installs created
+  // before Home/Scan/Results were profile-aware.
+  const profileCols = s
+    .getAllSync<{ name: string }>("PRAGMA table_info(profiles)")
+    .map((c) => c.name);
+  for (const col of [
+    "total_labels_read",
+    "total_red_flags_caught",
+    "total_clean_scans",
+    "total_skimpflation_caught",
+    "total_reformulations_caught",
+  ]) {
+    if (!profileCols.includes(col)) {
+      s.execSync(`ALTER TABLE profiles ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
+    }
+  }
+
+  // Pantry items now belong to the profile that scanned them (docs/17 Pantry
+  // mockup) — existing rows (pre-dating this) get '' and simply won't surface
+  // under any specific profile, only under "All".
+  const pantryCols = s
+    .getAllSync<{ name: string }>("PRAGMA table_info(pantry_items)")
+    .map((c) => c.name);
+  if (!pantryCols.includes("profile_id")) {
+    s.execSync("ALTER TABLE pantry_items ADD COLUMN profile_id TEXT NOT NULL DEFAULT ''");
   }
 }

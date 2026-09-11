@@ -2,7 +2,7 @@ import { matchParagraph, Match, ScanResult } from "../matching/matcher";
 import { looksLikeIngredientList } from "../matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagMetaForAll, RedFlagMeta, AllProfilesMeta } from "./activation";
 import type { RecheckOutcome } from "./diffEngine";
-import { getCategories, getIngredientTermMap, getStats, saveStats } from "../db/repositories";
+import { getCategories, getIngredientTermMap, getStats, saveStats, updateProfile } from "../db/repositories";
 import { FREE_SCAN_LIMIT, type Profile } from "./types";
 
 /**
@@ -69,49 +69,79 @@ function runEvaluation(
 }
 
 /**
- * Commit stats for a successful scan (docs/03/08).
- * Increments freeScansUsed (unless premium) + totalLabelsRead, and the
- * clean/flagged counters.
+ * Consume one credit from the shared, account-wide trial pool (docs/08). This
+ * stays a singleton on purpose — the free-scan limit does NOT multiply with
+ * the number of profiles, even for an "All profiles" scan (one scan = one
+ * credit, regardless of how many profiles it checked).
  */
-export function commitScanStats(result: ScanResult, isPremium: boolean): void {
+function bumpTrialCounter(isPremium: boolean): void {
+  if (isPremium) return;
   const stats = getStats();
-  stats.totalLabelsRead += 1;
-  if (!isPremium) {
-    stats.freeScansUsed = Math.min(FREE_SCAN_LIMIT, stats.freeScansUsed + 1);
-  }
-  if (result.isClean) {
-    stats.totalCleanScans += 1;
-  } else {
-    stats.totalRedFlagsCaught += result.matches.length;
-  }
+  stats.freeScansUsed = Math.min(FREE_SCAN_LIMIT, stats.freeScansUsed + 1);
   saveStats(stats);
 }
 
 /**
- * Commit stats for a completed pantry recheck (docs/03/07).
- * A recheck is a successful scan → always a label read, and consumes a free
- * scan when not premium. The two recheck-specific counters only move when the
- * recipe actually changed; both can move on one recheck.
+ * Commit stats for a successful single-profile scan (docs/03/08, docs/17).
+ * The Scans/Clean/Flags counters shown on that profile's Home dashboard now
+ * live on the profile itself — only the shared trial counter is account-wide.
  */
-export function commitRecheckStats(outcome: RecheckOutcome, isPremium: boolean): void {
-  const stats = getStats();
-  stats.totalLabelsRead += 1;
-  if (!isPremium) {
-    stats.freeScansUsed = Math.min(FREE_SCAN_LIMIT, stats.freeScansUsed + 1);
+export function commitScanStats(result: ScanResult, profile: Profile, isPremium: boolean): void {
+  bumpTrialCounter(isPremium);
+  const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
+  if (result.isClean) {
+    updated.totalCleanScans += 1;
+  } else {
+    updated.totalRedFlagsCaught += result.matches.length;
   }
+  updateProfile(updated);
+}
+
+/**
+ * Commit stats for an "All profiles" scan (docs/17): the trial counter moves
+ * once, and EVERY real profile gets its own Scans/Clean/Flags counters
+ * updated based on whether that specific profile's filters were among the
+ * matches — not whether the combined result was clean overall. A label that
+ * flags Sofia's dye filter but nothing of Steve's is a "clean" scan on
+ * Steve's dashboard and a "flagged" one on Sofia's.
+ */
+export function commitScanStatsForAll(result: ScanResult, profiles: Profile[], isPremium: boolean): void {
+  bumpTrialCounter(isPremium);
+  for (const profile of profiles) {
+    const mine = result.matches.filter((m) => m.profileNames?.includes(profile.name));
+    const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
+    if (mine.length === 0) {
+      updated.totalCleanScans += 1;
+    } else {
+      updated.totalRedFlagsCaught += mine.length;
+    }
+    updateProfile(updated);
+  }
+}
+
+/**
+ * Commit stats for a completed pantry recheck (docs/03/07) — recheck stays
+ * tied to a single profile (docs/17 scoped "All" to Home/Scan/Results only).
+ * A recheck is always a label read, and consumes a trial credit when not
+ * premium. The two recheck-specific counters only move when the recipe
+ * actually changed; both can move on one recheck.
+ */
+export function commitRecheckStats(outcome: RecheckOutcome, profile: Profile, isPremium: boolean): void {
+  bumpTrialCounter(isPremium);
+  const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
   if (outcome.kind !== "identical") {
     const { diff } = outcome;
     if (diff.added.length > 0 || diff.removed.length > 0) {
-      stats.totalReformulationsCaught += 1;
+      updated.totalReformulationsCaught += 1;
     }
     if (diff.orderShifted) {
-      stats.totalSkimpflationCaught += 1;
+      updated.totalSkimpflationCaught += 1;
     }
     if (outcome.kind === "changed_flagged") {
-      stats.totalRedFlagsCaught += outcome.matches.length;
+      updated.totalRedFlagsCaught += outcome.matches.length;
     }
   }
-  saveStats(stats);
+  updateProfile(updated);
 }
 
 /** Trial/paywall gate (docs/08). */

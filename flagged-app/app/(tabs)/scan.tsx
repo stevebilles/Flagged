@@ -66,6 +66,7 @@ export default function Scan() {
 
     let evaln;
     let scannedFor: string;
+    let profileIds: string[];
     if (scanAllProfiles) {
       const profiles = getProfiles();
       if (profiles.length === 0) {
@@ -74,6 +75,7 @@ export default function Scan() {
       }
       evaln = evaluateScanForAll(paragraph, profiles);
       scannedFor = `all ${profiles.length} profile${profiles.length === 1 ? "" : "s"}`;
+      profileIds = profiles.map((p) => p.profileId);
     } else {
       const profile = activeProfileId ? getProfile(activeProfileId) : null;
       if (!profile) {
@@ -82,6 +84,7 @@ export default function Scan() {
       }
       evaln = evaluateScan(paragraph, profile);
       scannedFor = profile.name;
+      profileIds = [profile.profileId];
     }
 
     if (evaln.status === "aborted") {
@@ -101,7 +104,7 @@ export default function Scan() {
               .map((mm) => mm.term + (mm.categoryName ? ` [${mm.categoryName}]` : ""))
               .join(", ")
     );
-    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean, scannedFor });
+    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean, scannedFor, profileIds });
     router.push("/results");
   }
 

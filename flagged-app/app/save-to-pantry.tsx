@@ -17,6 +17,7 @@ export default function SaveToPantry() {
   const t = useTheme();
   const router = useRouter();
   const lastScan = useAppStore((s) => s.lastScan);
+  const activeProfileId = useAppStore((s) => s.activeProfileId);
   const [brand, setBrand] = useState("");
   const [product, setProduct] = useState("");
   const [photoUri, setPhotoUri] = useState<string>("");
@@ -40,6 +41,9 @@ export default function SaveToPantry() {
   function save() {
     const ingredients = lastScan ? tokenize(normalizeParagraph(lastScan.paragraph)) : [];
     addPantryItem({
+      // The profile this card belongs to (docs/17 Pantry mockup) — the profile
+      // that was active when the scan ran, even if it was checked via "All".
+      profileId: activeProfileId ?? lastScan?.profileIds?.[0] ?? "",
       brandName: brand.trim(),
       productName: product.trim(),
       imageFilePath: photoUri,

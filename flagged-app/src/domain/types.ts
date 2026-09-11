@@ -46,11 +46,26 @@ export interface Profile {
   excludedIngredientIds: string[];
   customIngredients: string[];
   createdAt: number;
+  /**
+   * Per-profile dashboard counters (docs/17 Home mockup — each profile's own
+   * Scans/Flags/etc., "All" sums across every profile). Separate from the
+   * shared trial counter (Stats.freeScansUsed below), which stays account-wide
+   * regardless of how many profiles exist.
+   */
+  totalLabelsRead: number;
+  totalRedFlagsCaught: number;
+  totalCleanScans: number;
+  /** Pantry rechecks where the surviving ingredients changed order (docs/07). */
+  totalSkimpflationCaught: number;
+  /** Pantry rechecks where an ingredient was added or removed (docs/07). */
+  totalReformulationsCaught: number;
 }
 
-/** An approved food (docs/03 §3.2). */
+/** An approved food (docs/03 §3.2). Belongs to whichever profile scanned it —
+ * the Pantry tab filters by profile the same way Home does (docs/17). */
 export interface PantryItem {
   itemId: string;
+  profileId: string;
   brandName: string;
   productName: string;
   imageFilePath: string;
@@ -60,16 +75,16 @@ export interface PantryItem {
   deletedAt: number | null;
 }
 
-/** Lifetime stats & trial singleton (docs/03 §3.3). */
+/** Account-wide trial singleton (docs/03 §3.3). Only the shared free-scan
+ * counter is still read — the rest were per-account totals that predate
+ * per-profile stats and are no longer displayed anywhere. */
 export interface Stats {
   statsId: string;
   freeScansUsed: number;
   totalLabelsRead: number;
   totalRedFlagsCaught: number;
   totalCleanScans: number;
-  /** Pantry rechecks where the surviving ingredients changed order (docs/07). */
   totalSkimpflationCaught: number;
-  /** Pantry rechecks where an ingredient was added or removed (docs/07). */
   totalReformulationsCaught: number;
 }
 

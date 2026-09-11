@@ -16,6 +16,15 @@ import {
 } from "../domain/activation";
 import type { Category, Profile, QuickPack } from "../domain/types";
 
+/** Per-profile dashboard counters (docs/17) — zeroed for fixtures that don't care. */
+const zeroProfileStats = {
+  totalLabelsRead: 0,
+  totalRedFlagsCaught: 0,
+  totalCleanScans: 0,
+  totalSkimpflationCaught: 0,
+  totalReformulationsCaught: 0,
+};
+
 describe("levenshtein / similarity", () => {
   it("computes edit distance", () => {
     expect(levenshtein("kitten", "sitting")).toBe(3);
@@ -204,6 +213,7 @@ describe("pack activation + shared categories", () => {
   ];
   const base: Profile = {
     profileId: "p1", name: "x", activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
   };
 
   it("selecting a pack activates all its categories", () => {
@@ -231,6 +241,7 @@ describe("effective red-flag set", () => {
   it("union of active categories minus excluded plus custom", () => {
     const profile: Profile = {
       profileId: "p", name: "x", activeCategoryIds: ["dyes"], excludedIngredientIds: ["i-yellow5"], customIngredients: ["carrageenan"], createdAt: 0,
+      ...zeroProfileStats,
     };
     const terms = effectiveRedFlagTerms(profile, categories, termById);
     expect(terms).toContain("red 40");
@@ -252,9 +263,11 @@ describe("effectiveRedFlagMetaForAll (docs/17 'All' mode)", () => {
   ]);
   const sofia: Profile = {
     profileId: "sofia", name: "Sofia", activeCategoryIds: ["dyes", "milk"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
   };
   const steve: Profile = {
     profileId: "steve", name: "Steve", activeCategoryIds: ["milk", "nuts"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
   };
 
   it("unions every profile's terms", () => {

@@ -13,6 +13,10 @@ export interface ScanResultLike {
    * "all N profiles" — decided at scan time so Results doesn't have to guess
    * from the (possibly since-changed) active profile. */
   scannedFor?: string;
+  /** The profile(s) this scan was evaluated for — one id for a normal scan,
+   * every real profile's id for an "All" scan. Results uses this to commit
+   * per-profile stats to the right profile(s) (docs/17). */
+  profileIds?: string[];
 }
 
 /** Hand-off from the recheck capture screen to the recheck-result screen (docs/07). */

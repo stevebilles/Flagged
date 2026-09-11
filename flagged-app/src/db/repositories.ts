@@ -74,6 +74,11 @@ function mapProfile(r: any): Profile {
     excludedIngredientIds: parse<string[]>(r.excluded_ingredient_ids),
     customIngredients: parse<string[]>(r.custom_ingredients),
     createdAt: r.created_at,
+    totalLabelsRead: r.total_labels_read ?? 0,
+    totalRedFlagsCaught: r.total_red_flags_caught ?? 0,
+    totalCleanScans: r.total_clean_scans ?? 0,
+    totalSkimpflationCaught: r.total_skimpflation_caught ?? 0,
+    totalReformulationsCaught: r.total_reformulations_caught ?? 0,
   };
 }
 
@@ -96,6 +101,11 @@ export function createProfile(name: string): Profile {
     excludedIngredientIds: [],
     customIngredients: [],
     createdAt: Date.now(),
+    totalLabelsRead: 0,
+    totalRedFlagsCaught: 0,
+    totalCleanScans: 0,
+    totalSkimpflationCaught: 0,
+    totalReformulationsCaught: 0,
   };
   sqlite().runSync(
     "INSERT INTO profiles (profile_id, name, active_category_ids, excluded_ingredient_ids, custom_ingredients, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -106,12 +116,19 @@ export function createProfile(name: string): Profile {
 
 export function updateProfile(p: Profile): void {
   sqlite().runSync(
-    "UPDATE profiles SET name = ?, active_category_ids = ?, excluded_ingredient_ids = ?, custom_ingredients = ? WHERE profile_id = ?",
+    `UPDATE profiles SET name = ?, active_category_ids = ?, excluded_ingredient_ids = ?, custom_ingredients = ?,
+     total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?,
+     total_skimpflation_caught = ?, total_reformulations_caught = ? WHERE profile_id = ?`,
     [
       p.name,
       JSON.stringify(p.activeCategoryIds),
       JSON.stringify(p.excludedIngredientIds),
       JSON.stringify(p.customIngredients),
+      p.totalLabelsRead,
+      p.totalRedFlagsCaught,
+      p.totalCleanScans,
+      p.totalSkimpflationCaught,
+      p.totalReformulationsCaught,
       p.profileId,
     ]
   );
@@ -122,6 +139,7 @@ export function updateProfile(p: Profile): void {
 function mapPantry(r: any): PantryItem {
   return {
     itemId: r.item_id,
+    profileId: r.profile_id ?? "",
     brandName: r.brand_name,
     productName: r.product_name,
     imageFilePath: r.image_file_path,
@@ -157,9 +175,10 @@ export function addPantryItem(
   const now = Date.now();
   const item: PantryItem = { ...input, itemId: randomUUID(), dateAdded: now, lastVerifiedDate: now, deletedAt: null };
   sqlite().runSync(
-    "INSERT INTO pantry_items (item_id, brand_name, product_name, image_file_path, original_ingredients, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)",
+    "INSERT INTO pantry_items (item_id, profile_id, brand_name, product_name, image_file_path, original_ingredients, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
     [
       item.itemId,
+      item.profileId,
       item.brandName,
       item.productName,
       item.imageFilePath,

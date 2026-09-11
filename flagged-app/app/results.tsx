@@ -5,7 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button, Badge } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { commitScanStats, canScan } from "../src/domain/scanService";
+import { getProfile } from "../src/db/repositories";
+import { commitScanStats, commitScanStatsForAll, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 import type { Match } from "../src/matching/matcher";
 
@@ -38,7 +39,14 @@ export default function Results() {
   const scannedFor = lastScan?.scannedFor ?? "";
 
   useEffect(() => {
-    if (lastScan) commitScanStats({ tokens: [], matches: lastScan.matches, isClean: lastScan.isClean }, isPremium);
+    if (!lastScan) return;
+    const result = { tokens: [], matches: lastScan.matches, isClean: lastScan.isClean };
+    const profiles = (lastScan.profileIds ?? []).map(getProfile).filter((p): p is NonNullable<typeof p> => !!p);
+    if (profiles.length > 1) {
+      commitScanStatsForAll(result, profiles, isPremium);
+    } else if (profiles.length === 1) {
+      commitScanStats(result, profiles[0], isPremium);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -10,6 +10,7 @@ jest.mock("../db/repositories", () => ({
   getIngredientTermMap: jest.fn(() => new Map<string, string>()),
   getStats: jest.fn(),
   saveStats: jest.fn(),
+  updateProfile: jest.fn(),
 }));
 
 import * as repo from "../db/repositories";
@@ -17,6 +18,7 @@ import {
   canScan,
   scansRemaining,
   commitScanStats,
+  commitScanStatsForAll,
   commitRecheckStats,
   evaluateScan,
   evaluateScanForAll,
@@ -35,7 +37,7 @@ const zeroStats = (): Stats => ({
   totalReformulationsCaught: 0,
 });
 
-/** Wire getStats/saveStats to a mutable in-memory row. */
+/** Wire getStats/saveStats to a mutable in-memory row (the shared trial counter). */
 function withStats(initial: Partial<Stats> = {}) {
   let row: Stats = { ...zeroStats(), ...initial };
   (repo.getStats as jest.Mock).mockImplementation(() => ({ ...row }));
@@ -43,6 +45,16 @@ function withStats(initial: Partial<Stats> = {}) {
     row = { ...s };
   });
   return () => row;
+}
+
+/** The Profile object(s) passed to updateProfile — the per-profile counters
+ * (docs/17) are committed by calling updateProfile with the whole updated row. */
+function lastUpdatedProfile(): Profile {
+  const calls = (repo.updateProfile as jest.Mock).mock.calls;
+  return calls[calls.length - 1][0];
+}
+function allUpdatedProfiles(): Profile[] {
+  return (repo.updateProfile as jest.Mock).mock.calls.map((c) => c[0] as Profile);
 }
 
 const clean: ScanResult = { tokens: [], matches: [], isClean: true };
@@ -64,6 +76,11 @@ const emptyProfile: Profile = {
   excludedIngredientIds: [],
   customIngredients: [],
   createdAt: 0,
+  totalLabelsRead: 0,
+  totalRedFlagsCaught: 0,
+  totalCleanScans: 0,
+  totalSkimpflationCaught: 0,
+  totalReformulationsCaught: 0,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -88,30 +105,85 @@ describe("canScan / scansRemaining", () => {
 });
 
 describe("commitScanStats", () => {
-  it("a clean trial scan: +1 label, +1 free scan, +1 clean", () => {
-    const read = withStats();
-    commitScanStats(clean, false);
-    expect(read()).toMatchObject({ totalLabelsRead: 1, freeScansUsed: 1, totalCleanScans: 1 });
+  it("a clean trial scan: +1 shared free scan, +1 label and +1 clean on the profile", () => {
+    const readStats = withStats();
+    commitScanStats(clean, emptyProfile, false);
+    expect(readStats().freeScansUsed).toBe(1);
+    expect(lastUpdatedProfile()).toMatchObject({ totalLabelsRead: 1, totalCleanScans: 1 });
   });
 
-  it("a flagged trial scan: +1 label, +1 free scan, +N red flags", () => {
-    const read = withStats();
-    commitScanStats(flagged(3), false);
-    expect(read()).toMatchObject({ totalLabelsRead: 1, freeScansUsed: 1, totalRedFlagsCaught: 3 });
-    expect(read().totalCleanScans).toBe(0);
+  it("a flagged trial scan: +1 shared free scan, +N red flags on the profile", () => {
+    const readStats = withStats();
+    commitScanStats(flagged(3), emptyProfile, false);
+    expect(readStats().freeScansUsed).toBe(1);
+    const p = lastUpdatedProfile();
+    expect(p.totalLabelsRead).toBe(1);
+    expect(p.totalRedFlagsCaught).toBe(3);
+    expect(p.totalCleanScans).toBe(0);
   });
 
-  it("premium never increments freeScansUsed", () => {
-    const read = withStats({ freeScansUsed: 4 });
-    commitScanStats(clean, true);
-    expect(read().freeScansUsed).toBe(4);
-    expect(read().totalLabelsRead).toBe(1);
+  it("premium never increments the shared trial counter; the profile still updates", () => {
+    const readStats = withStats({ freeScansUsed: 4 });
+    commitScanStats(clean, emptyProfile, true);
+    expect(readStats().freeScansUsed).toBe(4);
+    expect(lastUpdatedProfile().totalLabelsRead).toBe(1);
   });
 
-  it("freeScansUsed caps at 10", () => {
-    const read = withStats({ freeScansUsed: 10 });
-    commitScanStats(clean, false);
-    expect(read().freeScansUsed).toBe(10);
+  it("the shared freeScansUsed caps at 10", () => {
+    const readStats = withStats({ freeScansUsed: 10 });
+    commitScanStats(clean, emptyProfile, false);
+    expect(readStats().freeScansUsed).toBe(10);
+  });
+
+  it("doesn't touch other profiles — each accumulates independently across calls", () => {
+    withStats();
+    commitScanStats(clean, emptyProfile, false);
+    commitScanStats(flagged(2), { ...emptyProfile, profileId: "p2", name: "y" }, false);
+    const [p1, p2] = allUpdatedProfiles();
+    expect(p1.profileId).toBe("p");
+    expect(p1.totalCleanScans).toBe(1);
+    expect(p2.profileId).toBe("p2");
+    expect(p2.totalRedFlagsCaught).toBe(2);
+  });
+});
+
+describe("commitScanStatsForAll (docs/17 'All' mode)", () => {
+  const sofia: Profile = { ...emptyProfile, profileId: "sofia", name: "Sofia" };
+  const steve: Profile = { ...emptyProfile, profileId: "steve", name: "Steve" };
+
+  it("consumes exactly ONE shared trial credit no matter how many profiles", () => {
+    const readStats = withStats();
+    commitScanStatsForAll(clean, [sofia, steve], false);
+    expect(readStats().freeScansUsed).toBe(1);
+  });
+
+  it("a clean result marks every profile clean", () => {
+    withStats();
+    commitScanStatsForAll(clean, [sofia, steve], false);
+    for (const p of allUpdatedProfiles()) {
+      expect(p.totalLabelsRead).toBe(1);
+      expect(p.totalCleanScans).toBe(1);
+      expect(p.totalRedFlagsCaught).toBe(0);
+    }
+  });
+
+  it("a match attributed only to Sofia flags Sofia but leaves Steve clean", () => {
+    withStats();
+    const result: ScanResult = {
+      tokens: [],
+      isClean: false,
+      matches: [{ token: "milk", term: "milk", kind: "exact", score: 1, profileNames: ["Sofia"] }],
+    };
+    commitScanStatsForAll(result, [sofia, steve], false);
+    const updatedSofia = allUpdatedProfiles().find((p) => p.profileId === "sofia")!;
+    const updatedSteve = allUpdatedProfiles().find((p) => p.profileId === "steve")!;
+    expect(updatedSofia.totalRedFlagsCaught).toBe(1);
+    expect(updatedSofia.totalCleanScans).toBe(0);
+    expect(updatedSteve.totalRedFlagsCaught).toBe(0);
+    expect(updatedSteve.totalCleanScans).toBe(1);
+    // both still count the scan itself as a label read
+    expect(updatedSofia.totalLabelsRead).toBe(1);
+    expect(updatedSteve.totalLabelsRead).toBe(1);
   });
 });
 
@@ -173,59 +245,72 @@ describe("commitRecheckStats", () => {
     ...over,
   });
 
-  it("identical: +1 label, +1 free scan, no change counters", () => {
-    const read = withStats();
-    commitRecheckStats({ kind: "identical" }, false);
-    expect(read()).toMatchObject({
-      totalLabelsRead: 1,
-      freeScansUsed: 1,
-      totalReformulationsCaught: 0,
-      totalSkimpflationCaught: 0,
-    });
+  it("identical: +1 shared free scan, +1 label on the profile, no change counters", () => {
+    const readStats = withStats();
+    commitRecheckStats({ kind: "identical" }, emptyProfile, false);
+    expect(readStats().freeScansUsed).toBe(1);
+    const p = lastUpdatedProfile();
+    expect(p.totalLabelsRead).toBe(1);
+    expect(p.totalReformulationsCaught).toBe(0);
+    expect(p.totalSkimpflationCaught).toBe(0);
   });
 
-  it("reformulation (add/remove): +1 reformulations", () => {
-    const read = withStats();
-    commitRecheckStats({ kind: "changed_safe", diff: diff({ added: ["red 40"], changed: true }) }, false);
-    expect(read().totalReformulationsCaught).toBe(1);
-    expect(read().totalSkimpflationCaught).toBe(0);
+  it("reformulation (add/remove): +1 reformulations on the profile", () => {
+    withStats();
+    commitRecheckStats(
+      { kind: "changed_safe", diff: diff({ added: ["red 40"], changed: true }) },
+      emptyProfile,
+      false
+    );
+    const p = lastUpdatedProfile();
+    expect(p.totalReformulationsCaught).toBe(1);
+    expect(p.totalSkimpflationCaught).toBe(0);
   });
 
-  it("order shift only: +1 skimpflation", () => {
-    const read = withStats();
-    commitRecheckStats({ kind: "changed_safe", diff: diff({ orderShifted: true, changed: true }) }, false);
-    expect(read().totalSkimpflationCaught).toBe(1);
-    expect(read().totalReformulationsCaught).toBe(0);
+  it("order shift only: +1 skimpflation on the profile", () => {
+    withStats();
+    commitRecheckStats(
+      { kind: "changed_safe", diff: diff({ orderShifted: true, changed: true }) },
+      emptyProfile,
+      false
+    );
+    const p = lastUpdatedProfile();
+    expect(p.totalSkimpflationCaught).toBe(1);
+    expect(p.totalReformulationsCaught).toBe(0);
   });
 
   it("both at once: +1 each", () => {
-    const read = withStats();
+    withStats();
     commitRecheckStats(
       { kind: "changed_safe", diff: diff({ added: ["x"], orderShifted: true, changed: true }) },
+      emptyProfile,
       false
     );
-    expect(read().totalReformulationsCaught).toBe(1);
-    expect(read().totalSkimpflationCaught).toBe(1);
+    const p = lastUpdatedProfile();
+    expect(p.totalReformulationsCaught).toBe(1);
+    expect(p.totalSkimpflationCaught).toBe(1);
   });
 
   it("changed_flagged also adds red flags", () => {
-    const read = withStats();
+    withStats();
     commitRecheckStats(
       {
         kind: "changed_flagged",
         diff: diff({ added: ["red 40"], changed: true }),
         matches: [{ token: "red 40", term: "red 40", kind: "exact", score: 1 }],
       },
+      emptyProfile,
       false
     );
-    expect(read().totalRedFlagsCaught).toBe(1);
-    expect(read().totalReformulationsCaught).toBe(1);
+    const p = lastUpdatedProfile();
+    expect(p.totalRedFlagsCaught).toBe(1);
+    expect(p.totalReformulationsCaught).toBe(1);
   });
 
-  it("premium recheck: label counts, free scan does not", () => {
-    const read = withStats({ freeScansUsed: 2 });
-    commitRecheckStats({ kind: "identical" }, true);
-    expect(read().freeScansUsed).toBe(2);
-    expect(read().totalLabelsRead).toBe(1);
+  it("premium recheck: profile label count still moves, shared free scan does not", () => {
+    const readStats = withStats({ freeScansUsed: 2 });
+    commitRecheckStats({ kind: "identical" }, emptyProfile, true);
+    expect(readStats().freeScansUsed).toBe(2);
+    expect(lastUpdatedProfile().totalLabelsRead).toBe(1);
   });
 });
