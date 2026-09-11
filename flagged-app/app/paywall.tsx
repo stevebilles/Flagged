@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Linking } from "react-native";
+import { ScrollView, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen, Text, Card, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
@@ -34,7 +34,10 @@ export default function Paywall() {
 
   return (
     <Screen>
-      <View style={{ flex: 1, justifyContent: "center", gap: t.spacing.lg }}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: t.spacing.lg }}
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="heading" bold>Unlimited label reading, all year.</Text>
         <Card style={{ alignItems: "center", gap: t.spacing.sm }}>
           <Text variant="display" bold tone="cyan">$24.99 / yr</Text>
@@ -68,7 +71,7 @@ export default function Paywall() {
           </Text>
         </Text>
         <Button title="Not now" kind="secondary" onPress={() => router.back()} />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

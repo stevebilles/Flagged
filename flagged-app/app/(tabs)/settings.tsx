@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, TextInput, Linking, Platform } from "react-native";
+import { View, ScrollView, TextInput, Linking, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
@@ -46,7 +46,7 @@ export default function Settings() {
 
   return (
     <Screen>
-      <View style={{ gap: t.spacing.lg }}>
+      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
         <View style={{ gap: t.spacing.sm }}>
           <Text tone="muted" variant="caption">FIRST NAME</Text>
           <Card>
@@ -143,7 +143,7 @@ export default function Settings() {
             </Card>
           </View>
         )}
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

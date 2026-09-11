@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TextInput, Image } from "react-native";
+import { ScrollView, TextInput, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../src/design/components";
@@ -61,7 +61,10 @@ export default function SaveToPantry() {
 
   return (
     <Screen>
-      <View style={{ gap: t.spacing.md, flex: 1, justifyContent: "center" }}>
+      <ScrollView
+        contentContainerStyle={{ gap: t.spacing.md, flexGrow: 1, justifyContent: "center" }}
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="title" bold>Save to Pantry</Text>
         <Text tone="muted" variant="caption">
           Snap a photo of the front of the packaging, then name it.
@@ -95,7 +98,7 @@ export default function SaveToPantry() {
         </Card>
         <Button title="Save" onPress={save} disabled={!brand.trim() || !product.trim()} />
         <Button title="Cancel" kind="secondary" onPress={() => router.back()} />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }
