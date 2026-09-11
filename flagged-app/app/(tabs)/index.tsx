@@ -31,7 +31,6 @@ export default function Home() {
   const savedCount = useMemo(() => getActivePantryItems().length, []);
   const firstName = getMetaValue("firstName") ?? "";
   const activeProfile = profiles.find((p) => p.profileId === activeProfileId);
-  const showRecheckStats = stats.totalSkimpflationCaught > 0 || stats.totalReformulationsCaught > 0;
 
   return (
     <Screen>
@@ -109,12 +108,10 @@ export default function Home() {
           <Pillar label="Saved" value={savedCount} tone="primary" />
           <Pillar label="Flags" value={stats.totalRedFlagsCaught} tone="red" />
         </View>
-        {showRecheckStats && (
-          <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-            <Pillar label="Skimpflation Caught" value={stats.totalSkimpflationCaught} tone="warning" />
-            <Pillar label="Reformulation Caught" value={stats.totalReformulationsCaught} tone="warning" />
-          </View>
-        )}
+        <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+          <Pillar label="Skimpflation Caught" value={stats.totalSkimpflationCaught} tone="warning" />
+          <Pillar label="Reformulation Caught" value={stats.totalReformulationsCaught} tone="warning" />
+        </View>
 
         <Button title="📷  Scan a label" onPress={() => router.push("/(tabs)/scan")} />
       </ScrollView>
