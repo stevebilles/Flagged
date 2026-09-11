@@ -17,12 +17,16 @@ export type ScanEvaluation =
   | { status: "aborted"; reason: "illegible" } // does NOT consume a free scan
   | { status: "result"; result: ScanResult };
 
-/** Attach the catching filter's name to each match (docs/07 breakdown card). */
+/** Attach the catching filter's name + classification to each match (docs/07 breakdown card). */
 export function attributeMatches(matches: Match[], meta: Map<string, RedFlagMeta>): Match[] {
-  return matches.map((m) => ({
-    ...m,
-    categoryName: m.categoryName ?? meta.get(m.term)?.categoryName,
-  }));
+  return matches.map((m) => {
+    const found = meta.get(m.term);
+    return {
+      ...m,
+      categoryName: m.categoryName ?? found?.categoryName,
+      classification: m.classification ?? found?.classification,
+    };
+  });
 }
 
 /** Evaluate a captured paragraph for a profile. Pure (no stats writes). */

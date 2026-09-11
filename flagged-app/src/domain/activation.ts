@@ -113,6 +113,8 @@ export interface RedFlagMeta {
   categoryId: string | null;
   /** Display name of the filter: the category name, or "Custom ingredient". */
   categoryName: string;
+  /** Badge shown on the results screen (docs/09); a custom term reads as "preference". */
+  classification: Category["classification"];
 }
 
 /**
@@ -136,12 +138,16 @@ export function effectiveRedFlagMeta(
       const term = ingredientTermById.get(ingId);
       if (!term) continue;
       const key = term.toLowerCase();
-      if (!map.has(key)) map.set(key, { categoryId: cat.id, categoryName: cat.name });
+      if (!map.has(key)) {
+        map.set(key, { categoryId: cat.id, categoryName: cat.name, classification: cat.classification });
+      }
     }
   }
   for (const custom of profile.customIngredients) {
     const key = custom.toLowerCase();
-    if (!map.has(key)) map.set(key, { categoryId: null, categoryName: "Custom ingredient" });
+    if (!map.has(key)) {
+      map.set(key, { categoryId: null, categoryName: "Custom ingredient", classification: "preference" });
+    }
   }
   return map;
 }

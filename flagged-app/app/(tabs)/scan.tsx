@@ -34,6 +34,10 @@ export default function Scan() {
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const activeProfileName = useMemo(
+    () => (activeProfileId ? getProfile(activeProfileId)?.name : null),
+    [activeProfileId]
+  );
 
   function runScan(rawParagraph: string, source: "camera" | "paste" | "photo" = "camera") {
     setError(null);
@@ -134,23 +138,76 @@ export default function Scan() {
   // State 1 — standby
   return (
     <Screen>
-      <View style={{ flex: 2, alignItems: "center", justifyContent: "center", gap: t.spacing.md }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text variant="heading" bold>Scan</Text>
         {!isPremium && (
-          <Card style={{ borderRadius: t.radius.pill, paddingVertical: t.spacing.sm }}>
-            <Text tone="cyan" bold>
-              Scans Remaining: {remaining} / 10
+          <View
+            style={{
+              borderRadius: t.radius.pill,
+              borderWidth: 1,
+              borderColor: t.colors.cyan,
+              paddingVertical: 6,
+              paddingHorizontal: t.spacing.sm,
+            }}
+          >
+            <Text tone="cyan" bold variant="caption">
+              {remaining} / 10 SCANS LEFT
             </Text>
-          </Card>
+          </View>
         )}
-        <Ionicons name="scan-outline" size={96} color={t.colors.textMuted} />
-        <Text tone="muted">Point at an ingredient list — no shutter needed.</Text>
-        {error && <Text tone="red" style={{ textAlign: "center" }}>{error}</Text>}
       </View>
 
-      <View style={{ flex: 1, gap: t.spacing.sm, justifyContent: "flex-end", paddingBottom: t.spacing.lg }}>
-        <Button title="Start Camera Scanner" onPress={() => setCameraOpen(true)} />
-        <Button title="Paste" kind="secondary" onPress={onPaste} />
-        <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} />
+      <View
+        style={{
+          flex: 1,
+          marginTop: t.spacing.lg,
+          borderRadius: t.radius.lg,
+          backgroundColor: t.colors.card,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: t.spacing.sm,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            width: "70%",
+            height: "48%",
+            borderWidth: 2,
+            borderStyle: "dashed",
+            borderRadius: t.radius.md,
+            borderColor: t.colors.cyan,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="scan-outline" size={28} color={t.colors.cyan} />
+          <Text tone="cyan" bold variant="caption" style={{ textAlign: "center" }}>
+            POINT AT{"\n"}INGREDIENT LIST
+          </Text>
+        </View>
+      </View>
+      <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
+        Hold steady over the ingredient list
+      </Text>
+      {activeProfileName && (
+        <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+          Profile: <Text tone="cyan" bold>{activeProfileName}</Text>
+        </Text>
+      )}
+      {error && (
+        <Text tone="red" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+          {error}
+        </Text>
+      )}
+
+      <View style={{ gap: t.spacing.sm, marginTop: t.spacing.lg, paddingBottom: t.spacing.lg }}>
+        <Button title="🎥  Scan Label" onPress={() => setCameraOpen(true)} />
+        <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+          <Button title="Paste Text" kind="secondary" onPress={onPaste} style={{ flex: 1 }} />
+          <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} style={{ flex: 1 }} />
+        </View>
       </View>
     </Screen>
   );

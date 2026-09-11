@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen, Text, Card, Button } from "../src/design/components";
+import { Screen, Text, Card, Button, Badge } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import { getProfile } from "../src/db/repositories";
@@ -10,9 +10,9 @@ import { commitScanStats, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 
 /**
- * Results screen (docs/07). Clean (cyan) vs Flagged (red). Commits stats on mount
- * (this scan successfully reached a result — docs/06/08). Highlights offending
- * tokens in the paragraph and explains the breakdown.
+ * Results screen (docs/07, docs/17 mockup). Clean (cyan) vs Flagged (red).
+ * Commits stats on mount (this scan successfully reached a result — docs/06/08).
+ * Highlights offending tokens in the paragraph and explains the breakdown.
  */
 export default function Results() {
   const t = useTheme();
@@ -71,44 +71,100 @@ export default function Results() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }}>
-        <View style={{ alignItems: "center", gap: t.spacing.sm }}>
-          <Ionicons
-            name={clean ? "checkmark-circle" : "warning"}
-            size={64}
-            color={clean ? t.colors.cyan : t.colors.red}
-          />
-          <Text variant="title" bold tone={clean ? "cyan" : "red"}>
-            {clean ? "No red flags detected." : "Red flags detected."}
-          </Text>
+      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: t.colors.card,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: t.spacing.sm,
+            }}
+          >
+            <Ionicons name="chevron-back" size={18} color={t.colors.textPrimary} />
+          </Pressable>
+          <Text variant="title" bold>Result</Text>
         </View>
 
-        {/* Ingredient paragraph with the matched words highlighted */}
-        <Card>
-          <Text style={{ lineHeight: 24 }}>
-            {segments.map((seg, idx) => (
-              <Text key={idx} tone={seg.flag ? "red" : "primary"} bold={seg.flag}>
-                {seg.text}
-              </Text>
-            ))}
+        <Card style={{ alignItems: "center", gap: t.spacing.sm }}>
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: clean ? "rgba(34,211,238,0.12)" : "rgba(239,68,68,0.12)",
+            }}
+          >
+            <Ionicons
+              name={clean ? "checkmark-circle" : "close-circle"}
+              size={40}
+              color={clean ? t.colors.cyan : t.colors.red}
+            />
+          </View>
+          <Text variant="title" bold tone={clean ? "cyan" : "red"}>
+            {clean ? "No red flags" : "Red flags detected"}
+          </Text>
+          <Text tone="muted">
+            {clean
+              ? `All ingredients clear${profileName ? ` for ${profileName}` : ""}`
+              : `${lastScan.matches.length} match${lastScan.matches.length === 1 ? "" : "es"} found${
+                  profileName ? ` for ${profileName}` : ""
+                }`}
           </Text>
         </Card>
 
-        {!clean && (
+        {/* Ingredient paragraph with the matched words highlighted */}
+        <View style={{ gap: t.spacing.sm }}>
+          <Text tone="muted" variant="caption">INGREDIENTS</Text>
           <Card>
-            <Text bold>Why it was flagged</Text>
-            {lastScan.matches.map((m, i) => {
-              const filter = m.categoryName ?? m.term;
-              const who = profileName ? `${profileName}'s ` : "your ";
-              return (
-                <Text key={i} tone="muted" variant="caption">
-                  • "{m.token}" — matches {who}
-                  {filter} filter
-                  {m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}% match)` : ""}
+            <Text style={{ lineHeight: 24 }}>
+              {segments.map((seg, idx) => (
+                <Text key={idx} tone={seg.flag ? "red" : "primary"} bold={seg.flag}>
+                  {seg.text}
                 </Text>
-              );
-            })}
+              ))}
+            </Text>
           </Card>
+        </View>
+
+        {!clean && (
+          <View style={{ gap: t.spacing.sm }}>
+            <Text tone="muted" variant="caption">
+              MATCHES — {lastScan.matches.length} FOUND
+            </Text>
+            <Card style={{ gap: t.spacing.md }}>
+              {lastScan.matches.map((m, i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: t.spacing.sm,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: t.colors.canvas,
+                    paddingTop: i === 0 ? 0 : t.spacing.sm,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text bold>{m.token}</Text>
+                    <Text tone="muted" variant="caption">
+                      matches {m.categoryName ?? m.term}
+                      {m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}%)` : ""}
+                    </Text>
+                  </View>
+                  <Badge classification={m.classification ?? "preference"} />
+                </View>
+              ))}
+            </Card>
+          </View>
         )}
 
         <View style={{ gap: t.spacing.sm }}>

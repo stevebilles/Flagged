@@ -1,5 +1,6 @@
 import { similarity } from "./levenshtein";
 import { normalizeParagraph, regexClean } from "./normalize";
+import type { Classification } from "../domain/types";
 
 /** Hybrid matcher: normalize → whole-word/phrase presence → fuzzy (docs/06 Step 3). */
 
@@ -11,11 +12,12 @@ export interface Match {
   kind: "exact" | "fuzzy";
   score: number; // 1 for exact, similarity ratio for fuzzy
   /**
-   * The filter that caught this term (category name, or "Custom ingredient").
-   * Populated by the scan/recheck layer (see attributeMatches); the pure matcher
-   * leaves it undefined.
+   * The filter that caught this term (category name, or "Custom ingredient"), and
+   * its classification badge (docs/09). Populated by the scan/recheck layer (see
+   * attributeMatches); the pure matcher leaves both undefined.
    */
   categoryName?: string;
+  classification?: Classification;
 }
 
 export interface ScanResult {
