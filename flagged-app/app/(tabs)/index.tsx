@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, Pressable, Text as RNText } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
@@ -65,7 +65,7 @@ export default function Home() {
             {profiles.length > 1 && (
               <AllChip selected={viewingAll} onPress={() => setViewingAll(true)} />
             )}
-            <Button title="+ Add" kind="secondary" onPress={() => router.push("/profile-edit?new=1")} />
+            <Pill label="+ Add" onPress={() => router.push("/profile-edit?new=1")} />
           </ScrollView>
         </View>
 
@@ -116,7 +116,7 @@ export default function Home() {
           </View>
         )}
 
-        <Button title="📷  Scan a Label" onPress={() => router.push("/(tabs)/scan")} />
+        <Button title="📷  Scan a label" onPress={() => router.push("/(tabs)/scan")} />
       </ScrollView>
     </Screen>
   );
@@ -143,6 +143,58 @@ function Pillar({
   );
 }
 
+/** Shared pill shell for the profile switcher row (docs/17 mockup). */
+function Chip({
+  selected,
+  onPress,
+  children,
+}: {
+  selected: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        backgroundColor: t.colors.card,
+        borderRadius: t.radius.pill,
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? t.colors.cyan : t.colors.textMuted,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+/** Small filled circle used for both the profile avatar and the "All" icon. */
+function AvatarDot({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: color,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
 function ProfileChip({
   profile,
   selected,
@@ -153,28 +205,53 @@ function ProfileChip({
   onPress: () => void;
 }) {
   const t = useTheme();
-  const color = profileColor(profile.profileId);
   return (
-    <Button
-      title={`${initials(profile.name)}  ${profile.name}`}
-      kind="secondary"
-      onPress={onPress}
-      style={{
-        borderColor: selected ? t.colors.cyan : t.colors.textMuted,
-        borderWidth: selected ? 2 : 1,
-      }}
-    />
+    <Chip selected={selected} onPress={onPress}>
+      <AvatarDot color={profileColor(profile.profileId)}>
+        <RNText style={{ fontSize: 10, fontFamily: t.fontFamily.bold, color: "#0B1220" }}>
+          {initials(profile.name)}
+        </RNText>
+      </AvatarDot>
+      <Text bold tone={selected ? "cyan" : "primary"}>
+        {profile.name}
+      </Text>
+    </Chip>
   );
 }
 
 function AllChip({ selected, onPress }: { selected: boolean; onPress: () => void }) {
   const t = useTheme();
   return (
-    <Button
-      title="All"
-      kind="secondary"
+    <Chip selected={selected} onPress={onPress}>
+      <AvatarDot color="rgba(34,211,238,0.18)">
+        <Ionicons name="shield-checkmark" size={13} color={t.colors.cyan} />
+      </AvatarDot>
+      <Text bold tone={selected ? "cyan" : "primary"}>
+        All
+      </Text>
+    </Chip>
+  );
+}
+
+/** Plain outlined pill — used for "+ Add" (no avatar). */
+function Pill({ label, onPress }: { label: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
       onPress={onPress}
-      style={{ borderColor: selected ? t.colors.cyan : t.colors.textMuted, borderWidth: selected ? 2 : 1 }}
-    />
+      style={({ pressed }) => ({
+        backgroundColor: t.colors.card,
+        borderRadius: t.radius.pill,
+        borderWidth: 1,
+        borderColor: t.colors.textMuted,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        justifyContent: "center",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Text bold>{label}</Text>
+    </Pressable>
   );
 }
