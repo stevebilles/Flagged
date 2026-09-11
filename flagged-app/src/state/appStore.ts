@@ -6,6 +6,10 @@ import type { Profile, ScanResultLike, RecheckHandoff } from "./storeTypes";
 
 interface AppState {
   activeProfileId: string | null;
+  // "All profiles" scan mode (docs/17): a shared flag, not a Home-local toggle,
+  // so Scan checks everyone's combined filters when it's on. No stored data of
+  // its own — it's computed live from every real profile at scan time.
+  scanAllProfiles: boolean;
   isPremium: boolean;
   hasOnboarded: boolean;
   // ephemeral hand-off of the last scan into the results route
@@ -15,6 +19,7 @@ interface AppState {
 
   hydrate: () => void;
   setActiveProfile: (id: string) => void;
+  setScanAllProfiles: (v: boolean) => void;
   setPremium: (v: boolean) => void;
   completeOnboarding: () => void;
   setLastScan: (s: ScanResultLike | null) => void;
@@ -22,10 +27,12 @@ interface AppState {
 }
 
 const KEY_ACTIVE_PROFILE = "activeProfileId";
+const KEY_SCAN_ALL = "scanAllProfiles";
 const KEY_ONBOARDED = "hasOnboarded";
 
 export const useAppStore = create<AppState>((set) => ({
   activeProfileId: null,
+  scanAllProfiles: false,
   isPremium: false,
   hasOnboarded: false,
   lastScan: null,
@@ -40,6 +47,7 @@ export const useAppStore = create<AppState>((set) => ({
         : profiles[0]?.profileId ?? null;
     set({
       activeProfileId,
+      scanAllProfiles: getMetaValue(KEY_SCAN_ALL) === "1",
       isPremium: isPremiumCached(),
       hasOnboarded: getMetaValue(KEY_ONBOARDED) === "1",
     });
@@ -47,7 +55,11 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveProfile: (id) => {
     setMetaValue(KEY_ACTIVE_PROFILE, id);
-    set({ activeProfileId: id });
+    set({ activeProfileId: id, scanAllProfiles: false });
+  },
+  setScanAllProfiles: (v) => {
+    setMetaValue(KEY_SCAN_ALL, v ? "1" : "0");
+    set({ scanAllProfiles: v });
   },
   setPremium: (v) => set({ isPremium: v }),
   completeOnboarding: () => {

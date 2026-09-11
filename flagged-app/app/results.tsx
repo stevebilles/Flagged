@@ -5,9 +5,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button, Badge } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getProfile } from "../src/db/repositories";
 import { commitScanStats, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
+import type { Match } from "../src/matching/matcher";
+
+/** "matches Sofia's Big-9 Allergens filter" / "...Sofia & Steve's..." (docs/17 "All" mode). */
+function matchCaption(m: Match): string {
+  const filter = m.categoryName ?? m.term;
+  const fuzzy = m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}%)` : "";
+  if (m.profileNames && m.profileNames.length > 0) {
+    const names = m.profileNames;
+    const who =
+      names.length === 1 ? `${names[0]}'s` : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}'s`;
+    return `matches ${who} ${filter} filter${fuzzy}`;
+  }
+  return `matches ${filter}${fuzzy}`;
+}
 
 /**
  * Results screen (docs/07, docs/17 mockup). Clean (cyan) vs Flagged (red).
@@ -19,11 +32,10 @@ export default function Results() {
   const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
   const lastScan = useAppStore((s) => s.lastScan);
-  const activeProfileId = useAppStore((s) => s.activeProfileId);
-  const profileName = useMemo(
-    () => (activeProfileId ? getProfile(activeProfileId)?.name ?? "" : ""),
-    [activeProfileId]
-  );
+  // Decided at scan time (a specific profile's name, or "all N profiles") —
+  // not re-derived from the current active profile, which may have changed
+  // since this scan ran.
+  const scannedFor = lastScan?.scannedFor ?? "";
 
   useEffect(() => {
     if (lastScan) commitScanStats({ tokens: [], matches: lastScan.matches, isClean: lastScan.isClean }, isPremium);
@@ -113,9 +125,9 @@ export default function Results() {
           </Text>
           <Text tone="muted">
             {clean
-              ? `All ingredients clear${profileName ? ` for ${profileName}` : ""}`
+              ? `All ingredients clear${scannedFor ? ` for ${scannedFor}` : ""}`
               : `${lastScan.matches.length} match${lastScan.matches.length === 1 ? "" : "es"} found${
-                  profileName ? ` for ${profileName}` : ""
+                  scannedFor ? ` for ${scannedFor}` : ""
                 }`}
           </Text>
         </Card>
@@ -140,9 +152,7 @@ export default function Results() {
           </Text>
           <Card style={{ gap: t.spacing.md }}>
             {clean ? (
-              <Text tone="muted">
-                Nothing matched {profileName ? `${profileName}'s` : "your"} filters in this label.
-              </Text>
+              <Text tone="muted">Nothing matched any active filters in this label.</Text>
             ) : (
               lastScan.matches.map((m, i) => (
                 <View
@@ -160,8 +170,7 @@ export default function Results() {
                   <View style={{ flex: 1 }}>
                     <Text bold>{m.token}</Text>
                     <Text tone="muted" variant="caption">
-                      matches {m.categoryName ?? m.term}
-                      {m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}%)` : ""}
+                      {matchCaption(m)}
                     </Text>
                   </View>
                   <Badge classification={m.classification ?? "preference"} />

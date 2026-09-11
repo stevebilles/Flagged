@@ -19,8 +19,9 @@ import {
   commitScanStats,
   commitRecheckStats,
   evaluateScan,
+  evaluateScanForAll,
 } from "../domain/scanService";
-import type { Stats, Profile } from "../domain/types";
+import type { Stats, Profile, Category } from "../domain/types";
 import type { ScanResult } from "../matching/matcher";
 import type { DiffResult } from "../domain/diffEngine";
 
@@ -127,6 +128,39 @@ describe("evaluateScan — illegible abort does not touch stats", () => {
       emptyProfile
     );
     expect(e.status).toBe("result");
+  });
+});
+
+describe("evaluateScanForAll (docs/17 'All' mode)", () => {
+  const categories: Category[] = [
+    { id: "milk", name: "Milk", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-milk"] },
+    { id: "nuts", name: "Tree Nuts", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-almond"] },
+  ];
+  const termById = new Map([
+    ["i-milk", "milk"],
+    ["i-almond", "almond"],
+  ]);
+  const sofia: Profile = { ...emptyProfile, profileId: "sofia", name: "Sofia", activeCategoryIds: ["milk"] };
+  const steve: Profile = { ...emptyProfile, profileId: "steve", name: "Steve", activeCategoryIds: ["nuts"] };
+
+  it("catches a match against any single profile's filters and names whose it was", () => {
+    (repo.getCategories as jest.Mock).mockReturnValueOnce(categories);
+    (repo.getIngredientTermMap as jest.Mock).mockReturnValueOnce(termById);
+    const e = evaluateScanForAll("Ingredients: water, milk, salt", [sofia, steve]);
+    expect(e.status).toBe("result");
+    if (e.status !== "result") return;
+    expect(e.result.isClean).toBe(false);
+    const m = e.result.matches.find((mm) => mm.term === "milk");
+    expect(m?.profileNames).toEqual(["Sofia"]);
+    expect(m?.categoryName).toBe("Milk");
+  });
+
+  it("clean when nothing matches any profile's filters", () => {
+    (repo.getCategories as jest.Mock).mockReturnValueOnce(categories);
+    (repo.getIngredientTermMap as jest.Mock).mockReturnValueOnce(termById);
+    const e = evaluateScanForAll("Ingredients: water, sugar, salt", [sofia, steve]);
+    expect(e.status).toBe("result");
+    if (e.status === "result") expect(e.result.isClean).toBe(true);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   isPackActive,
   selectPack,
   effectiveRedFlagTerms,
+  effectiveRedFlagMetaForAll,
 } from "../domain/activation";
 import type { Category, Profile, QuickPack } from "../domain/types";
 
@@ -235,6 +236,51 @@ describe("effective red-flag set", () => {
     expect(terms).toContain("red 40");
     expect(terms).not.toContain("yellow 5");
     expect(terms).toContain("carrageenan");
+  });
+});
+
+describe("effectiveRedFlagMetaForAll (docs/17 'All' mode)", () => {
+  const categories: Category[] = [
+    { id: "dyes", name: "Artificial Dyes", parentGroup: "Additives", classification: "advisory", ingredientIds: ["i-red40"] },
+    { id: "milk", name: "Milk", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-milk"] },
+    { id: "nuts", name: "Tree Nuts", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-almond"] },
+  ];
+  const termById = new Map([
+    ["i-red40", "red 40"],
+    ["i-milk", "milk"],
+    ["i-almond", "almond"],
+  ]);
+  const sofia: Profile = {
+    profileId: "sofia", name: "Sofia", activeCategoryIds: ["dyes", "milk"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+  };
+  const steve: Profile = {
+    profileId: "steve", name: "Steve", activeCategoryIds: ["milk", "nuts"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+  };
+
+  it("unions every profile's terms", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(new Set(meta.keys())).toEqual(new Set(["red 40", "milk", "almond"]));
+  });
+
+  it("a term only one profile has names just that profile", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("red 40")?.profileNames).toEqual(["Sofia"]);
+    expect(meta.get("almond")?.profileNames).toEqual(["Steve"]);
+  });
+
+  it("a term shared by two profiles names both, without duplicates", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("milk")?.profileNames).toEqual(["Sofia", "Steve"]);
+  });
+
+  it("carries the classification through for badges", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("milk")?.classification).toBe("regulated");
+    expect(meta.get("red 40")?.classification).toBe("advisory");
+  });
+
+  it("returns an empty set for an empty profile list", () => {
+    expect(effectiveRedFlagMetaForAll([], categories, termById).size).toBe(0);
   });
 });
 

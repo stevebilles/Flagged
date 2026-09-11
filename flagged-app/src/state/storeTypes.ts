@@ -9,6 +9,10 @@ export interface ScanResultLike {
   isClean: boolean;
   // set when this scan is a pantry recheck
   recheckItemId?: string;
+  /** Display label for who this scan was run for — a profile's name, or
+   * "all N profiles" — decided at scan time so Results doesn't have to guess
+   * from the (possibly since-changed) active profile. */
+  scannedFor?: string;
 }
 
 /** Hand-off from the recheck capture screen to the recheck-result screen (docs/07). */

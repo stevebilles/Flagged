@@ -24,8 +24,10 @@ export default function Home() {
   const router = useRouter();
   const activeProfileId = useAppStore((s) => s.activeProfileId);
   const setActiveProfile = useAppStore((s) => s.setActiveProfile);
-  // "All" is a Home-screen view only — it doesn't change which profile Scan uses.
-  const [viewingAll, setViewingAll] = useState(false);
+  // "All" is shared app-wide (not just a Home display toggle) — Scan reads the
+  // same flag so it actually checks every profile's combined filters.
+  const viewingAll = useAppStore((s) => s.scanAllProfiles);
+  const setViewingAll = useAppStore((s) => s.setScanAllProfiles);
 
   // Re-read from the DB every time Home gains focus (not just on first mount) —
   // a rename in the profile editor, a completed scan, or a Pantry save all

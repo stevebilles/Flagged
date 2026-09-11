@@ -18,6 +18,8 @@ export interface Match {
    */
   categoryName?: string;
   classification?: Classification;
+  /** Which profile(s) this term belongs to — only set for an "All profiles" scan. */
+  profileNames?: string[];
 }
 
 export interface ScanResult {

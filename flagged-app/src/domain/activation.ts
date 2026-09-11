@@ -151,3 +151,37 @@ export function effectiveRedFlagMeta(
   }
   return map;
 }
+
+/** RedFlagMeta plus which profile(s) a term came from — the "All" scan mode. */
+export interface AllProfilesMeta extends RedFlagMeta {
+  profileNames: string[];
+}
+
+/**
+ * Union of every profile's effective red-flag terms (docs/17 "All" mockup): a
+ * scan run under "All" checks everyone's filters in one pass. Each term keeps
+ * the name(s) of every profile it's active for, so a result can say whose
+ * filter it was ("matches Sofia's Big-9 Allergens filter") — a term shared by
+ * two profiles' filters lists both. The category/classification of the first
+ * profile that has the term wins (same stable-first-wins rule as a single
+ * profile's own effectiveRedFlagMeta).
+ */
+export function effectiveRedFlagMetaForAll(
+  profiles: Profile[],
+  categories: Category[],
+  ingredientTermById: Map<string, string>
+): Map<string, AllProfilesMeta> {
+  const map = new Map<string, AllProfilesMeta>();
+  for (const profile of profiles) {
+    const meta = effectiveRedFlagMeta(profile, categories, ingredientTermById);
+    for (const [term, m] of meta) {
+      const existing = map.get(term);
+      if (existing) {
+        if (!existing.profileNames.includes(profile.name)) existing.profileNames.push(profile.name);
+      } else {
+        map.set(term, { ...m, profileNames: [profile.name] });
+      }
+    }
+  }
+  return map;
+}

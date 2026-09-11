@@ -7,8 +7,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Screen, Text, Button, Card } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
-import { getProfile } from "../../src/db/repositories";
-import { canScan, evaluateScan, scansRemaining } from "../../src/domain/scanService";
+import { getProfile, getProfiles } from "../../src/db/repositories";
+import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
@@ -28,6 +28,7 @@ export default function Scan() {
   const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
   const activeProfileId = useAppStore((s) => s.activeProfileId);
+  const scanAllProfiles = useAppStore((s) => s.scanAllProfiles);
   const setLastScan = useAppStore((s) => s.setLastScan);
 
   // Re-read on every focus, not just first mount — a scan completed elsewhere
@@ -41,22 +42,48 @@ export default function Scan() {
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const activeProfileName = useMemo(
-    () => (activeProfileId ? getProfile(activeProfileId)?.name : null),
-    [activeProfileId]
-  );
+
+  // Who this scan will run for, and whether that's actually possible right now
+  // (mirrors Home's "no silent empty state" rule — explain, don't just vanish).
+  const scanContext = useMemo(() => {
+    if (scanAllProfiles) {
+      const count = getProfiles().length;
+      return count > 0
+        ? { label: `All Profiles (${count})`, ready: true as const }
+        : { label: "No profiles yet — add one from Home before scanning", ready: false as const };
+    }
+    const name = activeProfileId ? getProfile(activeProfileId)?.name : null;
+    return name
+      ? { label: name, ready: true as const }
+      : { label: "No profile selected — add one from Home before scanning", ready: false as const };
+  }, [scanAllProfiles, activeProfileId]);
 
   function runScan(rawParagraph: string, source: "camera" | "paste" | "photo" = "camera") {
     setError(null);
-    const profile = activeProfileId ? getProfile(activeProfileId) : null;
-    if (!profile) {
-      setError("No active profile.");
-      return;
-    }
     // Strip everything that isn't the ingredient list (2nd language, nutrition
     // panel, marketing) before it reaches the matcher or the results screen.
     const paragraph = extractIngredientList(rawParagraph);
-    const evaln = evaluateScan(paragraph, profile);
+
+    let evaln;
+    let scannedFor: string;
+    if (scanAllProfiles) {
+      const profiles = getProfiles();
+      if (profiles.length === 0) {
+        setError("No profiles yet — add one from Home first.");
+        return;
+      }
+      evaln = evaluateScanForAll(paragraph, profiles);
+      scannedFor = `all ${profiles.length} profile${profiles.length === 1 ? "" : "s"}`;
+    } else {
+      const profile = activeProfileId ? getProfile(activeProfileId) : null;
+      if (!profile) {
+        setError("No active profile.");
+        return;
+      }
+      evaln = evaluateScan(paragraph, profile);
+      scannedFor = profile.name;
+    }
+
     if (evaln.status === "aborted") {
       logScanDebug(source, rawParagraph, paragraph, "ABORTED (illegible)");
       // Illegible does NOT consume a free scan (docs/06/08).
@@ -74,7 +101,7 @@ export default function Scan() {
               .map((mm) => mm.term + (mm.categoryName ? ` [${mm.categoryName}]` : ""))
               .join(", ")
     );
-    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean });
+    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean, scannedFor });
     router.push("/results");
   }
 
@@ -199,14 +226,12 @@ export default function Scan() {
         Hold steady over the ingredient list
       </Text>
       <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
-        {activeProfileName ? (
+        {scanContext.ready ? (
           <>
-            Profile: <Text tone="cyan" bold>{activeProfileName}</Text>
+            Profile: <Text tone="cyan" bold>{scanContext.label}</Text>
           </>
         ) : (
-          <Text tone="warning" bold>
-            No profile selected — add one from Home before scanning
-          </Text>
+          <Text tone="warning" bold>{scanContext.label}</Text>
         )}
       </Text>
       {error && (
