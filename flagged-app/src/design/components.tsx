@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "./ThemeProvider";
 
 type Variant = "body" | "caption" | "title" | "heading" | "display";
@@ -180,11 +181,30 @@ export function Badge({ classification }: { classification: Classification }) {
   );
 }
 
+/**
+ * Full-screen page wrapper. Insets for the notch/status bar and the home
+ * indicator — the app never wired up safe-area handling before, so content
+ * (e.g. Home's greeting) rendered under the status bar on every screen.
+ */
 export function Screen({ style, ...rest }: ViewProps) {
   const t = useTheme();
-  return <View style={[styles.screen, { backgroundColor: t.colors.canvas }, style]} {...rest} />;
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        styles.screen,
+        {
+          backgroundColor: t.colors.canvas,
+          paddingTop: insets.top + 16,
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+        style,
+      ]}
+      {...rest}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16 },
+  screen: { flex: 1, paddingHorizontal: 16 },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { View, ActivityIndicator, AppState, AppStateStatus } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider } from "../src/design/ThemeProvider";
 import { useAppFonts } from "../src/design/useAppFonts";
@@ -52,14 +53,16 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="results" options={{ presentation: "card" }} />
-      </Stack>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="results" options={{ presentation: "card" }} />
+        </Stack>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
