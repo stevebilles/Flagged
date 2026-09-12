@@ -158,8 +158,12 @@ export default function ProfileEdit() {
     );
   }
 
-  function save() {
-    updateProfile(profile);
+  // Every toggle on this screen already persists immediately via persist()
+  // above — there's nothing left to save here. This just closes the screen,
+  // and (only meaningful for a brand-new profile; a no-op otherwise, since
+  // the only other way to reach this screen is editing the already-active
+  // profile) makes sure the profile being edited is the active one.
+  function finish() {
     setActiveProfile(profile.profileId);
     router.back();
   }
@@ -204,7 +208,7 @@ export default function ProfileEdit() {
               />
             </View>
             <Pressable
-              onPress={save}
+              onPress={finish}
               style={({ pressed }) => ({
                 backgroundColor: t.colors.cyan,
                 borderRadius: t.radius.md,
@@ -213,7 +217,7 @@ export default function ProfileEdit() {
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Save</Text>
+              <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Done</Text>
             </Pressable>
           </View>
           <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
