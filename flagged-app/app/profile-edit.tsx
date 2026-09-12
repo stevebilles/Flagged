@@ -55,8 +55,11 @@ export default function ProfileEdit() {
   const termById = useMemo(() => getIngredientTermMap(), []);
 
   const [profile, setProfile] = useState<Profile>(() => {
-    if (params.new) return createProfile("New Profile");
-    return getProfile(params.id ?? "") ?? createProfile("New Profile");
+    // A brand-new profile starts with an empty name so the "Profile name..."
+    // placeholder shows through — a pre-filled "New Profile" looked like an
+    // already-chosen name with no hint that tapping it does anything.
+    if (params.new) return createProfile("");
+    return getProfile(params.id ?? "") ?? createProfile("");
   });
   // Position among all profiles (same creation order Home uses) — the avatar
   // dot's color comes from this, not the id, so it can never collide with
@@ -164,6 +167,12 @@ export default function ProfileEdit() {
   // the only other way to reach this screen is editing the already-active
   // profile) makes sure the profile being edited is the active one.
   function finish() {
+    // Leaving the name empty (never typed anything) can't produce a nameless
+    // profile — falls back to a plain default rather than leaving Home to
+    // show a blank chip with no way to tell profiles apart.
+    if (!profile.name.trim()) {
+      persist({ ...profile, name: "New Profile" });
+    }
     setActiveProfile(profile.profileId);
     router.back();
   }
@@ -199,9 +208,10 @@ export default function ProfileEdit() {
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
               <TextInput
                 ref={nameInputRef}
+                autoFocus={!!params.new}
                 value={profile.name}
                 onChangeText={(v) => persist({ ...profile, name: v })}
-                placeholder="Profile name"
+                placeholder="Profile name..."
                 placeholderTextColor={t.colors.textMuted}
                 textAlign="center"
                 style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
