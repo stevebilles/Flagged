@@ -350,25 +350,41 @@ export default function ProfileEdit() {
                     />
                   </Pressable>
 
-                  {expanded === cat.id && (
-                    <View style={{ gap: 4, paddingBottom: t.spacing.sm }}>
-                      {cat.ingredientIds.map((ingId) => {
-                        const excluded = excludedSet.has(ingId);
-                        return (
-                          <View key={ingId} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                            <Text tone={excluded ? "muted" : "primary"} style={excluded ? { textDecorationLine: "line-through" } : undefined}>
-                              {termById.get(ingId) ?? ingId}
-                            </Text>
-                            <Switch
-                              value={!excluded}
-                              onValueChange={() => persist(toggleIngredientExcluded(profile, ingId))}
-                              trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
-                            />
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
+                  {expanded === cat.id && (() => {
+                    const categoryOn = activeSet.has(cat.id);
+                    return (
+                      <View style={{ gap: 4, paddingBottom: t.spacing.sm }}>
+                        {!categoryOn && (
+                          <Text tone="muted" variant="caption">
+                            {cat.name} is off, so every ingredient below is off too — turn the category on above to set exclusions.
+                          </Text>
+                        )}
+                        {cat.ingredientIds.map((ingId) => {
+                          const excluded = excludedSet.has(ingId);
+                          // Effective state = category on AND not individually excluded — matches
+                          // what actually gets checked while scanning (docs/data-schema.md), so a
+                          // category switched off can't leave its ingredient rows looking lit.
+                          const effectivelyOn = categoryOn && !excluded;
+                          return (
+                            <View key={ingId} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                              <Text
+                                tone={effectivelyOn ? "primary" : "muted"}
+                                style={categoryOn && excluded ? { textDecorationLine: "line-through" } : undefined}
+                              >
+                                {termById.get(ingId) ?? ingId}
+                              </Text>
+                              <Switch
+                                value={effectivelyOn}
+                                disabled={!categoryOn}
+                                onValueChange={() => persist(toggleIngredientExcluded(profile, ingId))}
+                                trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
                 </View>
               ))}
             </Card>
