@@ -5,11 +5,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
-import { getProfiles, getActivePantryItems, getQuickPacks } from "../../src/db/repositories";
+import { getProfiles, getActivePantryItems, getCategories } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
-import { activePackIds } from "../../src/domain/activation";
 import { profileColor, initials } from "../../src/design/avatar";
-import type { Profile, QuickPack, PantryItem } from "../../src/domain/types";
+import type { Profile, Category, PantryItem } from "../../src/domain/types";
 
 const ZERO_DASHBOARD_STATS = {
   totalLabelsRead: 0,
@@ -41,23 +40,26 @@ export default function Home() {
   // happen on other screens and wouldn't otherwise show up here.
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [quickPacks, setQuickPacks] = useState<QuickPack[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       setProfiles(getProfiles());
       setPantryItems(getActivePantryItems());
-      setQuickPacks(getQuickPacks());
+      setCategories(getCategories());
     }, [])
   );
 
   const firstName = getMetaValue("firstName") ?? "";
   const activeProfile = profiles.find((p) => p.profileId === activeProfileId);
-  const activePackNames = useMemo(() => {
+  // Filters are now the categories toggled directly in the profile editor
+  // (Quick Packs were removed — several shared a category with each other,
+  // which kept causing confusing knock-on toggles).
+  const activeFilterNames = useMemo(() => {
     if (!activeProfile) return [];
-    const ids = new Set(activePackIds(activeProfile, quickPacks));
-    return quickPacks.filter((p) => ids.has(p.id)).map((p) => p.name);
-  }, [activeProfile, quickPacks]);
+    const active = new Set(activeProfile.activeCategoryIds);
+    return categories.filter((c) => active.has(c.id)).map((c) => c.name);
+  }, [activeProfile, categories]);
 
   // Dashboard numbers are per-profile (docs/17): "All" sums every profile's
   // own counters, a specific profile shows just its own.
@@ -142,9 +144,9 @@ export default function Home() {
                   <Text tone="cyan" bold>Edit →</Text>
                 </Pressable>
               </View>
-              {activePackNames.length > 0 ? (
+              {activeFilterNames.length > 0 ? (
                 <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  {activePackNames.map((name) => (
+                  {activeFilterNames.map((name) => (
                     <View key={name} style={{ width: "50%", flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.colors.cyan }} />
                       <Text variant="caption" style={{ flexShrink: 1 }}>{name}</Text>
@@ -152,7 +154,7 @@ export default function Home() {
                   ))}
                 </View>
               ) : (
-                <Text tone="muted">No Quick Packs active yet — tap Edit to choose filters.</Text>
+                <Text tone="muted">No filters active yet — tap Edit to choose what to watch for.</Text>
               )}
             </>
           ) : (

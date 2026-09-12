@@ -8,12 +8,7 @@ import {
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
-  deselectPack,
-  isPackActive,
-  linkedActivePacks,
-  packSelectionNote,
   selectPack,
-  togglePack,
   effectiveRedFlagTerms,
   effectiveRedFlagMetaForAll,
 } from "../domain/activation";
@@ -209,90 +204,16 @@ describe("matcher", () => {
   });
 });
 
-describe("pack activation + shared categories", () => {
-  const packs: QuickPack[] = [
-    { id: "dyes-pack", name: "Artificial Dyes", type: "simple", categoryIds: ["dyes"] },
-    { id: "focus", name: "Focus & ADHD", type: "composite", categoryIds: ["dyes", "synth"] },
-    { id: "pres", name: "Preservatives", type: "composite", categoryIds: ["nitrates", "sulfites", "synth"] },
-    { id: "gluten", name: "Gluten Free", type: "simple", categoryIds: ["gluten"] },
-  ];
+describe("pack activation (onboarding starting template only)", () => {
+  const pack: QuickPack = { id: "focus", name: "Focus & ADHD", type: "composite", categoryIds: ["dyes", "synth"] };
   const base: Profile = {
     profileId: "p1", name: "x", activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
     ...zeroProfileStats,
   };
 
   it("selecting a pack activates all its categories", () => {
-    const p = selectPack(base, packs[1]);
+    const p = selectPack(base, pack);
     expect(new Set(p.activeCategoryIds)).toEqual(new Set(["dyes", "synth"]));
-    expect(isPackActive(p, packs[1])).toBe(true);
-  });
-
-  it("deselecting a pack cascades to every active pack sharing a category with it, even transitively", () => {
-    let p = selectPack(base, packs[0]); // Artificial Dyes: dyes
-    p = selectPack(p, packs[1]); // Focus & ADHD: dyes, synth
-    p = selectPack(p, packs[2]); // Preservatives: nitrates, sulfites, synth
-    // Artificial Dyes → Focus & ADHD (shares dyes) → Preservatives (shares synth):
-    // deselecting the first link has to take the whole chain down together,
-    // or a sibling pack still active would just put the shared category back.
-    p = deselectPack(p, packs[0], packs);
-    expect(p.activeCategoryIds).toEqual([]);
-    expect(isPackActive(p, packs[0])).toBe(false);
-    expect(isPackActive(p, packs[1])).toBe(false);
-    expect(isPackActive(p, packs[2])).toBe(false);
-  });
-
-  it("deselecting a pack leaves a genuinely unrelated active pack alone", () => {
-    let p = selectPack(base, packs[0]); // Artificial Dyes: dyes
-    p = selectPack(p, packs[3]); // Gluten Free: gluten (no category overlap with anything)
-    p = deselectPack(p, packs[0], packs);
-    expect(p.activeCategoryIds).toEqual(["gluten"]);
-    expect(isPackActive(p, packs[3])).toBe(true);
-  });
-
-  it("cascades through a pack that is only incidentally active (not directly tapped), since the app treats it as active either way", () => {
-    // Artificial Dyes (dyes) + Preservatives (nitrates, sulfites, synth) together
-    // happen to cover both of Focus & ADHD's categories, even though nobody
-    // selected Focus & ADHD directly — the app has no separate "manually
-    // selected" state, so it's active by the same rule the pill display uses,
-    // and a deselect has to treat it that way too rather than leaving it
-    // invisibly stuck on.
-    let p = selectPack(base, packs[0]);
-    p = selectPack(p, packs[2]);
-    expect(isPackActive(p, packs[1])).toBe(true); // Focus & ADHD, never tapped, is active
-    p = deselectPack(p, packs[0], packs);
-    expect(p.activeCategoryIds).toEqual([]);
-  });
-
-  it("linkedActivePacks reports the transitive chain, not just direct sharing", () => {
-    let p = selectPack(base, packs[0]);
-    p = selectPack(p, packs[1]);
-    p = selectPack(p, packs[2]);
-    const linked = linkedActivePacks(p, packs[0], packs).map((x) => x.id).sort();
-    expect(linked).toEqual(["focus", "pres"]);
-  });
-
-  it("re-selecting the pack that caused a cascade explains an asymmetric restore", () => {
-    // Reproduces Steve's report: Artificial Dyes + Focus & ADHD + Preservatives
-    // all active, deselect Focus & ADHD (cascades all three off), then
-    // reselect Focus & ADHD — it only owns "dyes" + "synth", so Artificial
-    // Dyes (needs only dyes) comes back fully, but Preservatives (needs
-    // nitrates + sulfites too) can't, and that needs explaining.
-    let p = selectPack(base, packs[0]); // Artificial Dyes
-    p = selectPack(p, packs[1]); // Focus & ADHD
-    p = selectPack(p, packs[2]); // Preservatives
-    p = deselectPack(p, packs[1], packs); // turn Focus & ADHD off — cascades all three off
-    expect(p.activeCategoryIds).toEqual([]);
-
-    const before = p;
-    const after = togglePack(p, packs[1], packs); // reselect Focus & ADHD
-    expect(isPackActive(after, packs[0])).toBe(true); // Artificial Dyes: fully restored
-    expect(isPackActive(after, packs[2])).toBe(false); // Preservatives: still short
-
-    const note = packSelectionNote(before, after, packs[1], packs)!;
-    expect(note).toContain("Artificial Dyes");
-    expect(note).toContain("turned on too");
-    expect(note).toContain("Preservatives");
-    expect(note).toContain("turn it on separately");
   });
 });
 

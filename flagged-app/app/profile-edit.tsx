@@ -8,28 +8,29 @@ import {
   getCategories,
   getIngredientTermMap,
   getProfile,
-  getQuickPacks,
   createProfile,
   updateProfile,
 } from "../src/db/repositories";
 import {
   addCustomIngredient,
-  isPackActive,
-  linkedActivePacks,
-  packSelectionNote,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
-  togglePack,
 } from "../src/domain/activation";
 import type { Category, Profile, ParentGroup } from "../src/domain/types";
 
 const GROUP_ORDER: ParentGroup[] = ["Allergens", "Sugars", "Additives", "Dietary"];
 
 /**
- * Profile editor (docs/05 Home → Edit). Quick Pack pills, categories grouped by
- * parent with classification badges + on/off switches, expandable individual
- * ingredient toggles, and custom ingredients. Activation per docs/data-schema.md.
+ * Profile editor (docs/05 Home → Edit). Categories grouped by parent with
+ * classification badges + on/off switches, expandable individual ingredient
+ * toggles, and custom ingredients. Activation per docs/data-schema.md.
+ *
+ * Quick Packs (bulk-select bundles of categories) were removed from this
+ * screen — several packs share a category with each other, and turning one
+ * off/on had knock-on effects on the others that kept confusing users no
+ * matter how it was explained. Toggling categories directly has no such
+ * coupling: each switch does exactly what it shows.
  */
 export default function ProfileEdit() {
   const t = useTheme();
@@ -37,7 +38,6 @@ export default function ProfileEdit() {
   const params = useLocalSearchParams<{ id?: string; new?: string }>();
   const setActiveProfile = useAppStore((s) => s.setActiveProfile);
 
-  const packs = useMemo(() => getQuickPacks(), []);
   const categories = useMemo(() => getCategories(), []);
   const termById = useMemo(() => getIngredientTermMap(), []);
 
@@ -47,14 +47,74 @@ export default function ProfileEdit() {
   });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [custom, setCustom] = useState("");
-  const [packNote, setPackNote] = useState<string | null>(null);
+  const [customNote, setCustomNote] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const activeSet = new Set(profile.activeCategoryIds);
   const excludedSet = new Set(profile.excludedIngredientIds);
 
+  // Every default ingredient term, lowercased, mapped to the category that
+  // owns it — used both to answer "what category is X in?" (search) and to
+  // stop a custom ingredient from duplicating one already in the dictionary.
+  const termToCategory = useMemo(() => {
+    const map = new Map<string, Category>();
+    for (const cat of categories) {
+      for (const ingId of cat.ingredientIds) {
+        const term = termById.get(ingId);
+        if (term) map.set(term.toLowerCase(), cat);
+      }
+    }
+    return map;
+  }, [categories, termById]);
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    const results: { ingredientId: string; term: string; category: Category }[] = [];
+    for (const cat of categories) {
+      for (const ingId of cat.ingredientIds) {
+        const term = termById.get(ingId);
+        if (term && term.toLowerCase().includes(q)) {
+          results.push({ ingredientId: ingId, term, category: cat });
+        }
+      }
+    }
+    return results;
+  }, [search, categories, termById]);
+
   function persist(next: Profile) {
     setProfile(next);
     updateProfile(next);
+  }
+
+  // Search result tap: make sure this exact ingredient is switched on — turn
+  // on its category if needed, and un-exclude the ingredient if it had been
+  // individually excluded — then jump to it in the list below.
+  function activateIngredient(categoryId: string, ingredientId: string) {
+    let next = profile;
+    if (!activeSet.has(categoryId)) next = toggleCategory(next, categoryId);
+    if (excludedSet.has(ingredientId)) next = toggleIngredientExcluded(next, ingredientId);
+    persist(next);
+    setExpanded(categoryId);
+    setSearch("");
+  }
+
+  function addCustom() {
+    const t = custom.trim();
+    if (!t) return;
+    const lower = t.toLowerCase();
+    if (profile.customIngredients.includes(lower)) {
+      setCustomNote(`"${t}" is already in your custom list.`);
+      return;
+    }
+    const existing = termToCategory.get(lower);
+    if (existing) {
+      setCustomNote(`"${t}" is already tracked under ${existing.name} — turn that filter on above instead of adding it as custom.`);
+      return;
+    }
+    persist(addCustomIngredient(profile, t));
+    setCustom("");
+    setCustomNote(null);
   }
 
   function save() {
@@ -82,50 +142,46 @@ export default function ProfileEdit() {
           />
         </Card>
 
-        {/* QUICK PACKS */}
+        {/* FIND AN INGREDIENT */}
         <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">QUICK PACKS</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-            {packs.map((p) => (
-              <Pill
-                key={p.id}
-                label={p.name}
-                selected={isPackActive(profile, p)}
-                onPress={() => {
-                  const wasActive = isPackActive(profile, p);
-                  if (wasActive) {
-                    // Packs sharing a category are turned off together as one
-                    // unit (see linkedActivePacks) — name them so a tap that
-                    // also switches off other packs is never a silent surprise.
-                    const linked = linkedActivePacks(profile, p, packs);
-                    persist(togglePack(profile, p, packs));
-                    const names = linked.map((l) => l.name).join(" & ");
-                    setPackNote(
-                      linked.length > 0
-                        ? `${p.name} shares a filter with ${names}, so turning it off also turns ${
-                            linked.length === 1 ? "that one" : "those"
-                          } off. You can turn ${names} back on individually if you'd like to keep ${
-                            linked.length === 1 ? "it" : "them"
-                          } on.`
-                        : null
-                    );
-                  } else {
-                    // Re-selecting can bring a linked pack fully back on (if this
-                    // pack alone covers everything it needs) or leave it short —
-                    // explain either way instead of a silent partial restore.
-                    const next = togglePack(profile, p, packs);
-                    persist(next);
-                    setPackNote(packSelectionNote(profile, next, p, packs));
-                  }
-                }}
-              />
+          <Text tone="muted" variant="caption">FIND AN INGREDIENT</Text>
+          <Card>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="e.g. red 40, aspartame, MSG"
+              placeholderTextColor={t.colors.textMuted}
+              style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.regular, fontSize: t.fontSize.body }}
+            />
+          </Card>
+          {search.trim().length > 0 &&
+            (searchResults.length > 0 ? (
+              <View style={{ gap: t.spacing.xs }}>
+                {searchResults.slice(0, 15).map((r) => (
+                  <Pressable
+                    key={r.ingredientId}
+                    onPress={() => activateIngredient(r.category.id, r.ingredientId)}
+                    style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}
+                  >
+                    <Text style={{ flexShrink: 1 }}>{r.term}</Text>
+                    <Text tone={activeSet.has(r.category.id) && !excludedSet.has(r.ingredientId) ? "cyan" : "muted"} variant="caption">
+                      {activeSet.has(r.category.id) && !excludedSet.has(r.ingredientId)
+                        ? `${r.category.name} · on`
+                        : `${r.category.name} · tap to turn on`}
+                    </Text>
+                  </Pressable>
+                ))}
+                {searchResults.length > 15 && (
+                  <Text tone="muted" variant="caption">
+                    +{searchResults.length - 15} more — keep typing to narrow it down.
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <Text tone="muted">
+                No match in our list for "{search.trim()}" — add it as a custom ingredient below.
+              </Text>
             ))}
-          </View>
-          {packNote && (
-            <Text tone="warning" variant="caption">
-              {packNote}
-            </Text>
-          )}
         </View>
 
         {/* CUSTOM */}
@@ -135,22 +191,22 @@ export default function ProfileEdit() {
             <Card style={{ flex: 1 }}>
               <TextInput
                 value={custom}
-                onChangeText={setCustom}
+                onChangeText={(v) => {
+                  setCustom(v);
+                  setCustomNote(null);
+                }}
                 placeholder="e.g. carrageenan"
                 placeholderTextColor={t.colors.textMuted}
                 style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.regular }}
               />
             </Card>
-            <Button
-              title="Add"
-              onPress={() => {
-                if (custom.trim()) {
-                  persist(addCustomIngredient(profile, custom));
-                  setCustom("");
-                }
-              }}
-            />
+            <Button title="Add" onPress={addCustom} disabled={!custom.trim()} />
           </View>
+          {customNote && (
+            <Text tone="warning" variant="caption">
+              {customNote}
+            </Text>
+          )}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
             {profile.customIngredients.map((c) => (
               <Pill key={c} label={`${c}  ✕`} selected onPress={() => persist(removeCustomIngredient(profile, c))} />
