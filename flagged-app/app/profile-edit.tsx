@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { View, ScrollView, TextInput, Pressable, Switch, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -65,6 +65,7 @@ export default function ProfileEdit() {
     const idx = getProfiles().findIndex((p) => p.profileId === profile.profileId);
     return idx === -1 ? 0 : idx;
   }, [profile.profileId]);
+  const nameInputRef = useRef<TextInput>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [customNote, setCustomNote] = useState<string | null>(null);
@@ -173,9 +174,9 @@ export default function ProfileEdit() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
-        {/* HEADER — back/save row, then name + subtitle, kept tight as one block */}
-        <View style={{ gap: t.spacing.sm }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        {/* HEADER — back button, name, and Save all on one row; subtitle below */}
+        <View style={{ gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
             <Pressable
               onPress={() => router.back()}
               hitSlop={8}
@@ -190,6 +191,18 @@ export default function ProfileEdit() {
             >
               <Ionicons name="chevron-back" size={22} color={t.colors.textPrimary} />
             </Pressable>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: t.spacing.sm }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
+              <TextInput
+                ref={nameInputRef}
+                value={profile.name}
+                onChangeText={(v) => persist({ ...profile, name: v })}
+                placeholder="Profile name"
+                placeholderTextColor={t.colors.textMuted}
+                textAlign="center"
+                style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
+              />
+            </View>
             <Pressable
               onPress={save}
               style={({ pressed }) => ({
@@ -203,21 +216,9 @@ export default function ProfileEdit() {
               <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Save</Text>
             </Pressable>
           </View>
-          <View style={{ gap: 4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
-              <TextInput
-                value={profile.name}
-                onChangeText={(v) => persist({ ...profile, name: v })}
-                placeholder="Profile name"
-                placeholderTextColor={t.colors.textMuted}
-                style={{ flex: 1, color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.heading }}
-              />
-            </View>
-            <Text tone="muted" variant="caption">
-              {categoryCount} {categoryCount === 1 ? "category" : "categories"} active
-            </Text>
-          </View>
+          <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
+            {categoryCount} {categoryCount === 1 ? "category" : "categories"} active
+          </Text>
         </View>
 
         {/* CUSTOM INGREDIENTS (search the dictionary or add your own) */}
