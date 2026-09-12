@@ -22,6 +22,7 @@ import {
 } from "../src/domain/activation";
 import { profileColor } from "../src/design/avatar";
 import type { Classification } from "../src/design/components";
+import { displayName } from "../src/domain/types";
 import type { Category, Profile, ParentGroup } from "../src/domain/types";
 
 const GROUP_ORDER: ParentGroup[] = ["Allergens", "Sugars", "Additives", "Dietary"];
@@ -141,9 +142,10 @@ export default function ProfileEdit() {
   }
 
   function confirmDelete() {
+    const name = displayName(profile.name);
     Alert.alert(
-      `Delete ${profile.name}?`,
-      `This removes ${profile.name}'s profile and filters. Pantry items already saved for ${profile.name} are kept, but won't show under this profile anymore.`,
+      `Delete ${name}?`,
+      `This removes ${name}'s profile and filters. Pantry items already saved for ${name} are kept, but won't show under this profile anymore.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -166,13 +168,14 @@ export default function ProfileEdit() {
   // and (only meaningful for a brand-new profile; a no-op otherwise, since
   // the only other way to reach this screen is editing the already-active
   // profile) makes sure the profile being edited is the active one.
+  //
+  // The stored name is allowed to stay empty (never falls back to writing
+  // literal "New Profile" text) — that text would otherwise become the
+  // field's real value next time this profile is edited, forcing the user
+  // to delete it before typing their own name instead of just typing over
+  // a placeholder. Anywhere the name needs to be *displayed*, displayName()
+  // supplies the "New Profile" fallback without ever touching storage.
   function finish() {
-    // Leaving the name empty (never typed anything) can't produce a nameless
-    // profile — falls back to a plain default rather than leaving Home to
-    // show a blank chip with no way to tell profiles apart.
-    if (!profile.name.trim()) {
-      persist({ ...profile, name: "New Profile" });
-    }
     setActiveProfile(profile.profileId);
     router.back();
   }

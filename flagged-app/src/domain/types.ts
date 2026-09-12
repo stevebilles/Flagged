@@ -61,6 +61,18 @@ export interface Profile {
   totalReformulationsCaught: number;
 }
 
+/**
+ * Label to show wherever a profile's name is DISPLAYED (Home, alerts, scan
+ * context, the "All" scan's per-term attribution) when it hasn't been named
+ * yet. Profile.name itself is allowed to stay empty — that's what lets the
+ * editor's name field show its "Profile name..." placeholder instead of
+ * literal text the user has to delete before typing their own. Never use
+ * this for the editable field itself, only for read-only display.
+ */
+export function displayName(name: string): string {
+  return name.trim() || "New Profile";
+}
+
 /** An approved food (docs/03 §3.2). Belongs to whichever profile scanned it —
  * the Pantry tab filters by profile the same way Home does (docs/17). */
 export interface PantryItem {

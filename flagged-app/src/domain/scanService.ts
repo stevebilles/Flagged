@@ -3,7 +3,7 @@ import { looksLikeIngredientList } from "../matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagMetaForAll, RedFlagMeta, AllProfilesMeta } from "./activation";
 import type { RecheckOutcome } from "./diffEngine";
 import { getCategories, getIngredientTermMap, getStats, saveStats, updateProfile } from "../db/repositories";
-import { FREE_SCAN_LIMIT, type Profile } from "./types";
+import { displayName, FREE_SCAN_LIMIT, type Profile } from "./types";
 
 /**
  * Orchestrates a scan (docs/06/07/08).
@@ -108,7 +108,9 @@ export function commitScanStats(result: ScanResult, profile: Profile, isPremium:
 export function commitScanStatsForAll(result: ScanResult, profiles: Profile[], isPremium: boolean): void {
   bumpTrialCounter(isPremium);
   for (const profile of profiles) {
-    const mine = result.matches.filter((m) => m.profileNames?.includes(profile.name));
+    // profileNames was built from displayName() (never empty) — compare
+    // against the same, or an unnamed profile would never match its own terms.
+    const mine = result.matches.filter((m) => m.profileNames?.includes(displayName(profile.name)));
     const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
     if (mine.length === 0) {
       updated.totalCleanScans += 1;

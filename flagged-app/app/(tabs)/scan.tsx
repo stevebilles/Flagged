@@ -14,6 +14,7 @@ import { logScanDebug } from "../../src/domain/scanDebug";
 import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
 import { CameraScanner } from "../../src/ocr/CameraScanner";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
+import { displayName } from "../../src/domain/types";
 
 /**
  * SCAN — the core action tab (docs/05 Tab 2).
@@ -52,9 +53,12 @@ export default function Scan() {
         ? { label: `All Profiles (${count})`, ready: true as const }
         : { label: "No profiles yet — add one from Home before scanning", ready: false as const };
     }
-    const name = activeProfileId ? getProfile(activeProfileId)?.name : null;
-    return name
-      ? { label: name, ready: true as const }
+    // Check the profile itself, not truthiness of its name — an empty (not
+    // yet named) name is a valid, falsy string that would otherwise wrongly
+    // read as "no profile selected" even though one genuinely is.
+    const profile = activeProfileId ? getProfile(activeProfileId) : null;
+    return profile
+      ? { label: displayName(profile.name), ready: true as const }
       : { label: "No profile selected — add one from Home before scanning", ready: false as const };
   }, [scanAllProfiles, activeProfileId]);
 
@@ -83,7 +87,7 @@ export default function Scan() {
         return;
       }
       evaln = evaluateScan(paragraph, profile);
-      scannedFor = profile.name;
+      scannedFor = displayName(profile.name);
       profileIds = [profile.profileId];
     }
 

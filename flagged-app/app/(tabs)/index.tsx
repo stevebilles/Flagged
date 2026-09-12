@@ -8,6 +8,7 @@ import { useAppStore } from "../../src/state/appStore";
 import { getProfiles, getActivePantryItems, getCategories } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
 import { profileColor, initials } from "../../src/design/avatar";
+import { displayName } from "../../src/domain/types";
 import type { Profile, Category, PantryItem } from "../../src/domain/types";
 
 const ZERO_DASHBOARD_STATS = {
@@ -124,7 +125,7 @@ export default function Home() {
               {profiles.map((p, index) => (
                 <View key={p.profileId} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: profileColor(index) }} />
-                  <Text>{p.name}</Text>
+                  <Text>{displayName(p.name)}</Text>
                   <Text tone="muted"> · {p.activeCategoryIds.length} filters</Text>
                 </View>
               ))}
@@ -136,7 +137,7 @@ export default function Home() {
                   <AvatarDot color="rgba(34,211,238,0.18)">
                     <Ionicons name="shield-checkmark" size={13} color={t.colors.cyan} />
                   </AvatarDot>
-                  <Text bold>{activeProfile.name}'s Red Flags</Text>
+                  <Text bold>{displayName(activeProfile.name)}'s Red Flags</Text>
                 </View>
                 <Pressable
                   hitSlop={8}
@@ -273,7 +274,7 @@ function ProfileChip({
         </RNText>
       </AvatarDot>
       <Text bold tone={selected ? "cyan" : "primary"}>
-        {profile.name}
+        {displayName(profile.name)}
       </Text>
     </Chip>
   );

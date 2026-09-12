@@ -12,6 +12,7 @@ import {
   effectiveRedFlagTerms,
   effectiveRedFlagMetaForAll,
 } from "../domain/activation";
+import { displayName } from "../domain/types";
 import type { Category, Profile, QuickPack } from "../domain/types";
 
 /** Per-profile dashboard counters (docs/17) — zeroed for fixtures that don't care. */
@@ -302,5 +303,15 @@ describe("diff engine (pantry recheck)", () => {
   it("changed but safe when no red flags", () => {
     const outcome = evaluateRecheck(["oats", "honey"], ["oats", "honey", "salt"], ["red 40"]);
     expect(outcome.kind).toBe("changed_safe");
+  });
+});
+
+describe("displayName", () => {
+  it("returns the real name when one is set", () => {
+    expect(displayName("Sofia")).toBe("Sofia");
+  });
+  it("falls back to New Profile for an empty or whitespace-only name", () => {
+    expect(displayName("")).toBe("New Profile");
+    expect(displayName("   ")).toBe("New Profile");
   });
 });

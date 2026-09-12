@@ -1,4 +1,4 @@
-import type { Category, Profile, QuickPack } from "./types";
+import { displayName, type Category, type Profile, type QuickPack } from "./types";
 
 /**
  * Quick Pack activation (authoritative: docs/data-schema.md). Packs are only
@@ -133,13 +133,16 @@ export function effectiveRedFlagMetaForAll(
 ): Map<string, AllProfilesMeta> {
   const map = new Map<string, AllProfilesMeta>();
   for (const profile of profiles) {
+    // displayName(), not the raw (possibly still-empty) profile.name — an
+    // unnamed profile's terms should attribute to "New Profile", not a blank.
+    const name = displayName(profile.name);
     const meta = effectiveRedFlagMeta(profile, categories, ingredientTermById);
     for (const [term, m] of meta) {
       const existing = map.get(term);
       if (existing) {
-        if (!existing.profileNames.includes(profile.name)) existing.profileNames.push(profile.name);
+        if (!existing.profileNames.includes(name)) existing.profileNames.push(name);
       } else {
-        map.set(term, { ...m, profileNames: [profile.name] });
+        map.set(term, { ...m, profileNames: [name] });
       }
     }
   }
