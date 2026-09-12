@@ -357,20 +357,30 @@ export default function ProfileEdit() {
                   {expanded === cat.id && (() => {
                     const categoryOn = activeSet.has(cat.id);
                     return (
-                      <View style={{ gap: 4, paddingBottom: t.spacing.sm }}>
+                      <View style={{ paddingBottom: t.spacing.xs, borderTopWidth: 1, borderTopColor: t.colors.canvas }}>
                         {!categoryOn && (
-                          <Text tone="muted" variant="caption">
+                          <Text tone="muted" variant="caption" style={{ paddingTop: t.spacing.sm }}>
                             {cat.name} is off, so every ingredient below is off too — turn the category on above to set exclusions.
                           </Text>
                         )}
-                        {cat.ingredientIds.map((ingId) => {
+                        {cat.ingredientIds.map((ingId, ingIdx) => {
                           const excluded = excludedSet.has(ingId);
                           // Effective state = category on AND not individually excluded — matches
                           // what actually gets checked while scanning (docs/data-schema.md), so a
                           // category switched off can't leave its ingredient rows looking lit.
                           const effectivelyOn = categoryOn && !excluded;
                           return (
-                            <View key={ingId} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <View
+                              key={ingId}
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                paddingVertical: t.spacing.sm,
+                                borderTopWidth: ingIdx > 0 ? 1 : 0,
+                                borderTopColor: t.colors.canvas,
+                              }}
+                            >
                               <Text
                                 tone={effectivelyOn ? "primary" : "muted"}
                                 style={categoryOn && excluded ? { textDecorationLine: "line-through" } : undefined}
