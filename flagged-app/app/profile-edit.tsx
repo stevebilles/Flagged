@@ -218,6 +218,8 @@ export default function ProfileEdit() {
                   placeholder="Profile name..."
                   placeholderTextColor={t.colors.textMuted}
                   textAlign="center"
+                  cursorColor={t.colors.cyan}
+                  selectionColor={t.colors.cyan}
                   style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
                 />
               </View>
