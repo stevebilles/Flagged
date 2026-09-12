@@ -55,7 +55,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <StatusBar style="auto" />
+        {/* "auto" follows the PHONE's system Light/Dark Mode setting, not the
+            app's own theme — since ThemeProvider forces dark regardless of the
+            OS setting, "auto" could render dark (near-invisible) status bar
+            icons on Flagged's dark background when the phone is in Light Mode. */}
+        <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />
