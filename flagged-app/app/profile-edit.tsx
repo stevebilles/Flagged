@@ -173,38 +173,51 @@ export default function ProfileEdit() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={t.colors.textPrimary} />
-          </Pressable>
-          <Pressable
-            onPress={save}
-            style={({ pressed }) => ({
-              backgroundColor: t.colors.cyan,
-              borderRadius: t.radius.md,
-              paddingVertical: 8,
-              paddingHorizontal: t.spacing.md,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Save</Text>
-          </Pressable>
-        </View>
-        <View style={{ gap: 4 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
-            <TextInput
-              value={profile.name}
-              onChangeText={(v) => persist({ ...profile, name: v })}
-              placeholder="Profile name"
-              placeholderTextColor={t.colors.textMuted}
-              style={{ flex: 1, color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.heading }}
-            />
+        {/* HEADER — back/save row, then name + subtitle, kept tight as one block */}
+        <View style={{ gap: t.spacing.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: t.colors.card,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="chevron-back" size={22} color={t.colors.textPrimary} />
+            </Pressable>
+            <Pressable
+              onPress={save}
+              style={({ pressed }) => ({
+                backgroundColor: t.colors.cyan,
+                borderRadius: t.radius.md,
+                paddingVertical: 8,
+                paddingHorizontal: t.spacing.md,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Save</Text>
+            </Pressable>
           </View>
-          <Text tone="muted" variant="caption">
-            {categoryCount} {categoryCount === 1 ? "category" : "categories"} active
-          </Text>
+          <View style={{ gap: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
+              <TextInput
+                value={profile.name}
+                onChangeText={(v) => persist({ ...profile, name: v })}
+                placeholder="Profile name"
+                placeholderTextColor={t.colors.textMuted}
+                style={{ flex: 1, color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.heading }}
+              />
+            </View>
+            <Text tone="muted" variant="caption">
+              {categoryCount} {categoryCount === 1 ? "category" : "categories"} active
+            </Text>
+          </View>
         </View>
 
         {/* CUSTOM INGREDIENTS (search the dictionary or add your own) */}
@@ -247,9 +260,13 @@ export default function ProfileEdit() {
           {query.trim().length > 0 &&
             (searchResults.length > 0 ? (
               <View style={{ gap: t.spacing.xs }}>
+                {/* Keyed by category+ingredient, not just ingredient: a few
+                    ingredient rows are shared by two categories (docs/data-schema.md
+                    "Shared ingredient terms", e.g. wheat in both Wheat and Gluten
+                    Sources) and both are valid, separately-actionable results. */}
                 {searchResults.slice(0, 15).map((r) => (
                   <Pressable
-                    key={r.ingredientId}
+                    key={`${r.category.id}-${r.ingredientId}`}
                     onPress={() => activateIngredient(r.category.id, r.ingredientId)}
                     style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}
                   >
