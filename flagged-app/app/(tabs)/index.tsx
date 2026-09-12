@@ -289,7 +289,7 @@ function AllChip({ selected, onPress }: { selected: boolean; onPress: () => void
         <Ionicons name="shield-checkmark" size={13} color={t.colors.cyan} />
       </AvatarDot>
       <Text bold tone={selected ? "cyan" : "primary"}>
-        All
+        All Profiles
       </Text>
     </Chip>
   );
