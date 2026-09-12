@@ -214,7 +214,17 @@ export default function ProfileEdit() {
                 placeholder="Profile name..."
                 placeholderTextColor={t.colors.textMuted}
                 textAlign="center"
-                style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
+                // A permanent underline (not just placeholder text) is the cue
+                // that this is a tappable field, not a plain label — matches
+                // the mockup, and holds even once a real name is typed in.
+                style={{
+                  color: t.colors.textPrimary,
+                  fontFamily: t.fontFamily.bold,
+                  fontSize: t.fontSize.title,
+                  borderBottomWidth: 2,
+                  borderBottomColor: t.colors.cyan,
+                  paddingBottom: 2,
+                }}
               />
             </View>
             <Pressable
