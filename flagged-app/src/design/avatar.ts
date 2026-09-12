@@ -1,19 +1,30 @@
 /**
- * Deterministic per-profile avatar color + initials (Figma mockups, docs/17).
- * Derived from the profileId — no DB column, no migration, stable across renders.
+ * Per-profile avatar color + initials (Figma mockups, docs/17).
+ *
+ * Colors are assigned by a profile's position among all profiles (creation
+ * order, same order getProfiles() returns), not hashed from its id — a hash
+ * mod palette-length can put two different profiles on the same color even
+ * with just two profiles in the house, which defeats the point of a color
+ * cue. Position-based assignment guarantees every profile gets its own color
+ * for as long as there are fewer profiles than palette entries. The palette
+ * itself is spread evenly around the hue wheel so no two entries read as
+ * "close" to each other.
  */
 
-const PALETTE = ["#22D3EE", "#A78BFA", "#34D399", "#F59E0B", "#F472B6", "#60A5FA"] as const;
+const PALETTE = [
+  "#F87171", // red
+  "#F59E0B", // amber
+  "#A3E635", // lime
+  "#34D399", // green
+  "#22D3EE", // cyan
+  "#60A5FA", // blue
+  "#A78BFA", // purple
+  "#F472B6", // pink
+] as const;
 
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-/** Stable color for a profile, picked from a small fixed palette by id hash. */
-export function profileColor(profileId: string): string {
-  return PALETTE[hashString(profileId) % PALETTE.length];
+/** Color for the profile at this position in the household's profile list. */
+export function profileColor(index: number): string {
+  return PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length];
 }
 
 /** Up to 2 initials from a profile's name ("Sofia" -> "SF", "Mary Jane" -> "MJ"). */

@@ -58,6 +58,13 @@ export default function ProfileEdit() {
     if (params.new) return createProfile("New Profile");
     return getProfile(params.id ?? "") ?? createProfile("New Profile");
   });
+  // Position among all profiles (same creation order Home uses) — the avatar
+  // dot's color comes from this, not the id, so it can never collide with
+  // another profile's color the way a hash could.
+  const profileIndex = useMemo(() => {
+    const idx = getProfiles().findIndex((p) => p.profileId === profile.profileId);
+    return idx === -1 ? 0 : idx;
+  }, [profile.profileId]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [customNote, setCustomNote] = useState<string | null>(null);
@@ -186,7 +193,7 @@ export default function ProfileEdit() {
         </View>
         <View style={{ gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profile.profileId) }} />
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
             <TextInput
               value={profile.name}
               onChangeText={(v) => persist({ ...profile, name: v })}

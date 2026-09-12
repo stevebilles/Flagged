@@ -96,10 +96,11 @@ export default function Home() {
             ACTIVE PROFILE
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: t.spacing.sm }}>
-            {profiles.map((p) => (
+            {profiles.map((p, index) => (
               <ProfileChip
                 key={p.profileId}
                 profile={p}
+                index={index}
                 selected={!viewingAll && p.profileId === activeProfileId}
                 onPress={() => {
                   setViewingAll(false);
@@ -120,9 +121,9 @@ export default function Home() {
                 <Ionicons name="shield-checkmark" size={18} color={t.colors.cyan} />
                 <Text bold>Scans all profiles</Text>
               </View>
-              {profiles.map((p) => (
+              {profiles.map((p, index) => (
                 <View key={p.profileId} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: profileColor(p.profileId) }} />
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: profileColor(index) }} />
                   <Text>{p.name}</Text>
                   <Text tone="muted"> · {p.activeCategoryIds.length} filters</Text>
                 </View>
@@ -254,17 +255,19 @@ function AvatarDot({ color, children }: { color: string; children: React.ReactNo
 
 function ProfileChip({
   profile,
+  index,
   selected,
   onPress,
 }: {
   profile: Profile;
+  index: number;
   selected: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   return (
     <Chip selected={selected} onPress={onPress}>
-      <AvatarDot color={profileColor(profile.profileId)}>
+      <AvatarDot color={profileColor(index)}>
         <RNText style={{ fontSize: 10, fontFamily: t.fontFamily.bold, color: "#0B1220" }}>
           {initials(profile.name)}
         </RNText>
