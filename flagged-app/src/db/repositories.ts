@@ -134,6 +134,17 @@ export function updateProfile(p: Profile): void {
   );
 }
 
+/**
+ * Delete a profile. Pantry items it saved are kept (never destroy a scan
+ * history the user chose to save) but detached — profile_id reset to '',
+ * the same "unassigned" value pre-migration rows already use — so they only
+ * surface under "All" from then on, never under a profile that no longer exists.
+ */
+export function deleteProfile(profileId: string): void {
+  sqlite().runSync("UPDATE pantry_items SET profile_id = '' WHERE profile_id = ?", [profileId]);
+  sqlite().runSync("DELETE FROM profiles WHERE profile_id = ?", [profileId]);
+}
+
 // ---------------- Pantry ----------------
 
 function mapPantry(r: any): PantryItem {
