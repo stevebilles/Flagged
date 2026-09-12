@@ -91,12 +91,13 @@ export default function Home() {
           </Text>
         </View>
 
-        {/* Profile switcher */}
+        {/* Profile switcher — wraps onto as many lines as needed so every
+            profile is visible at once, no horizontal scrolling to find one. */}
         <View style={{ gap: t.spacing.sm }}>
           <Text tone="muted" variant="caption">
-            ACTIVE PROFILE
+            ACTIVE PROFILES
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: t.spacing.sm }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
             {profiles.map((p, index) => (
               <ProfileChip
                 key={p.profileId}
@@ -111,7 +112,7 @@ export default function Home() {
             ))}
             <AllChip selected={viewingAll} onPress={() => setViewingAll(true)} />
             <Pill label="+ Add" onPress={() => router.push("/profile-edit?new=1")} />
-          </ScrollView>
+          </View>
         </View>
 
         {/* Summary card: either "scans all profiles" or the active profile's filter count */}
