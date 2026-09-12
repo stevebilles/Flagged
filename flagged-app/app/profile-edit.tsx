@@ -206,26 +206,21 @@ export default function ProfileEdit() {
             </Pressable>
             <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: t.spacing.sm }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
-              <TextInput
-                ref={nameInputRef}
-                autoFocus={!!params.new}
-                value={profile.name}
-                onChangeText={(v) => persist({ ...profile, name: v })}
-                placeholder="Profile name..."
-                placeholderTextColor={t.colors.textMuted}
-                textAlign="center"
-                // A permanent underline (not just placeholder text) is the cue
-                // that this is a tappable field, not a plain label — matches
-                // the mockup, and holds even once a real name is typed in.
-                style={{
-                  color: t.colors.textPrimary,
-                  fontFamily: t.fontFamily.bold,
-                  fontSize: t.fontSize.title,
-                  borderBottomWidth: 2,
-                  borderBottomColor: t.colors.cyan,
-                  paddingBottom: 2,
-                }}
-              />
+              {/* Card background (lighter than the screen behind it), same
+                  pattern as the ingredient search box below — reads as a real
+                  input field rather than plain text, with or without a name typed in. */}
+              <View style={{ backgroundColor: t.colors.card, borderRadius: t.radius.md, paddingHorizontal: t.spacing.md, paddingVertical: 6 }}>
+                <TextInput
+                  ref={nameInputRef}
+                  autoFocus={!!params.new}
+                  value={profile.name}
+                  onChangeText={(v) => persist({ ...profile, name: v })}
+                  placeholder="Profile name..."
+                  placeholderTextColor={t.colors.textMuted}
+                  textAlign="center"
+                  style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
+                />
+              </View>
             </View>
             <Pressable
               onPress={finish}
