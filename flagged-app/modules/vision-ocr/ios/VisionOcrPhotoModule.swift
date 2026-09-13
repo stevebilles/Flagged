@@ -97,6 +97,16 @@ class VisionOcrPhotoModule: NSObject {
    * `photo.width`/`height`) that might not agree with what this module
    * considers "upright" — a real, previously-costly mismatch this session
    * (docs/06, 2026-09-13, ML Kit's own unrelated rotation bug).
+   *
+   * Hard-capped at DETECT_TIMEOUT: a real device test (2026-09-13) found
+   * rectangle search can take far longer than text recognition on a full-
+   * resolution photo — `VNImageRequestHandler.perform` blocks the calling
+   * queue until Vision is done, so a slow search looked from JS like the
+   * whole capture flow had hung, with no error or timeout to explain why.
+   * This is only ever a starting SUGGESTION, never something worth blocking
+   * the user over, so a `resolveOnce` guard lets whichever finishes first —
+   * the timeout or the real detection — resolve, and silently ignores
+   * whichever arrives second.
    */
   @objc(detectDocumentCorners:withResolver:withRejecter:)
   private func detectDocumentCorners(
@@ -111,49 +121,67 @@ class VisionOcrPhotoModule: NSObject {
     }
     let orientation = VisionOcrPhotoModule.cgOrientation(from: image.imageOrientation)
     let (uprightWidth, uprightHeight) = VisionOcrPhotoModule.uprightSize(cgImage: cgImage, orientation: orientation)
+    let base: [String: Any] = ["width": uprightWidth, "height": uprightHeight]
+    let noCorners = base.merging(["corners": NSNull()]) { _, new in new }
 
-    let request = VNDetectRectanglesRequest { request, error in
-      let base: [String: Any] = ["width": uprightWidth, "height": uprightHeight]
-      if error != nil {
-        resolve(base.merging(["corners": NSNull()]) { _, new in new })
-        return
-      }
-      guard let best = (request.results as? [VNRectangleObservation])?.first else {
-        resolve(base.merging(["corners": NSNull()]) { _, new in new })
-        return
-      }
-      // Vision's corner points are normalized (0...1), origin at the
-      // BOTTOM-left of the upright image — same convention as
-      // observation.boundingBox in `recognize` above. Flip Y for plain
-      // top-left-origin pixel coordinates.
-      func toPixel(_ p: CGPoint) -> [String: Any] {
-        return ["x": p.x * uprightWidth, "y": (1 - p.y) * uprightHeight]
-      }
-      resolve(
-        base.merging([
-          "corners": [
-            "topLeft": toPixel(best.topLeft),
-            "topRight": toPixel(best.topRight),
-            "bottomLeft": toPixel(best.bottomLeft),
-            "bottomRight": toPixel(best.bottomRight),
-          ],
-        ]) { _, new in new }
-      )
+    let resolveLock = NSLock()
+    var didResolve = false
+    func resolveOnce(_ value: [String: Any]) {
+      resolveLock.lock()
+      defer { resolveLock.unlock() }
+      if didResolve { return }
+      didResolve = true
+      resolve(value)
     }
-    request.minimumConfidence = 0.6
-    request.maximumObservations = 1
-    // A printed panel on packaging, not necessarily a full sheet of paper —
-    // allow a wide range of shapes/tilts rather than Vision's stricter
-    // document-page defaults.
-    request.minimumAspectRatio = 0.2
-    request.maximumAspectRatio = 1.0
-    request.quadratureTolerance = 30
 
-    let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
-    do {
-      try handler.perform([request])
-    } catch {
-      resolve(["width": uprightWidth, "height": uprightHeight, "corners": NSNull()])
+    let DETECT_TIMEOUT = 1.5
+    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + DETECT_TIMEOUT) {
+      resolveOnce(noCorners)
+    }
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let request = VNDetectRectanglesRequest { request, error in
+        if error != nil {
+          resolveOnce(noCorners)
+          return
+        }
+        guard let best = (request.results as? [VNRectangleObservation])?.first else {
+          resolveOnce(noCorners)
+          return
+        }
+        // Vision's corner points are normalized (0...1), origin at the
+        // BOTTOM-left of the upright image — same convention as
+        // observation.boundingBox in `recognize` above. Flip Y for plain
+        // top-left-origin pixel coordinates.
+        func toPixel(_ p: CGPoint) -> [String: Any] {
+          return ["x": p.x * uprightWidth, "y": (1 - p.y) * uprightHeight]
+        }
+        resolveOnce(
+          base.merging([
+            "corners": [
+              "topLeft": toPixel(best.topLeft),
+              "topRight": toPixel(best.topRight),
+              "bottomLeft": toPixel(best.bottomLeft),
+              "bottomRight": toPixel(best.bottomRight),
+            ],
+          ]) { _, new in new }
+        )
+      }
+      request.minimumConfidence = 0.6
+      request.maximumObservations = 1
+      // A printed panel on packaging, not necessarily a full sheet of paper —
+      // allow a wide range of shapes/tilts rather than Vision's stricter
+      // document-page defaults.
+      request.minimumAspectRatio = 0.2
+      request.maximumAspectRatio = 1.0
+      request.quadratureTolerance = 30
+
+      let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+      do {
+        try handler.perform([request])
+      } catch {
+        resolveOnce(noCorners)
+      }
     }
   }
 
