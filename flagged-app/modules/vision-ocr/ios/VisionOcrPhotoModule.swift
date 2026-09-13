@@ -81,32 +81,50 @@ class VisionOcrPhotoModule: NSObject {
   }
 
   /**
+   * The photo's own upright pixel dimensions — the SAME calculation
+   * `correctPerspective` uses internally, so callers should build their
+   * screen<->image coordinate mapping from THIS rather than a separately-
+   * reported size (e.g. the camera library's own `photo.width`/`height`),
+   * which isn't guaranteed to agree with what this module considers
+   * "upright" (docs/06, 2026-09-13 — a real, previously-costly mismatch of
+   * exactly this kind, from ML Kit's own unrelated rotation bug). Just
+   * decodes the image header — no Vision inference, near-instant, so
+   * nothing about the corner-review screen's own layout has to wait on the
+   * (much slower, best-effort) rectangle detector below.
+   */
+  @objc(getImageSize:withResolver:withRejecter:)
+  private func getImageSize(
+    uri: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    let path = uri.hasPrefix("file://") ? String(uri.dropFirst("file://".count)) : uri
+    guard let image = UIImage(contentsOfFile: path), let cgImage = image.cgImage else {
+      reject("Error", "Can't find or decode photo at \(uri)", nil)
+      return
+    }
+    let orientation = VisionOcrPhotoModule.cgOrientation(from: image.imageOrientation)
+    let (uprightWidth, uprightHeight) = VisionOcrPhotoModule.uprightSize(cgImage: cgImage, orientation: orientation)
+    resolve(["width": uprightWidth, "height": uprightHeight])
+  }
+
+  /**
    * Suggests a starting quad for the user to adjust (docs/14 corner-review
    * step) using Vision's own rectangle detector — this only ever pre-fills
    * a starting position; the user always confirms or drags it before
-   * anything is cropped/corrected. `corners` comes back `null` (not a
-   * rejection) when nothing confident is found, so the caller can fall back
-   * to a plain default box — no detected rectangle is a normal, expected
-   * outcome for a curved or low-contrast package, not an error.
+   * anything is cropped/corrected. Resolves `null` (not a rejection) when
+   * nothing confident is found, so the caller falls back to a plain default
+   * box — no detected rectangle is a normal, expected outcome for a curved
+   * or low-contrast package, not an error.
    *
-   * Always resolves `width`/`height` (the upright pixel dimensions), even
-   * when `corners` is null — this is the SAME calculation `correctPerspective`
-   * uses, so the JS layer has one authoritative source for the image's true
-   * dimensions to build its screen<->image coordinate mapping from, rather
-   * than trusting a separately-reported size (e.g. the camera library's own
-   * `photo.width`/`height`) that might not agree with what this module
-   * considers "upright" — a real, previously-costly mismatch this session
-   * (docs/06, 2026-09-13, ML Kit's own unrelated rotation bug).
-   *
-   * Hard-capped at DETECT_TIMEOUT: a real device test (2026-09-13) found
-   * rectangle search can take far longer than text recognition on a full-
-   * resolution photo — `VNImageRequestHandler.perform` blocks the calling
-   * queue until Vision is done, so a slow search looked from JS like the
-   * whole capture flow had hung, with no error or timeout to explain why.
-   * This is only ever a starting SUGGESTION, never something worth blocking
-   * the user over, so a `resolveOnce` guard lets whichever finishes first —
-   * the timeout or the real detection — resolve, and silently ignores
-   * whichever arrives second.
+   * A real device test (2026-09-13) found rectangle search can take far
+   * longer than plain text recognition on a full-resolution photo — long
+   * enough that even a same-process dispatch-queue timeout here wasn't
+   * reliably winning the race on slower hardware. Since this is ONLY EVER a
+   * starting suggestion, never something worth the user waiting on, the
+   * caller races this against its OWN timeout on the JS side (independent
+   * of whatever this native call's queue is doing) and treats a slow
+   * response exactly like a `null` one.
    */
   @objc(detectDocumentCorners:withResolver:withRejecter:)
   private func detectDocumentCorners(
@@ -121,32 +139,15 @@ class VisionOcrPhotoModule: NSObject {
     }
     let orientation = VisionOcrPhotoModule.cgOrientation(from: image.imageOrientation)
     let (uprightWidth, uprightHeight) = VisionOcrPhotoModule.uprightSize(cgImage: cgImage, orientation: orientation)
-    let base: [String: Any] = ["width": uprightWidth, "height": uprightHeight]
-    let noCorners = base.merging(["corners": NSNull()]) { _, new in new }
-
-    let resolveLock = NSLock()
-    var didResolve = false
-    func resolveOnce(_ value: [String: Any]) {
-      resolveLock.lock()
-      defer { resolveLock.unlock() }
-      if didResolve { return }
-      didResolve = true
-      resolve(value)
-    }
-
-    let DETECT_TIMEOUT = 1.5
-    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + DETECT_TIMEOUT) {
-      resolveOnce(noCorners)
-    }
 
     DispatchQueue.global(qos: .userInitiated).async {
       let request = VNDetectRectanglesRequest { request, error in
         if error != nil {
-          resolveOnce(noCorners)
+          resolve(NSNull())
           return
         }
         guard let best = (request.results as? [VNRectangleObservation])?.first else {
-          resolveOnce(noCorners)
+          resolve(NSNull())
           return
         }
         // Vision's corner points are normalized (0...1), origin at the
@@ -156,16 +157,12 @@ class VisionOcrPhotoModule: NSObject {
         func toPixel(_ p: CGPoint) -> [String: Any] {
           return ["x": p.x * uprightWidth, "y": (1 - p.y) * uprightHeight]
         }
-        resolveOnce(
-          base.merging([
-            "corners": [
-              "topLeft": toPixel(best.topLeft),
-              "topRight": toPixel(best.topRight),
-              "bottomLeft": toPixel(best.bottomLeft),
-              "bottomRight": toPixel(best.bottomRight),
-            ],
-          ]) { _, new in new }
-        )
+        resolve([
+          "topLeft": toPixel(best.topLeft),
+          "topRight": toPixel(best.topRight),
+          "bottomLeft": toPixel(best.bottomLeft),
+          "bottomRight": toPixel(best.bottomRight),
+        ])
       }
       request.minimumConfidence = 0.6
       request.maximumObservations = 1
@@ -180,7 +177,7 @@ class VisionOcrPhotoModule: NSObject {
       do {
         try handler.perform([request])
       } catch {
-        resolveOnce(noCorners)
+        resolve(NSNull())
       }
     }
   }

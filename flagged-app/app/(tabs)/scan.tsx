@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View } from "react-native";
+import { View, LayoutChangeEvent } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
-import { Screen, Text, Button, Card } from "../../src/design/components";
+import { Screen, Text, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
 import { getProfile, getProfiles } from "../../src/db/repositories";
@@ -12,7 +12,7 @@ import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../..
 import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
-import { CameraScanner } from "../../src/ocr/CameraScanner";
+import { useCameraCapture } from "../../src/ocr/CameraScanner";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
 import { displayName } from "../../src/domain/types";
 
@@ -20,9 +20,16 @@ import { displayName } from "../../src/domain/types";
  * SCAN — the core action tab (docs/05 Tab 2).
  * State 1 Standby · State 2 Hard paywall lockout · State 3 live scan (camera).
  *
- * State 3 uses the live CameraScanner (VisionCamera + Apple Vision OCR, docs/14). Paste
- * reads the clipboard; Choose Photo runs on-device OCR on a picked image. All
- * paths funnel a paragraph string into runScan().
+ * State 3 (VisionCamera + Apple Vision OCR, docs/14) renders INLINE inside
+ * this screen's own existing viewfinder box — never a full-screen takeover.
+ * A real user test (2026-09-13) objected to the whole tab (header, profile,
+ * buttons) disappearing to scan a label, and pointed out the dashed-border
+ * guide already in the box should just become the crop tool in place,
+ * rather than launching a separate screen. `useCameraCapture` supplies the
+ * box content and footer buttons for whichever phase scanning is in; this
+ * screen just drops them into the same slots its idle state uses. Paste
+ * reads the clipboard; Choose Photo runs on-device OCR on a picked image.
+ * All paths funnel a paragraph string into runScan().
  */
 export default function Scan() {
   const t = useTheme();
@@ -43,6 +50,7 @@ export default function Scan() {
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
   // Who this scan will run for, and whether that's actually possible right now
   // (mirrors Home's "no silent empty state" rule — explain, don't just vanish).
@@ -152,10 +160,18 @@ export default function Scan() {
     }
   }
 
-  // State 3 — live camera scan (full-screen).
-  if (cameraOpen) {
-    return <CameraScanner onCapture={onCameraCapture} onCancel={() => setCameraOpen(false)} />;
-  }
+  const { boxContent, footer } = useCameraCapture({
+    active: cameraOpen,
+    boxWidth: boxSize.width,
+    boxHeight: boxSize.height,
+    onCapture: onCameraCapture,
+    onCancel: () => setCameraOpen(false),
+  });
+
+  const onBoxLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBoxSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+  }, []);
 
   if (locked) {
     // State 2 — hard paywall lockout
@@ -176,7 +192,9 @@ export default function Scan() {
     );
   }
 
-  // State 1 — standby
+  // State 1 — standby / State 3 — live scan, same shell either way (2026-09-13:
+  // the whole tab used to disappear behind a full-screen camera; now only the
+  // box and button contents change).
   return (
     <Screen>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -199,6 +217,7 @@ export default function Scan() {
       </View>
 
       <View
+        onLayout={onBoxLayout}
         style={{
           flex: 1,
           marginTop: t.spacing.lg,
@@ -210,37 +229,46 @@ export default function Scan() {
           overflow: "hidden",
         }}
       >
-        <View
-          style={{
-            width: "70%",
-            height: "48%",
-            borderWidth: 2,
-            borderStyle: "dashed",
-            borderRadius: t.radius.md,
-            borderColor: t.colors.cyan,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <Ionicons name="scan-outline" size={28} color={t.colors.cyan} />
-          <Text tone="cyan" bold variant="caption" style={{ textAlign: "center" }}>
-            POINT AT{"\n"}INGREDIENT LIST
-          </Text>
-        </View>
-      </View>
-      <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
-        Hold steady over the ingredient list
-      </Text>
-      <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
-        {scanContext.ready ? (
-          <>
-            Profile: <Text tone="cyan" bold>{scanContext.label}</Text>
-          </>
+        {cameraOpen ? (
+          boxContent
         ) : (
-          <Text tone="warning" bold>{scanContext.label}</Text>
+          <View
+            style={{
+              width: "70%",
+              height: "48%",
+              borderWidth: 2,
+              borderStyle: "dashed",
+              borderRadius: t.radius.md,
+              borderColor: t.colors.cyan,
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <Ionicons name="scan-outline" size={28} color={t.colors.cyan} />
+            <Text tone="cyan" bold variant="caption" style={{ textAlign: "center" }}>
+              POINT AT{"\n"}INGREDIENT LIST
+            </Text>
+          </View>
         )}
-      </Text>
+      </View>
+
+      {!cameraOpen && (
+        <>
+          <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
+            Hold steady over the ingredient list
+          </Text>
+          <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+            {scanContext.ready ? (
+              <>
+                Profile: <Text tone="cyan" bold>{scanContext.label}</Text>
+              </>
+            ) : (
+              <Text tone="warning" bold>{scanContext.label}</Text>
+            )}
+          </Text>
+        </>
+      )}
       {error && (
         <Text tone="red" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
           {error}
@@ -248,11 +276,17 @@ export default function Scan() {
       )}
 
       <View style={{ gap: t.spacing.sm, marginTop: t.spacing.lg, paddingBottom: t.spacing.lg }}>
-        <Button title="🎥  Scan Label" onPress={() => setCameraOpen(true)} />
-        <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-          <Button title="Paste Text" kind="secondary" onPress={onPaste} style={{ flex: 1 }} />
-          <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} style={{ flex: 1 }} />
-        </View>
+        {cameraOpen ? (
+          footer
+        ) : (
+          <>
+            <Button title="🎥  Scan Label" onPress={() => setCameraOpen(true)} />
+            <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+              <Button title="Paste Text" kind="secondary" onPress={onPaste} style={{ flex: 1 }} />
+              <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} style={{ flex: 1 }} />
+            </View>
+          </>
+        )}
       </View>
     </Screen>
   );

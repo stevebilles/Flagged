@@ -1,52 +1,59 @@
-import React, { useMemo, useRef, useState } from "react";
-import { View, StyleSheet, PanResponder, Image, Dimensions, GestureResponderEvent, PanResponderGestureState } from "react-native";
-import { Text, Button } from "../design/components";
-import { useTheme } from "../design/ThemeProvider";
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { View, StyleSheet, PanResponder, Image, GestureResponderEvent, PanResponderGestureState } from "react-native";
 import type { DocumentCorners, CornerPoint } from "vision-ocr";
 
 /**
- * Corner-review screen (docs/14, 2026-09-13): shown on the CAPTURED PHOTO,
- * never the live camera — the user is holding the product in one hand and
- * the phone in the other during capture, so there's no way for them to drag
- * anything until the shutter has already fired and they can set the
- * product down. Four draggable corners let them box in exactly the
+ * The draggable crop tool (docs/14, 2026-09-13) — shown on the CAPTURED
+ * PHOTO, never the live camera: the user is holding the product in one
+ * hand and the phone in the other during capture, so there's no way for
+ * them to drag anything until the shutter has already fired and they can
+ * set the product down. Four draggable corners let them box in exactly the
  * ingredient panel (excluding the Nutrition Facts grid, a second-language
  * repeat, etc.) before the photo is perspective-corrected and OCR'd —
  * removing the guesswork (and resulting bugs) of trying to infer the
  * panel's boundaries automatically from OCR text/geometry after the fact.
+ *
+ * Renders INLINE, sized to whatever box the caller places it in — the same
+ * viewfinder box the idle Scan tab and live camera preview already use
+ * (docs/05), not a separate full-screen takeover (2026-09-13: replaced a
+ * full-screen review step after real user feedback that the whole Scan tab
+ * — header, profile, buttons — shouldn't disappear to scan a label).
+ *
+ * A pure, controlled-ish component: drag state is kept locally for smooth
+ * per-touch updates (avoiding a full parent re-render on every pixel of
+ * movement), but the CURRENT corners (in image-pixel space) are exposed to
+ * the caller via a ref (`getCorners()`) rather than a callback-per-frame,
+ * since the confirm/retake actions live in the caller's own persistent
+ * button row, not inside this component.
  */
 
 type CornerKey = keyof DocumentCorners;
 const CORNER_KEYS: CornerKey[] = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
-const HANDLE_SIZE = 44;
+const HANDLE_SIZE = 40;
 
-export interface CornerAdjustOverlayProps {
+export interface CropBoxHandle {
+  getCorners(): DocumentCorners;
+}
+
+export interface CropBoxProps {
+  containerWidth: number;
+  containerHeight: number;
   photoUri: string;
   photoWidth: number;
   photoHeight: number;
   initialCorners: DocumentCorners;
-  onConfirm: (corners: DocumentCorners) => void;
-  onRetake: () => void;
+  color: string;
 }
 
-export function CornerAdjustOverlay({
-  photoUri,
-  photoWidth,
-  photoHeight,
-  initialCorners,
-  onConfirm,
-  onRetake,
-}: CornerAdjustOverlayProps) {
-  const t = useTheme();
-  const screen = Dimensions.get("window");
-  const containerW = screen.width;
-  const containerH = screen.height * 0.72;
-
-  const scale = Math.min(containerW / photoWidth, containerH / photoHeight);
+export const CropBox = forwardRef<CropBoxHandle, CropBoxProps>(function CropBox(
+  { containerWidth, containerHeight, photoUri, photoWidth, photoHeight, initialCorners, color },
+  ref
+) {
+  const scale = Math.min(containerWidth / photoWidth, containerHeight / photoHeight);
   const dispW = photoWidth * scale;
   const dispH = photoHeight * scale;
-  const offsetX = (containerW - dispW) / 2;
-  const offsetY = (containerH - dispH) / 2;
+  const offsetX = (containerWidth - dispW) / 2;
+  const offsetY = (containerHeight - dispH) / 2;
 
   const imageToScreen = (p: CornerPoint) => ({ x: p.x * scale + offsetX, y: p.y * scale + offsetY });
   const screenToImage = (p: CornerPoint): CornerPoint => ({
@@ -64,6 +71,15 @@ export function CornerAdjustOverlay({
   cornersRef.current = corners;
   const dragStartRef = useRef<CornerPoint>({ x: 0, y: 0 });
 
+  useImperativeHandle(ref, () => ({
+    getCorners: () => ({
+      topLeft: screenToImage(cornersRef.current.topLeft),
+      topRight: screenToImage(cornersRef.current.topRight),
+      bottomLeft: screenToImage(cornersRef.current.bottomLeft),
+      bottomRight: screenToImage(cornersRef.current.bottomRight),
+    }),
+  }));
+
   const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
 
   const panResponderFor = (key: CornerKey) =>
@@ -74,8 +90,8 @@ export function CornerAdjustOverlay({
       },
       onPanResponderMove: (_evt: GestureResponderEvent, gesture: PanResponderGestureState) => {
         const next = {
-          x: clamp(dragStartRef.current.x + gesture.dx, containerW),
-          y: clamp(dragStartRef.current.y + gesture.dy, containerH),
+          x: clamp(dragStartRef.current.x + gesture.dx, containerWidth),
+          y: clamp(dragStartRef.current.y + gesture.dy, containerHeight),
         };
         setCorners((prev) => ({ ...prev, [key]: next }));
       },
@@ -90,59 +106,37 @@ export function CornerAdjustOverlay({
     []
   );
 
-  const handleConfirm = () => {
-    onConfirm({
-      topLeft: screenToImage(corners.topLeft),
-      topRight: screenToImage(corners.topRight),
-      bottomLeft: screenToImage(corners.bottomLeft),
-      bottomRight: screenToImage(corners.bottomRight),
-    });
-  };
-
   return (
-    <View style={[styles.fill, { backgroundColor: t.colors.canvas }]}>
-      <View style={{ paddingHorizontal: t.spacing.md, paddingTop: t.spacing.lg, paddingBottom: t.spacing.sm }}>
-        <Text bold style={{ textAlign: "center" }}>
-          Drag the corners to box in just the ingredient list
-        </Text>
-      </View>
+    <View style={[styles.container, { width: containerWidth, height: containerHeight }]}>
+      <Image
+        source={{ uri: photoUri }}
+        style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
+        resizeMode="contain"
+      />
 
-      <View style={[styles.imageContainer, { width: containerW, height: containerH }]}>
-        <Image
-          source={{ uri: photoUri }}
-          style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
-          resizeMode="contain"
-        />
+      <Line from={corners.topLeft} to={corners.topRight} color={color} />
+      <Line from={corners.topRight} to={corners.bottomRight} color={color} />
+      <Line from={corners.bottomRight} to={corners.bottomLeft} color={color} />
+      <Line from={corners.bottomLeft} to={corners.topLeft} color={color} />
 
-        <Line from={corners.topLeft} to={corners.topRight} color={t.colors.cyan} />
-        <Line from={corners.topRight} to={corners.bottomRight} color={t.colors.cyan} />
-        <Line from={corners.bottomRight} to={corners.bottomLeft} color={t.colors.cyan} />
-        <Line from={corners.bottomLeft} to={corners.topLeft} color={t.colors.cyan} />
-
-        {CORNER_KEYS.map((key) => (
-          <View
-            key={key}
-            {...responders[key].panHandlers}
-            style={[
-              styles.handle,
-              {
-                left: corners[key].x - HANDLE_SIZE / 2,
-                top: corners[key].y - HANDLE_SIZE / 2,
-              },
-            ]}
-          >
-            <View style={[styles.handleDot, { backgroundColor: t.colors.cyan }]} />
-          </View>
-        ))}
-      </View>
-
-      <View style={{ padding: t.spacing.md, gap: t.spacing.sm }}>
-        <Button title="Use this photo" onPress={handleConfirm} />
-        <Button title="Retake" kind="secondary" onPress={onRetake} />
-      </View>
+      {CORNER_KEYS.map((key) => (
+        <View
+          key={key}
+          {...responders[key].panHandlers}
+          style={[
+            styles.handle,
+            {
+              left: corners[key].x - HANDLE_SIZE / 2,
+              top: corners[key].y - HANDLE_SIZE / 2,
+            },
+          ]}
+        >
+          <View style={[styles.handleDot, { backgroundColor: color }]} />
+        </View>
+      ))}
     </View>
   );
-}
+});
 
 function Line({ from, to, color }: { from: CornerPoint; to: CornerPoint; color: string }) {
   const dx = to.x - from.x;
@@ -169,8 +163,7 @@ function Line({ from, to, color }: { from: CornerPoint; to: CornerPoint; color: 
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  imageContainer: { alignSelf: "center", overflow: "hidden" },
+  container: { overflow: "hidden" },
   handle: {
     position: "absolute",
     width: HANDLE_SIZE,
@@ -179,9 +172,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   handleDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: "white",
   },
