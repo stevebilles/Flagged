@@ -9,7 +9,7 @@ import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
 import { getProfile, getProfiles } from "../../src/db/repositories";
 import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../../src/domain/scanService";
-import { extractIngredientList } from "../../src/matching/normalize";
+import { extractIngredientList, droppedAllergenLine } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
 import { CameraScanner } from "../../src/ocr/CameraScanner";
@@ -67,6 +67,18 @@ export default function Scan() {
     // Strip everything that isn't the ingredient list (2nd language, nutrition
     // panel, marketing) before it reaches the matcher or the results screen.
     const paragraph = extractIngredientList(rawParagraph);
+
+    // Safety gate: a "Contains: ..." allergen line the raw capture clearly
+    // read but the extracted body lost is a strong sign the capture is
+    // truncated, not clean — a confident "no red flags" here could hide a
+    // real allergen. Doesn't consume a free scan, same as an illegible capture.
+    if (droppedAllergenLine(rawParagraph, paragraph)) {
+      logScanDebug(source, rawParagraph, paragraph, "ABORTED (dropped allergen line)");
+      setError(
+        "Couldn't read the whole label — the allergen summary line got cut off. Hold steady until the full label is in frame and try again. This won't use a free scan."
+      );
+      return;
+    }
 
     let evaln;
     let scannedFor: string;

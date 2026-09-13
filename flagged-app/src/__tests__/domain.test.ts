@@ -5,6 +5,7 @@ import {
   looksLikeIngredientList,
   extractIngredientList,
   cleanForDisplay,
+  droppedAllergenLine,
 } from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
@@ -336,5 +337,34 @@ describe("displayName", () => {
   it("falls back to New Profile for an empty or whitespace-only name", () => {
     expect(displayName("")).toBe("New Profile");
     expect(displayName("   ")).toBe("New Profile");
+  });
+});
+
+describe("droppedAllergenLine (truncated-capture safety gate)", () => {
+  it("flags a capture that read \"Contains:\" but lost it during extraction", () => {
+    // Reproduces the real bilingual snack label report (2026-09-13): the
+    // capture jumped from partway through English into mid-French and never
+    // reached either "Contains:"/"Contient:" line.
+    const raw =
+      "Ingredients: Maize, Rice, Seasoning [Milk solids, Salt]. Contains: Soy, Milk. May contain: Sesame";
+    const extracted = "Maize, Rice, Scasoning [Milk solids, Sel, Arôme (naturel";
+    expect(droppedAllergenLine(raw, extracted)).toBe(true);
+  });
+
+  it("does not flag a label with no Contains: line at all (nothing to drop)", () => {
+    const raw = "Ingredients: water, sugar, salt.";
+    expect(droppedAllergenLine(raw, raw)).toBe(false);
+  });
+
+  it("does not flag when the Contains: line survived extraction", () => {
+    const raw = "Ingredients: water, sugar. Contains: none.";
+    const extracted = "water, sugar. Contains: none.";
+    expect(droppedAllergenLine(raw, extracted)).toBe(false);
+  });
+
+  it("recognizes the French Contient: form", () => {
+    const raw = "Ingrédients: eau, sucre. Contient: aucun.";
+    const extracted = "eau, sucre";
+    expect(droppedAllergenLine(raw, extracted)).toBe(true);
   });
 });

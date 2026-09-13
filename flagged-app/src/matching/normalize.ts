@@ -223,3 +223,23 @@ export function looksLikeIngredientList(raw: string): boolean {
   const commas = (raw.match(/,/g) ?? []).length;
   return raw.trim().length >= 60 && commas >= 5;
 }
+
+const CONTAINS_MARKER_RE = /\b(?:contains|contient)\s*:/i;
+
+/**
+ * True when the raw OCR capture clearly read an allergen declaration
+ * ("Contains: ..." / "Contient: ...") but extractIngredientList's result
+ * doesn't have it — the strongest single sign that a capture is truncated
+ * rather than clean (docs/07/08, reported 2026-09-13: a real bilingual snack
+ * label's capture jumped from partway through the English list into the
+ * middle of the French one and never reached either "Contains:" line, yet
+ * `looksLikeIngredientList` still passed it — that check only asks "does
+ * this look like *an* ingredient list", not "is this capture complete" — so
+ * the scan showed a confident "No red flags" despite silently dropping the
+ * one line that would tell an allergic user the product may contain sesame).
+ * Presenting a clean result on a definitely-incomplete capture is unsafe;
+ * callers should treat this as a reason to ask for a rescan instead.
+ */
+export function droppedAllergenLine(raw: string, extracted: string): boolean {
+  return CONTAINS_MARKER_RE.test(raw) && !CONTAINS_MARKER_RE.test(extracted);
+}
