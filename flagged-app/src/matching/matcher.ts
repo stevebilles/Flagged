@@ -55,6 +55,11 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
   // dye codes ("red 40" → "red 4o"), so only use it for digit-free terms.
   const cleaned = regexClean(normalized);
   const words = normalized.split(/[^a-z0-9]+/i).filter(Boolean);
+  // Position-aware word list — needed for the multi-word fuzzy fallback below
+  // to report a real, highlightable start/end span; `words` above (used by
+  // the existing single-word path and the returned `tokens` field) discards
+  // position on purpose and is left untouched.
+  const wordMatches = [...normalized.matchAll(/[a-z0-9]+/gi)];
 
   const terms = [...new Set(redFlagTerms.map((t) => t.toLowerCase().trim()))].filter(Boolean);
 
@@ -77,15 +82,59 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
       continue;
     }
 
-    // Fuzzy — single-word terms only, against individual label words.
-    if (term.includes(" ") || term.length < 4) continue;
+    if (hasDigit) continue; // never fuzzy a dye code / E-number — see regression test below
+
+    const termWords = term.split(" ");
+    if (termWords.length === 1) {
+      // Fuzzy — single-word terms, against individual label words.
+      if (term.length < 4) continue;
+      let best: Hit | null = null;
+      for (const w of words) {
+        if (Math.abs(w.length - term.length) > 2) continue;
+        const score = similarity(w, term);
+        if (score >= FUZZY_THRESHOLD && (!best || score > best.score)) {
+          const at = normalized.indexOf(w);
+          best = { token: w, term, kind: "fuzzy", score, start: at, end: at + w.length };
+        }
+      }
+      if (best) hits.push(best);
+      continue;
+    }
+
+    // Fuzzy — multi-word terms ("sunflower oil"), against a same-length
+    // window of consecutive label words. A real device miss (2026-09-13):
+    // "Sunfiower oil" (an l→i OCR slip) never matched "sunflower oil"
+    // because multi-word terms were excluded from fuzzy matching entirely —
+    // only an exact substring counted. Each word in the window must match
+    // (exactly, or fuzzily if it's long enough to compare safely — a short
+    // word like "oil" must match exactly, since 3 letters is too little to
+    // judge similarity on); the window's score is its worst-matching word,
+    // so one confidently-fuzzy word can't drag in a match on the strength
+    // of the others alone.
     let best: Hit | null = null;
-    for (const w of words) {
-      if (Math.abs(w.length - term.length) > 2) continue;
-      const score = similarity(w, term);
-      if (score >= FUZZY_THRESHOLD && (!best || score > best.score)) {
-        const at = normalized.indexOf(w);
-        best = { token: w, term, kind: "fuzzy", score, start: at, end: at + w.length };
+    for (let i = 0; i + termWords.length <= wordMatches.length; i++) {
+      let minScore = Infinity;
+      let ok = true;
+      for (let j = 0; j < termWords.length; j++) {
+        const labelWord = wordMatches[i + j][0];
+        const termWord = termWords[j];
+        let score: number;
+        if (labelWord === termWord) {
+          score = 1;
+        } else if (termWord.length < 4 || Math.abs(labelWord.length - termWord.length) > 2) {
+          ok = false;
+          break;
+        } else {
+          score = similarity(labelWord, termWord);
+        }
+        if (score < minScore) minScore = score;
+      }
+      if (!ok || minScore < FUZZY_THRESHOLD) continue;
+      if (!best || minScore > best.score) {
+        const start = wordMatches[i].index!;
+        const lastWord = wordMatches[i + termWords.length - 1];
+        const end = lastWord.index! + lastWord[0].length;
+        best = { token: normalized.slice(start, end), term, kind: "fuzzy", score: minScore, start, end };
       }
     }
     if (best) hits.push(best);

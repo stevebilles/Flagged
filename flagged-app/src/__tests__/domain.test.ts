@@ -204,6 +204,35 @@ describe("matcher", () => {
     const r = matchParagraph("color added (yellow 5, blue 1)", ["yellow 5", "blue 1", "red 40"]);
     expect(r.matches.map((m) => m.term).sort()).toEqual(["blue 1", "yellow 5"]);
   });
+
+  it("recovers a fuzzy OCR-misread letter inside a MULTI-word term (real device miss, 2026-09-13)", () => {
+    // "Sunfiower oil" — an l->i slip — never matched "sunflower oil" before
+    // this fix, since multi-word terms were excluded from fuzzy matching
+    // entirely (only single words got the fuzzy fallback).
+    const r = matchParagraph("Anti-caking agent (551), Sunfiower oil, Herb extract", ["sunflower oil"]);
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]).toMatchObject({ term: "sunflower oil", kind: "fuzzy" });
+    expect(r.isClean).toBe(false);
+  });
+
+  it("still requires a short word in a multi-word term to match exactly, not fuzzily", () => {
+    // "oil" is only 3 letters — too short to judge similarity on safely — so
+    // a garbled "oil" (e.g. "0il" already recovered by regexClean upstream,
+    // or something less recoverable) must match it exactly, even though the
+    // longer word "sunflower" is spelled correctly.
+    const r = matchParagraph("Sunflower ail", ["sunflower oil"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not fuzzy-match a multi-word term across unrelated words", () => {
+    const r = matchParagraph("Sunflower seeds and olive oil blend", ["sunflower oil"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("never fuzzes a multi-word term containing a digit (same rule as single-word dye codes)", () => {
+    const r = matchParagraph("citric acit 4o", ["citric acid 40"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
 describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {
