@@ -60,6 +60,26 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
   // the existing single-word path and the returned `tokens` field) discards
   // position on purpose and is left untouched.
   const wordMatches = [...normalized.matchAll(/[a-z0-9]+/gi)];
+  // Which printed ingredient this word belongs to (Steve's observation,
+  // 2026-09-13: real labels separate ingredients with a comma OR a bullet
+  // dot — "Maize, Rice, Seasoning" vs "Enriched wheat flour • Sugars •
+  // Yeast" — and that's the true, structural signal for where one
+  // ingredient ends and the next begins, not something the word-only fuzzy
+  // window below could otherwise know). Increments every time a real
+  // inter-ingredient separator sits between two words, so a multi-word
+  // fuzzy window (below) can be restricted to never span two different
+  // ingredients — closing off a theoretical, if rare, false-match path.
+  const BOUNDARY_RE = /[,•·∙‣▪]/;
+  const segmentOf: number[] = [];
+  for (let i = 0; i < wordMatches.length; i++) {
+    if (i === 0) {
+      segmentOf.push(0);
+    } else {
+      const prev = wordMatches[i - 1];
+      const between = normalized.slice(prev.index! + prev[0].length, wordMatches[i].index!);
+      segmentOf.push(segmentOf[i - 1] + (BOUNDARY_RE.test(between) ? 1 : 0));
+    }
+  }
 
   const terms = [...new Set(redFlagTerms.map((t) => t.toLowerCase().trim()))].filter(Boolean);
 
@@ -110,9 +130,13 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
     // word like "oil" must match exactly, since 3 letters is too little to
     // judge similarity on); the window's score is its worst-matching word,
     // so one confidently-fuzzy word can't drag in a match on the strength
-    // of the others alone.
+    // of the others alone. The window must also stay within a single
+    // printed ingredient (segmentOf above) — never blend the tail of one
+    // ingredient with the head of the next just because the words happen
+    // to resemble a red-flag phrase.
     let best: Hit | null = null;
     for (let i = 0; i + termWords.length <= wordMatches.length; i++) {
+      if (segmentOf[i] !== segmentOf[i + termWords.length - 1]) continue;
       let minScore = Infinity;
       let ok = true;
       for (let j = 0; j < termWords.length; j++) {

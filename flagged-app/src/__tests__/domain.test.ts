@@ -233,6 +233,31 @@ describe("matcher", () => {
     const r = matchParagraph("citric acit 4o", ["citric acid 40"]);
     expect(r.isClean).toBe(true);
   });
+
+  it("does not blend adjacent words from two DIFFERENT printed ingredients into a false multi-word match", () => {
+    // Steve's observation, 2026-09-13: the real separator printed between
+    // ingredients (a comma here; some labels use a "•" bullet instead) marks
+    // a true boundary — two words that are only adjacent because one
+    // ingredient happens to end right where another begins should never be
+    // read as a single two-word phrase, even if they'd otherwise score a
+    // fuzzy match. "Yeast" and a typo'd "Extrbct" are separate ingredients
+    // here (comma-separated), not "Yeast extract".
+    const r = matchParagraph("Yeast, Extrbct powder, Salt", ["yeast extract"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("still matches a genuine multi-word phrase that itself contains no internal separator", () => {
+    // Same word pair, no comma between them this time — a real occurrence
+    // of "Yeast extract" as one ingredient, with the same single-letter typo.
+    const r = matchParagraph("Onion powder, Yeast extrbct, Salt", ["yeast extract"]);
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]).toMatchObject({ term: "yeast extract", kind: "fuzzy" });
+  });
+
+  it("recognizes a bullet-dot ingredient separator the same way as a comma", () => {
+    const r = matchParagraph("Yeast • Extrbct powder • Salt", ["yeast extract"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
 describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {
