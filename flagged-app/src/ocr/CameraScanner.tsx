@@ -7,7 +7,7 @@ import {
   useFrameProcessor,
   runAtTargetFps,
 } from "react-native-vision-camera";
-import { recognizeText, visionScanText } from "vision-ocr";
+import { recognizeText, useVisionScanText } from "vision-ocr";
 import { useRunOnJS } from "react-native-worklets-core";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
@@ -99,6 +99,7 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   const t = useTheme();
   const device = useCameraDevice("back");
   const { hasPermission, requestPermission } = useCameraPermission();
+  const visionScanText = useVisionScanText();
   const cameraRef = useRef<Camera>(null);
 
   const [phase, setPhase] = useState<Phase>("waiting");
@@ -146,7 +147,7 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
         onFrameResult(result);
       });
     },
-    [onFrameResult]
+    [visionScanText, onFrameResult]
   );
 
   // Take one real photo and OCR it. A failed shot (camera busy, a hiccup
