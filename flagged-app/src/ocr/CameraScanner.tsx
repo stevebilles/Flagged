@@ -478,8 +478,14 @@ export function useCameraCapture({
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  // width: "100%" matters here: the parent box (Scan tab) centers its
+  // children rather than stretching them, and a view whose only children
+  // are absolutely positioned (the camera feed, the guide overlay) has no
+  // intrinsic width of its own to report — without an explicit width it
+  // collapses to a sliver (a real device miss, 2026-09-13: rendered as a
+  // single vertical dashed line instead of a camera preview).
+  fill: { flex: 1, width: "100%" },
+  center: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
   guideWrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
