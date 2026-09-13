@@ -367,4 +367,14 @@ describe("droppedAllergenLine (truncated-capture safety gate)", () => {
     const extracted = "eau, sucre";
     expect(droppedAllergenLine(raw, extracted)).toBe(true);
   });
+
+  it("regression: still catches it when OCR itself misspells the marker (Contains -> Contais)", () => {
+    // An earlier version of this function required exact "contains:"/
+    // "contient:" spelling, which meant a genuinely garbled marker (real
+    // device capture, 2026-09-13: "Contains:" read as "Contais:") failed
+    // the check on BOTH sides equally and never triggered a rescan.
+    const raw = "Maize, Rice. Contais: Soy, Milk, May contain: Sesane, Contint: Soja, La.";
+    const extracted = "Maize, Rice, Scasoring [Milk solids";
+    expect(droppedAllergenLine(raw, extracted)).toBe(true);
+  });
 });

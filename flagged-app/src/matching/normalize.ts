@@ -71,6 +71,19 @@ export function tokenize(normalized: string): string[] {
 const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR garble
 
 /**
+ * Whether `text` contains an allergen-declaration marker — tolerant of OCR
+ * garble the same way extraction's own anchor is (e.g. "Contains:" misread
+ * as "Contais:" still matches). Exported so callers outside this file
+ * (droppedAllergenLine below; the burst-photo completeness check in
+ * src/ocr/completeness.ts) use the exact same tolerant definition
+ * extraction itself relies on, instead of a separate, stricter regex that
+ * could disagree with it on genuinely garbled OCR text.
+ */
+export function hasAllergenMarker(text: string): boolean {
+  return CONTAINS_RE.test(text);
+}
+
+/**
  * Every position that looks like an ingredient header. OCR mangles the word
  * badly ("Ingredlents:", "Ihgrédients:", "lnaredients:", "Ionredients:"), so any
  * 7–14 letter word before a colon that is ≥60% similar to "ingredients" /
@@ -224,8 +237,6 @@ export function looksLikeIngredientList(raw: string): boolean {
   return raw.trim().length >= 60 && commas >= 5;
 }
 
-const CONTAINS_MARKER_RE = /\b(?:contains|contient)\s*:/i;
-
 /**
  * True when the raw OCR capture clearly read an allergen declaration
  * ("Contains: ..." / "Contient: ...") but extractIngredientList's result
@@ -239,7 +250,14 @@ const CONTAINS_MARKER_RE = /\b(?:contains|contient)\s*:/i;
  * one line that would tell an allergic user the product may contain sesame).
  * Presenting a clean result on a definitely-incomplete capture is unsafe;
  * callers should treat this as a reason to ask for a rescan instead.
+ *
+ * Uses hasAllergenMarker's OCR-garble-tolerant check on both sides. An
+ * earlier version of this function used a stricter regex requiring the
+ * exact spelling "contains"/"contient" — which meant it silently missed the
+ * very real-world garble ("Contains:" -> "Contais:") it was written to
+ * catch, since a genuinely mis-OCR'd marker would fail that strict check on
+ * BOTH the raw and extracted sides equally, never triggering a rescan.
  */
 export function droppedAllergenLine(raw: string, extracted: string): boolean {
-  return CONTAINS_MARKER_RE.test(raw) && !CONTAINS_MARKER_RE.test(extracted);
+  return hasAllergenMarker(raw) && !hasAllergenMarker(extracted);
 }

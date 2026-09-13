@@ -145,6 +145,32 @@ export function toRecognizedBlocks(result: RawResult): RecognizedBlock[] {
   return out;
 }
 
+/** A recognized block plus its height — needed to reason about the vertical
+ * gap to the next block (see completeness.ts), which plain x/y can't do. */
+export interface SpatialBlock extends RecognizedBlock {
+  height: number;
+}
+
+/** Same as `toRecognizedBlocks`, but keeps each block's height too (docs/06,
+ * used only by the burst-photo completeness check, not the live frame
+ * processor's cosmetic "sawText" indicator, which doesn't need it). */
+export function toSpatialBlocks(result: RawResult): SpatialBlock[] {
+  const out: SpatialBlock[] = [];
+  for (const b of collectBlocks(result)) {
+    const text = textOf(b);
+    if (!text) continue;
+    const frame = frameOf(b);
+    out.push({
+      id: blockId(frame, text),
+      text,
+      x: frame?.x ?? 0,
+      y: frame?.y ?? 0,
+      height: frame?.height ?? 0,
+    });
+  }
+  return out;
+}
+
 /**
  * Convert a still-photo result (PhotoRecognizer) into a paragraph string.
  * Used by the "Choose Photo" path (docs/06/14).
