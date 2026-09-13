@@ -189,3 +189,15 @@ export async function restorePurchases(): Promise<boolean> {
   cachePremium(active, expiryOf(info));
   return active;
 }
+
+/**
+ * Dev-only: force the offline entitlement cache without a real purchase
+ * (used by Settings' __DEV__ "Turn ON/OFF Premium" toggle). Writing only to
+ * the Zustand store (setPremium) isn't enough — the very next time the app
+ * comes to the foreground, refreshEntitlement() re-reads isPremiumCached()
+ * (RevenueCat isn't configured in dev, so that's the only source of truth)
+ * and silently overwrites an in-memory-only override back to false.
+ */
+export function setDevPremiumOverride(active: boolean): void {
+  cachePremium(active, active ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : null);
+}

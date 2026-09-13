@@ -6,7 +6,7 @@ import { useTheme } from "../../src/design/ThemeProvider";
 import { getMetaValue, setMetaValue } from "../../src/db/appMeta";
 import { getStats, saveStats } from "../../src/db/repositories";
 import { useAppStore } from "../../src/state/appStore";
-import { restorePurchases, cachedRenewalDate } from "../../src/purchases/purchases";
+import { restorePurchases, cachedRenewalDate, setDevPremiumOverride } from "../../src/purchases/purchases";
 import { scansRemaining } from "../../src/domain/scanService";
 import { FREE_SCAN_LIMIT } from "../../src/domain/types";
 
@@ -135,8 +135,13 @@ export default function Settings() {
                 title={isPremium ? "Turn OFF Premium" : "Turn ON Premium"}
                 kind="secondary"
                 onPress={() => {
-                  setPremium(!isPremium);
-                  setDevNote(isPremium ? "Premium off." : "Premium on — unlimited scans.");
+                  const next = !isPremium;
+                  // Persist to the offline cache too, not just the in-memory
+                  // store — otherwise the next app-foreground entitlement
+                  // check silently reverts this back to free.
+                  setDevPremiumOverride(next);
+                  setPremium(next);
+                  setDevNote(next ? "Premium on — unlimited scans." : "Premium off.");
                 }}
               />
               {devNote && <Text tone="cyan" variant="caption">{devNote}</Text>}
