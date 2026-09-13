@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "./ThemeProvider";
 
 type Variant = "body" | "caption" | "title" | "heading" | "display";
-type Tone = "primary" | "muted" | "cyan" | "red" | "warning";
+type Tone = "primary" | "muted" | "cyan" | "red" | "warning" | "success";
 
 export function Text({
   variant = "body",
@@ -29,6 +29,7 @@ export function Text({
     cyan: t.colors.cyan,
     red: t.colors.red,
     warning: t.colors.warning,
+    success: t.colors.success,
   }[tone];
   return (
     <RNText
