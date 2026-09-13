@@ -13,6 +13,7 @@ import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { looksSpatiallyComplete } from "./completeness";
 import { combineBurst, BurstShot } from "./burst";
+import { reconcileTexts } from "./reconcile";
 import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText } from "./recognition";
 
 /**
@@ -34,16 +35,33 @@ import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText 
  * using the label's own printed whitespace/border layout
  * (looksSpatiallyComplete, completeness.ts) — for whether it alone shows a
  * complete ingredients panel. Most packaging is flat or only mildly curved
- * and fits in one photo: that's the common case, and it's both faster (one
- * shutter sound, not three) and more accurate than firing on a fixed
- * schedule regardless of readiness.
+ * and fits in one photo: that's the common case, and this first shot is
+ * both faster to trigger (waits for a genuinely good view, not a clock) and
+ * more accurate than firing on a fixed schedule regardless of readiness.
  *
- * Only when that check says the panel isn't fully captured — a long or
- * curved label that plainly continues past the frame — does the app ask
- * the user to rotate the package, wait for a fresh strong read of the new
- * view, and take a second photo, merging the two (combineBurst, burst.ts).
- * The decision to ask is automatic and structural, not a guess, so "please
- * rotate" only ever shows up when something genuinely wasn't captured.
+ * Even a single clean, well-focused photo of small, curved, glossy print
+ * can still misread individual letters (docs/06, 2026-09-13) — that's a
+ * real limit of on-device OCR, not something extraction/matching logic can
+ * fully eliminate. So once the first photo is confirmed to cover the whole
+ * panel, the app takes CONFIRM_SHOT_COUNT-1 more quick photos of that same
+ * already-good view and reconciles all of them word by word
+ * (reconcileTexts, reconcile.ts): every observed on-device misread has been
+ * a dropped or substituted letter, never the identical mistake on the
+ * identical word across separate captures, so independent re-reads of the
+ * same content can vote out that noise (2 agreeing reads beat 1 outlier).
+ * This costs a couple of extra shutter sounds on the common path — a
+ * deliberate accuracy-over-speed tradeoff.
+ *
+ * Only when the FIRST photo's completeness check says the panel isn't fully
+ * captured — a long or curved label that plainly continues past the frame
+ * — does the app instead ask the user to rotate the package, wait for a
+ * fresh strong read of the new view, and take a second photo covering the
+ * rest, merging the two (combineBurst, burst.ts). That's a different
+ * situation from the confirmation shots above — two DIFFERENT portions of
+ * a long label, not redundant reads of the same one — so it's stitched,
+ * not reconciled. The decision to ask is automatic and structural, not a
+ * guess, so "please rotate" only ever shows up when something genuinely
+ * wasn't captured.
  *
  * Replaces an earlier design that waited for ANY text then a blind settle
  * delay before capturing, and before that, one that always took a fixed
@@ -67,8 +85,10 @@ const READY_STREAK = 2; // consecutive good frames required (~3fps, so ~660ms su
 const READY_TIMEOUT_MS = 6000; // capture anyway if the view never reads strongly (bad angle/lighting)
 const GREEN_FLASH_MS = 250; // let the user see the guide turn green just before the shutter fires
 const ROTATE_PROMPT_MS = 1800; // minimum time given to start physically rotating the package
+const CONFIRM_SHOT_COUNT = 3; // total redundant reads of an already-complete view, for word-level reconciliation
+const CONFIRM_SHOT_GAP_MS = 350; // brief pause between confirmation shots so each is a genuinely independent read
 
-type Phase = "waiting" | "ready" | "analyzing" | "needMore" | "done";
+type Phase = "waiting" | "ready" | "analyzing" | "confirming" | "needMore" | "done";
 
 export interface CameraScannerProps {
   onCapture: (paragraph: string) => void;
@@ -172,19 +192,21 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   }, []);
 
   const finish = useCallback(
-    (shots: BurstShot[]) => {
+    (paragraph: string) => {
       if (finishedRef.current) return;
       finishedRef.current = true;
       setPhase("done");
-      onCapture(combineBurst(shots));
+      onCapture(paragraph);
     },
     [onCapture]
   );
 
   // The whole capture sequence: wait for a strong, sustained live read (the
-  // "in focus and readable" proxy), take one photo, and only ask for a
-  // second if the first didn't show a complete panel (looksSpatiallyComplete
-  // — the label's own printed whitespace/border, not a guess).
+  // "in focus and readable" proxy), take one photo, and either confirm it
+  // with a couple of redundant re-reads of the same view (the common case
+  // — see file header for why), or ask for a second, different photo if
+  // the first didn't show a complete panel (looksSpatiallyComplete — the
+  // label's own printed whitespace/border, not a guess).
   useEffect(() => {
     if (!hasPermission || !device || sequenceStartedRef.current) return;
     sequenceStartedRef.current = true;
@@ -213,13 +235,28 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       if (cancelled) return;
 
       if (looksSpatiallyComplete(shot1.blocks)) {
-        finish([shot1]);
+        // The common case: one photo already covers the whole panel. Take
+        // a couple more quick, independent reads of that SAME view and
+        // reconcile them word by word (reconcile.ts) to catch the kind of
+        // single-letter misread that survives even a clean, well-focused
+        // photo — see file header for the evidence this is based on.
+        setPhase("confirming");
+        const extraTexts: string[] = [];
+        for (let i = 1; i < CONFIRM_SHOT_COUNT; i++) {
+          await sleep(CONFIRM_SHOT_GAP_MS);
+          if (cancelled) return;
+          const shot = await takeShot();
+          if (cancelled) return;
+          if (shot.text) extraTexts.push(shot.text);
+        }
+        finish(reconcileTexts(shot1.text, ...extraTexts));
         return;
       }
 
-      // Ask for a second photo — reset the readiness signal so we wait for
-      // a FRESH strong read of the new (rotated) view, not the stale one
-      // from the original framing.
+      // Ask for a second, DIFFERENT photo covering the rest of a long/
+      // curved label — reset the readiness signal so we wait for a FRESH
+      // strong read of the new (rotated) view, not the stale one from the
+      // original framing.
       setPhase("needMore");
       readyRef.current = false;
       streakRef.current = 0;
@@ -237,7 +274,7 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       setPhase("analyzing");
       const shot2 = await takeShot();
       if (cancelled) return;
-      finish([shot1, shot2]);
+      finish(combineBurst([shot1, shot2]));
     })();
 
     return () => {
@@ -272,6 +309,12 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
           message: "Didn't catch the whole list — slowly rotate the package so we can see the rest",
           tone: "warning" as const,
           borderColor: t.colors.warning,
+        }
+      : phase === "confirming"
+      ? {
+          message: "Double-checking a couple more shots for accuracy…",
+          tone: "success" as const,
+          borderColor: t.colors.success,
         }
       : phase === "ready" || phase === "analyzing"
       ? { message: "Clear view — capturing…", tone: "success" as const, borderColor: t.colors.success }
