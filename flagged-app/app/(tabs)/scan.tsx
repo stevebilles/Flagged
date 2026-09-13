@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, LayoutChangeEvent } from "react-native";
+import { View } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -50,7 +50,6 @@ export default function Scan() {
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
   // Who this scan will run for, and whether that's actually possible right now
   // (mirrors Home's "no silent empty state" rule — explain, don't just vanish).
@@ -162,16 +161,9 @@ export default function Scan() {
 
   const { boxContent, footer } = useCameraCapture({
     active: cameraOpen,
-    boxWidth: boxSize.width,
-    boxHeight: boxSize.height,
     onCapture: onCameraCapture,
     onCancel: () => setCameraOpen(false),
   });
-
-  const onBoxLayout = useCallback((e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setBoxSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-  }, []);
 
   if (locked) {
     // State 2 — hard paywall lockout
@@ -217,7 +209,6 @@ export default function Scan() {
       </View>
 
       <View
-        onLayout={onBoxLayout}
         style={{
           flex: 1,
           marginTop: t.spacing.lg,

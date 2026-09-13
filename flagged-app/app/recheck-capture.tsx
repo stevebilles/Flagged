@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, LayoutChangeEvent } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -38,7 +38,6 @@ export default function RecheckCapture() {
   const item = useMemo(() => (id ? getPantryItem(id) : null), [id]);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
   function runRecheck(rawParagraph: string) {
     setError(null);
@@ -90,8 +89,6 @@ export default function RecheckCapture() {
 
   const { boxContent, footer } = useCameraCapture({
     active: cameraOpen,
-    boxWidth: boxSize.width,
-    boxHeight: boxSize.height,
     onCapture: (p) => {
       setCameraOpen(false);
       runRecheck(p);
@@ -99,15 +96,9 @@ export default function RecheckCapture() {
     onCancel: () => setCameraOpen(false),
   });
 
-  const onBoxLayout = useCallback((e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setBoxSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-  }, []);
-
   return (
     <Screen>
       <View
-        onLayout={onBoxLayout}
         style={{
           flex: 2,
           alignItems: "center",
