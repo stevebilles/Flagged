@@ -12,6 +12,25 @@ export function regexClean(token: string): string {
 }
 
 /**
+ * Cosmetic-only cleanup for the raw ingredient text shown on the results
+ * screen (docs/07) — NOT used for matching (matching has its own
+ * digit-free-only regexClean fallback in matcher.ts, scoped differently
+ * because corrupting "red 40" into "red 4o" would be worse than a stray
+ * "0" on screen). Two narrow, low-risk fixes for what a real device capture
+ * showed (Steve, 2026-09-13): a leading "0" that should be a capital "O"
+ * ("0at bran" -> "Oat bran"), and a lone apostrophe standing in for a comma
+ * the OCR dropped ("Salt' Soybean" -> "Salt, Soybean" — a real possessive
+ * is immediately followed by a letter, e.g. "Baker's", never whitespace).
+ * Both patterns are common ML Kit confusions and deliberately scoped to
+ * avoid touching legitimate numbers (dye codes, E-numbers, weights).
+ */
+export function cleanForDisplay(text: string): string {
+  return text
+    .replace(/(^|[^A-Za-z0-9])0(?=[A-Za-z])/g, "$1O")
+    .replace(/['’]\s/g, ", ");
+}
+
+/**
  * Normalize a raw OCR paragraph (docs/06 Step 2):
  *  - lowercase
  *  - strip line-break hyphens (rejoin words split across lines)

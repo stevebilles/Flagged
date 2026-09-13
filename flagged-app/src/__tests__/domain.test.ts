@@ -4,6 +4,7 @@ import {
   tokenize,
   looksLikeIngredientList,
   extractIngredientList,
+  cleanForDisplay,
 } from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
@@ -202,6 +203,28 @@ describe("matcher", () => {
   it("digit dye codes match independently (yellow 5, blue 1)", () => {
     const r = matchParagraph("color added (yellow 5, blue 1)", ["yellow 5", "blue 1", "red 40"]);
     expect(r.matches.map((m) => m.term).sort()).toEqual(["blue 1", "yellow 5"]);
+  });
+});
+
+describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {
+  it("fixes a leading zero-for-O misread", () => {
+    expect(cleanForDisplay("Rice flour, Wheat bran, 0at bran, Rye flour")).toBe(
+      "Rice flour, Wheat bran, Oat bran, Rye flour"
+    );
+  });
+
+  it("fixes a lone apostrophe standing in for a dropped comma", () => {
+    expect(cleanForDisplay("Salt' Soybean oil")).toBe("Salt, Soybean oil");
+  });
+
+  it("never touches a dye code, E-number, or a weight", () => {
+    expect(cleanForDisplay("color added (Red 40, Yellow 5)")).toBe("color added (Red 40, Yellow 5)");
+    expect(cleanForDisplay("contains E120 and E621")).toBe("contains E120 and E621");
+    expect(cleanForDisplay("Sodium 40mg per serving")).toBe("Sodium 40mg per serving");
+  });
+
+  it("leaves a real possessive alone (letter right after the apostrophe, no space)", () => {
+    expect(cleanForDisplay("Baker's chocolate")).toBe("Baker's chocolate");
   });
 });
 

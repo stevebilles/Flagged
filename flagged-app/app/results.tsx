@@ -8,6 +8,7 @@ import { useAppStore } from "../src/state/appStore";
 import { getProfile } from "../src/db/repositories";
 import { commitScanStats, commitScanStatsForAll, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
+import { cleanForDisplay } from "../src/matching/normalize";
 import type { Match } from "../src/matching/matcher";
 
 /** "matches Sofia's Big-9 Allergens filter" / "...Sofia & Steve's..." (docs/17 "All" mode). */
@@ -53,7 +54,12 @@ export default function Results() {
   // Split the paragraph so ONLY the exact matched words/phrases are highlighted —
   // not the whole comma-chunk they sit in (which was reddening "Contains:" etc).
   const segments = useMemo(() => {
-    const para = lastScan?.paragraph ?? "";
+    // Cosmetic-only cleanup (0->O, a lone apostrophe standing in for a
+    // dropped comma) for what's SHOWN — the raw text used for matching
+    // upstream is untouched. Cleaning before highlighting also means a term
+    // matched via the matcher's own digit-cleanup fallback (e.g. "oat" found
+    // inside a raw "0at") now actually lines up with the highlighted text.
+    const para = cleanForDisplay(lastScan?.paragraph ?? "");
     const tokens = Array.from(
       new Set((lastScan?.matches ?? []).map((m) => m.token.trim()).filter((s) => s.length > 1))
     ).sort((a, b) => b.length - a.length); // longest first: "wheat flour" before "wheat"
