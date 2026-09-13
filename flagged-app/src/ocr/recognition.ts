@@ -172,14 +172,48 @@ export function toSpatialBlocks(result: RawResult): SpatialBlock[] {
 }
 
 /**
+ * Reading order for a still photo's blocks, built from their own measured
+ * positions — top-to-bottom, left-to-right within a row — rather than
+ * trusting the plugin's own resultText field or the native block array's
+ * order. Neither of those is guaranteed to reflect true visual layout for a
+ * dense, multi-line, nested (bracketed) list: a real device capture
+ * (2026-09-13) showed resultText scramble the order of clauses inside a
+ * "[...]" bracket on an otherwise perfectly legible single photo ("Food
+ * acid (270,327,330)" landing before "(Natural, contains soy flour)", which
+ * prints in the opposite order on the actual label) — the OCR plugin's own
+ * internal text-assembly heuristic failed on this layout even though every
+ * individual block's position was presumably still measured correctly.
+ * Row grouping uses a tolerance relative to the blocks' own typical height
+ * rather than a fixed pixel number, since raw ML Kit coordinates scale with
+ * photo resolution and this needs to hold up across different phones/photos.
+ */
+function sortByPosition(blocks: SpatialBlock[]): SpatialBlock[] {
+  if (blocks.length === 0) return blocks;
+  const heights = blocks.map((b) => b.height).filter((h) => h > 0).sort((a, b) => a - b);
+  const medianHeight = heights.length ? heights[Math.floor(heights.length / 2)] : 20;
+  const rowTolerance = medianHeight * 0.6;
+  return [...blocks].sort((a, b) => {
+    if (Math.abs(a.y - b.y) > rowTolerance) return a.y - b.y;
+    return a.x - b.x;
+  });
+}
+
+/**
  * Convert a still-photo result (PhotoRecognizer) into a paragraph string.
- * Used by the "Choose Photo" path (docs/06/14).
+ * Used by the "Choose Photo" path and the burst-photo scanner (docs/06/14).
+ * Built from position-sorted blocks (see sortByPosition) rather than the
+ * plugin's own resultText — see that function's doc comment for why.
  */
 export function photoResultToParagraph(result: MLKitText | MLKitText[]): string {
-  const direct = resultTextOf(result as RawResult);
-  if (direct) return direct;
-  return toRecognizedBlocks(result as RawResult)
-    .map((b) => b.text)
-    .join(" ")
-    .trim();
+  const blocks = toSpatialBlocks(result as RawResult);
+  if (blocks.length > 0) {
+    return sortByPosition(blocks)
+      .map((b) => b.text)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  // No individual blocks at all (rare) — fall back to whatever flat text
+  // the plugin can offer; there's no position data to sort by either way.
+  return resultTextOf(result as RawResult);
 }

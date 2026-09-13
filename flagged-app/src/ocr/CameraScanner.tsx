@@ -117,10 +117,27 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       const photo = await camera.takePhoto({ flash: "off", enableShutterSound: false });
       const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
       const result = await PhotoRecognizer({ uri, orientation: "portrait" });
-      return {
-        text: photoResultToParagraph(result as any),
-        blocks: toSpatialBlocks(result as any),
-      };
+      const blocks = toSpatialBlocks(result as any);
+      if (__DEV__) {
+        // Diagnostic only (docs/06): the OCR plugin's own documented shape
+        // has already proven unreliable once (recognition.ts's header
+        // comment) — this shows exactly what one real block looks like
+        // (position + how much text it carries) instead of guessing at a
+        // deeper line/element-level parse blind. Grep Metro for "BLOCKS".
+        // eslint-disable-next-line no-console
+        console.log(
+          `\n▓▓▓ PHOTO BLOCKS (${blocks.length}) ▓▓▓\n` +
+            blocks
+              .map(
+                (b, i) =>
+                  `[${i}] y=${Math.round(b.y)} h=${Math.round(b.height)} x=${Math.round(b.x)} :: ${JSON.stringify(
+                    b.text.length > 100 ? `${b.text.slice(0, 100)}… (+${b.text.length - 100})` : b.text
+                  )}`
+              )
+              .join("\n")
+        );
+      }
+      return { text: photoResultToParagraph(result as any), blocks };
     } catch {
       return { text: "", blocks: [] };
     }

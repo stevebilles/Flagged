@@ -85,9 +85,24 @@ describe("photoResultToParagraph", () => {
     );
   });
 
-  it("joins block text when resultText is missing", () => {
-    expect(photoResultToParagraph(result([block("ingredients: oats", 0, 0), block("salt", 0, 20)]))).toBe(
-      "ingredients: oats\nsalt"
+  it("builds the paragraph from position-sorted blocks, not the plugin's own resultText", () => {
+    // resultText is deliberately WRONG/scrambled here to prove blocks (with
+    // real position data) win when present — the whole point of this fix
+    // (2026-09-13): a real device capture showed the plugin's own resultText
+    // scramble clause order on a dense layout, so it's no longer trusted
+    // when position data is available to reconstruct order ourselves.
+    const out = photoResultToParagraph(
+      result([block("ingredients: oats", 0, 0), block("salt", 0, 20)], "salt ingredients: oats")
     );
+    expect(out).toBe("ingredients: oats salt");
+  });
+
+  it("orders blocks top-to-bottom by measured position even when the block array arrives out of order", () => {
+    const out = photoResultToParagraph(result([block("salt", 0, 100), block("ingredients: oats", 0, 0)]));
+    expect(out).toBe("ingredients: oats salt");
+  });
+
+  it("falls back to resultText when there are no blocks to sort by position", () => {
+    expect(photoResultToParagraph(result([], "ingredients: oats"))).toBe("ingredients: oats");
   });
 });
