@@ -69,19 +69,19 @@ export function tokenize(normalized: string): string[] {
  * Falls back to the raw text when no header is found or the result is too short.
  */
 const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR garble
-
-/**
- * Whether `text` contains an allergen-declaration marker — tolerant of OCR
- * garble the same way extraction's own anchor is (e.g. "Contains:" misread
- * as "Contais:" still matches). Exported so callers outside this file
- * (droppedAllergenLine below; the burst-photo completeness check in
- * src/ocr/completeness.ts) use the exact same tolerant definition
- * extraction itself relies on, instead of a separate, stricter regex that
- * could disagree with it on genuinely garbled OCR text.
- */
-export function hasAllergenMarker(text: string): boolean {
-  return CONTAINS_RE.test(text);
-}
+// Scoped use only: extractIngredientList below searches for this within a
+// small window right after the chosen ingredient header, to find where the
+// list's own "Contains:" line ends. Kept deliberately unexported — a real
+// device false positive (2026-09-13) showed this pattern is too loose to
+// use as a whole-text "is there an allergen marker ANYWHERE" check: it
+// matches plenty of unrelated words that also happen to start with
+// cont/cant and end in a colon (Control:, Contact:, Content:, Continue:,
+// Container:), and tightening it with a similarity threshold doesn't cleanly
+// separate those from real garble ("Content" and "Contais" score similarly
+// close to "Contains"). See git history for the standalone
+// droppedAllergenLine safety gate this used to back, removed for the same
+// reason — the spatial completeness check in src/ocr/completeness.ts,
+// added the same day, is the sturdier replacement (docs/06).
 
 /**
  * Every position that looks like an ingredient header. OCR mangles the word
@@ -237,27 +237,3 @@ export function looksLikeIngredientList(raw: string): boolean {
   return raw.trim().length >= 60 && commas >= 5;
 }
 
-/**
- * True when the raw OCR capture clearly read an allergen declaration
- * ("Contains: ..." / "Contient: ...") but extractIngredientList's result
- * doesn't have it — the strongest single sign that a capture is truncated
- * rather than clean (docs/07/08, reported 2026-09-13: a real bilingual snack
- * label's capture jumped from partway through the English list into the
- * middle of the French one and never reached either "Contains:" line, yet
- * `looksLikeIngredientList` still passed it — that check only asks "does
- * this look like *an* ingredient list", not "is this capture complete" — so
- * the scan showed a confident "No red flags" despite silently dropping the
- * one line that would tell an allergic user the product may contain sesame).
- * Presenting a clean result on a definitely-incomplete capture is unsafe;
- * callers should treat this as a reason to ask for a rescan instead.
- *
- * Uses hasAllergenMarker's OCR-garble-tolerant check on both sides. An
- * earlier version of this function used a stricter regex requiring the
- * exact spelling "contains"/"contient" — which meant it silently missed the
- * very real-world garble ("Contains:" -> "Contais:") it was written to
- * catch, since a genuinely mis-OCR'd marker would fail that strict check on
- * BOTH the raw and extracted sides equally, never triggering a rescan.
- */
-export function droppedAllergenLine(raw: string, extracted: string): boolean {
-  return hasAllergenMarker(raw) && !hasAllergenMarker(extracted);
-}

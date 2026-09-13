@@ -12,7 +12,7 @@ import {
   getPantryItem,
   getProfile,
 } from "../src/db/repositories";
-import { normalizeParagraph, tokenize, extractIngredientList, droppedAllergenLine } from "../src/matching/normalize";
+import { normalizeParagraph, tokenize, extractIngredientList } from "../src/matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagTerms } from "../src/domain/activation";
 import { evaluateRecheck } from "../src/domain/diffEngine";
 import { attributeMatches } from "../src/domain/scanService";
@@ -42,13 +42,6 @@ export default function RecheckCapture() {
       return;
     }
     const paragraph = extractIngredientList(rawParagraph);
-    // Same safety gate as Scan (docs/07/08): a dropped "Contains:" line means
-    // the capture is truncated, not a genuinely unchanged/safe recipe.
-    if (droppedAllergenLine(rawParagraph, paragraph)) {
-      logScanDebug("recheck", rawParagraph, paragraph, "ABORTED (dropped allergen line)");
-      setError("Couldn't read the whole label — the allergen summary line got cut off. Hold steady until the full label is in frame and try again.");
-      return;
-    }
     const profile = activeProfileId ? getProfile(activeProfileId) : null;
     if (!profile) {
       setError("No active profile.");

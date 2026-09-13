@@ -1,5 +1,4 @@
 import type { SpatialBlock } from "./recognition";
-import { looksLikeIngredientList, hasAllergenMarker } from "../matching/normalize";
 
 /**
  * Does one photo's OWN blocks show a self-contained, complete ingredients
@@ -54,18 +53,3 @@ export function looksSpatiallyComplete(blocks: SpatialBlock[]): boolean {
   return false;
 }
 
-/**
- * Combined per-photo completeness check: the spatial signal above (primary
- * — see its own doc comment for why), OR the tolerant Contains:/Contient:
- * text check as a fallback for when a crease/fold on curved packaging
- * splits one true panel into several small ML Kit blocks with no single
- * clean gap. Leniency here is safe: this only decides whether ONE photo's
- * text is good enough to use on its own instead of merging with the other
- * burst shots (see burst.ts) — the scan pipeline's own separate safety net
- * (droppedAllergenLine, in normalize.ts) still independently checks
- * whatever text is finally chosen before ever showing a result, so a wrong
- * "complete" guess here can't produce a silent bad verdict on its own.
- */
-export function looksLikeCompletePhoto(text: string, blocks: SpatialBlock[]): boolean {
-  return looksSpatiallyComplete(blocks) || (looksLikeIngredientList(text) && hasAllergenMarker(text));
-}

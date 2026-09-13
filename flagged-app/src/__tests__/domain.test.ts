@@ -5,7 +5,6 @@ import {
   looksLikeIngredientList,
   extractIngredientList,
   cleanForDisplay,
-  droppedAllergenLine,
 } from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
@@ -340,41 +339,3 @@ describe("displayName", () => {
   });
 });
 
-describe("droppedAllergenLine (truncated-capture safety gate)", () => {
-  it("flags a capture that read \"Contains:\" but lost it during extraction", () => {
-    // Reproduces the real bilingual snack label report (2026-09-13): the
-    // capture jumped from partway through English into mid-French and never
-    // reached either "Contains:"/"Contient:" line.
-    const raw =
-      "Ingredients: Maize, Rice, Seasoning [Milk solids, Salt]. Contains: Soy, Milk. May contain: Sesame";
-    const extracted = "Maize, Rice, Scasoning [Milk solids, Sel, Arôme (naturel";
-    expect(droppedAllergenLine(raw, extracted)).toBe(true);
-  });
-
-  it("does not flag a label with no Contains: line at all (nothing to drop)", () => {
-    const raw = "Ingredients: water, sugar, salt.";
-    expect(droppedAllergenLine(raw, raw)).toBe(false);
-  });
-
-  it("does not flag when the Contains: line survived extraction", () => {
-    const raw = "Ingredients: water, sugar. Contains: none.";
-    const extracted = "water, sugar. Contains: none.";
-    expect(droppedAllergenLine(raw, extracted)).toBe(false);
-  });
-
-  it("recognizes the French Contient: form", () => {
-    const raw = "Ingrédients: eau, sucre. Contient: aucun.";
-    const extracted = "eau, sucre";
-    expect(droppedAllergenLine(raw, extracted)).toBe(true);
-  });
-
-  it("regression: still catches it when OCR itself misspells the marker (Contains -> Contais)", () => {
-    // An earlier version of this function required exact "contains:"/
-    // "contient:" spelling, which meant a genuinely garbled marker (real
-    // device capture, 2026-09-13: "Contains:" read as "Contais:") failed
-    // the check on BOTH sides equally and never triggered a rescan.
-    const raw = "Maize, Rice. Contais: Soy, Milk, May contain: Sesane, Contint: Soja, La.";
-    const extracted = "Maize, Rice, Scasoring [Milk solids";
-    expect(droppedAllergenLine(raw, extracted)).toBe(true);
-  });
-});

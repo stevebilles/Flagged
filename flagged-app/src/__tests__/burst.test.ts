@@ -1,4 +1,4 @@
-import { looksSpatiallyComplete, looksLikeCompletePhoto } from "../ocr/completeness";
+import { looksSpatiallyComplete } from "../ocr/completeness";
 import { combineBurst } from "../ocr/burst";
 import type { SpatialBlock } from "../ocr/recognition";
 
@@ -39,23 +39,6 @@ describe("looksSpatiallyComplete", () => {
       block("Contains: none.", 44, 20), // still normal spacing — part of the same panel
     ];
     expect(looksSpatiallyComplete(blocks)).toBe(false);
-  });
-});
-
-describe("looksLikeCompletePhoto", () => {
-  it("true via the spatial signal even when the text itself has no Contains: marker", () => {
-    const blocks = [block("Ingredients: water, sugar, salt", 100, 60), block("Best before 2027", 500, 20)];
-    expect(looksLikeCompletePhoto("Ingredients: water, sugar, salt", blocks)).toBe(true);
-  });
-
-  it("true via the text fallback when geometry is inconclusive (e.g. a single fused block)", () => {
-    const text = "Ingredients: water, sugar, salt. Contains: none.";
-    expect(looksLikeCompletePhoto(text, [block(text, 0, 20)])).toBe(true);
-  });
-
-  it("false when neither signal indicates completeness", () => {
-    const text = "Ingredients: water, sug";
-    expect(looksLikeCompletePhoto(text, [block(text, 0, 20)])).toBe(false);
   });
 });
 
