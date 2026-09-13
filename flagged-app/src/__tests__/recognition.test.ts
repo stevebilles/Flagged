@@ -74,4 +74,31 @@ describe("photoResultToParagraph", () => {
     const out = photoResultToParagraph(result([bigNutritionBlock, line2, line1]));
     expect(out).toBe("Nutrition Facts Ingredients: water, sugar, salt, dangerous nut oil.");
   });
+
+  it("orders sequential paragraph lines by y even when their gap-to-height ratio varies between photos", () => {
+    // Two real device captures (2026-09-13), same content, cropped with the
+    // corner tool at slightly different tightness — proved a HEIGHT-derived
+    // row tolerance is fundamentally unstable, not just mistunable: on one
+    // capture the line gap (81px) cleared the tolerance (61px) and sorted
+    // correctly; on the next, near-identical capture the gap (65px) fell
+    // just under a slightly higher tolerance (68px, from slightly taller
+    // text) and got misjudged as "the same row," scrambling two lines and
+    // wrongly showing "CLEAN" for a label that actually contains a flagged
+    // ingredient. Horizontal overlap is stable at ~99% in both captures
+    // regardless of the gap/height ratio, which is why that's the signal
+    // used now instead.
+    const failingCapture = [
+      block("Ingredients: Maize, Rice, seasoning [Milk solids, Salt, Flavour", 186, 50, 1576, 114),
+      block("(Natural, contains soy flour), Sugar, Cheese powder (milk),", 175, 115, 1569, 114),
+      block("Yeast extract, Onion powder, Food acid (270, 327, 330)", 183, 178, 1399, 122),
+      block("Anti-caking agent (551)], Sunflower oil, Herb extract", 189, 243, 1316, 107),
+    ];
+    const out = photoResultToParagraph(result(failingCapture));
+    expect(out).toBe(
+      "Ingredients: Maize, Rice, seasoning [Milk solids, Salt, Flavour " +
+        "(Natural, contains soy flour), Sugar, Cheese powder (milk), " +
+        "Yeast extract, Onion powder, Food acid (270, 327, 330) " +
+        "Anti-caking agent (551)], Sunflower oil, Herb extract"
+    );
+  });
 });
