@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import {
   Camera,
   useCameraDevice,
@@ -7,16 +7,17 @@ import {
   useFrameProcessor,
   runAtTargetFps,
 } from "react-native-vision-camera";
-import { recognizeText, useVisionScanText } from "vision-ocr";
+import { recognizeText, useVisionScanText, detectDocumentCorners, correctPerspective } from "vision-ocr";
+import type { DocumentCorners } from "vision-ocr";
 import { useRunOnJS } from "react-native-worklets-core";
-import { Text, Button } from "../design/components";
+import { Text, Button, Card } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
-import { looksSpatiallyComplete, looksTextuallyComplete } from "./completeness";
-import { combineBurst, BurstShot } from "./burst";
-import { toSpatialBlocks, photoResultToParagraph } from "./recognition";
+import { photoResultToParagraph } from "./recognition";
+import { stitch } from "./stitch";
+import { CornerAdjustOverlay } from "./CornerAdjustOverlay";
 
 /**
- * Adaptive 1-or-2-photo scanner (docs/06 Step 1 / docs/14), triggered by a
+ * Capture-then-adjust scanner (docs/14, 2026-09-13), triggered by a
  * live-read-quality signal rather than a clock.
  *
  * `react-native-vision-camera` doesn't expose the phone's actual hardware
@@ -27,42 +28,39 @@ import { toSpatialBlocks, photoResultToParagraph } from "./recognition";
  * no recognizable text, while a sharp, well-aimed one reads a solid amount
  * of it — so once the live preview has read a substantial chunk of text for
  * a couple of consecutive frames in a row (READY_STREAK), the guide turns
- * green and the real photo is taken right then, instead of on a blind timer
- * that might fire on a still-settling or moving frame.
+ * green and the real photo is taken right then.
  *
- * The real, full-resolution photo is then OCR'd (Apple Vision, accurate
- * mode — modules/vision-ocr) and checked — automatically, using the label's
- * own printed whitespace/border layout (looksSpatiallyComplete,
- * completeness.ts) — for whether it alone shows a complete ingredients
- * panel. Most packaging is flat or only mildly curved and fits in one
- * photo: that's the common case, and this single shot is both faster to
- * trigger (waits for a genuinely good view, not a clock) and, with Vision's
- * accuracy, reliable enough on its own — no redundant confirmation shots.
+ * The user CANNOT interact with anything mid-capture — they're holding the
+ * product in one hand and the phone in the other, so dragging a crop guide
+ * live is impossible. Instead: capture first, adjust second. After the
+ * shutter fires, they can set the product down, and a review screen shows
+ * the CAPTURED PHOTO (not the live camera) with four draggable corners —
+ * Vision's own rectangle detector suggests a starting position — for them
+ * to box in exactly the ingredient panel at their own pace.
  *
- * An earlier design (2026-09-13, while still on Google ML Kit) took two
- * more quick photos of an already-complete view and reconciled all three
- * word by word to vote out ML Kit's frequent single-letter misreads. Once
- * ML Kit was replaced with Apple's own Vision framework, that reconciliation
- * step became a net liability rather than a help: a real device scan showed
- * a photo whose OWN text was already complete and correctly ordered still
- * came out with a dropped, misordered chunk after being merged with two
- * other independently-framed photos — the word-alignment merge itself was
- * introducing the kind of error Vision's much higher single-shot accuracy
- * no longer produces on its own. Dropped in favor of trusting one good shot.
+ * That confirmed quad is then perspective-corrected (flattened into an
+ * upright rectangle, the same technique document-scanner apps use) BEFORE
+ * running OCR on it. This replaced an automatic-decision pipeline that grew
+ * increasingly elaborate over several real-device failures on 2026-09-13
+ * (spatial/textual completeness heuristics, then multi-shot reconciliation,
+ * then several attempts at more robust reading-order sorting) without ever
+ * fully fixing the root cause: a tilted photo makes Vision's axis-aligned
+ * text boxes come back inflated/skewed, which no amount of downstream
+ * guessing could reliably compensate for. Perspective correction fixes the
+ * tilt at the source; manual cropping removes the Nutrition Facts grid and
+ * second-language repeat from the image entirely, rather than needing
+ * text-side logic to guess where the real ingredient list starts and ends.
  *
- * Only when the FIRST photo's completeness check says the panel isn't fully
- * captured — a long or curved label that plainly continues past the frame
- * — does the app ask the user to rotate the package, wait for a fresh
- * strong read of the new view, and take a second photo covering the rest,
- * merging the two (combineBurst, burst.ts). That's a genuinely different
- * situation from the dropped confirmation shots above — two DIFFERENT
- * portions of a long label, not redundant reads of the same one. The
- * decision to ask is automatic and structural, not a guess, so "please
- * rotate" only ever shows up when something genuinely wasn't captured.
+ * After each capture+adjust+correct cycle, the user is asked directly —
+ * "Done" or "Add more" — rather than the app guessing whether the whole
+ * label was captured. "Add more" repeats capture-then-adjust for a second,
+ * different photo (e.g. the label wraps around a curved package) and joins
+ * the two texts (stitch, stitch.ts) — an explicit choice is far more
+ * reliable than any automatic completeness heuristic this session tried.
  *
  * The live frame processor below is kept only for the readiness signal and
  * the cosmetic "Reading label…" cue; it never supplies the text that
- * actually gets scanned — every scan is built from a real still photo.
+ * actually gets scanned — every scan is built from a real, corrected photo.
  *
  * NOTE: requires a dev/EAS build (native modules). Cannot run in Expo Go or
  * the sandbox. See docs/14 "Definition of done".
@@ -72,9 +70,30 @@ const READY_MIN_CHARS = 30; // total live-preview text length that counts as "re
 const READY_STREAK = 2; // consecutive good frames required (~3fps, so ~660ms sustained)
 const READY_TIMEOUT_MS = 6000; // capture anyway if the view never reads strongly (bad angle/lighting)
 const GREEN_FLASH_MS = 250; // let the user see the guide turn green just before the shutter fires
-const ROTATE_PROMPT_MS = 1800; // minimum time given to start physically rotating the package
 
-type Phase = "waiting" | "ready" | "analyzing" | "needMore" | "done";
+type Phase = "waiting" | "ready" | "capturing" | "reviewing" | "correcting" | "confirmDone" | "done";
+
+interface CapturedPhoto {
+  uri: string;
+  width: number;
+  height: number;
+  corners: DocumentCorners;
+}
+
+/** A reasonable starting box (roughly matching the old live-preview guide's
+ * proportions) when Vision's rectangle detector doesn't find anything
+ * confident — a curved or low-contrast package, say. */
+function defaultCorners(width: number, height: number): DocumentCorners {
+  const marginX = width * 0.09;
+  const top = height * 0.3;
+  const bottom = height * 0.74;
+  return {
+    topLeft: { x: marginX, y: top },
+    topRight: { x: width - marginX, y: top },
+    bottomLeft: { x: marginX, y: bottom },
+    bottomRight: { x: width - marginX, y: bottom },
+  };
+}
 
 export interface CameraScannerProps {
   onCapture: (paragraph: string) => void;
@@ -90,22 +109,31 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
 
   const [phase, setPhase] = useState<Phase>("waiting");
   const [sawText, setSawText] = useState(false);
+  const [captured, setCaptured] = useState<CapturedPhoto | null>(null);
+  const [previewText, setPreviewText] = useState("");
   const sawTextRef = useRef(false);
   const readyRef = useRef(false);
   const streakRef = useRef(0);
   const finishedRef = useRef(false);
-  const sequenceStartedRef = useRef(false);
+  const accumulatedRef = useRef("");
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
+
+  const resetReadiness = useCallback(() => {
+    readyRef.current = false;
+    streakRef.current = 0;
+    sawTextRef.current = false;
+    setSawText(false);
+  }, []);
 
   // Live-read-quality signal: a strong, sustained read (READY_STREAK
   // consecutive frames over READY_MIN_CHARS) is our proxy for "the camera
   // can currently read this clearly" — there's no hardware focus-lock event
   // exposed to JS to wait for instead (see file header). Also drives the
   // cosmetic "Reading label…"/green cues. Not used for the text that's
-  // actually scanned — that always comes from a real photo (takeShot).
+  // actually scanned — that always comes from a real, corrected photo.
   const onFrameResult = useRunOnJS(
     (result: { text: string }) => {
       if (finishedRef.current) return;
@@ -136,69 +164,36 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     [visionScanText, onFrameResult]
   );
 
-  // Take one real photo and OCR it. A failed shot (camera busy, a hiccup
-  // mid-capture) shouldn't crash the sequence — return an empty shot;
-  // combineBurst and the downstream "couldn't read a label" gate handle it.
-  const takeShot = useCallback(async (): Promise<BurstShot> => {
+  // Take one real photo and get a starting crop suggestion for it. A
+  // failed shot (camera busy, a hiccup mid-capture) just returns to
+  // waiting — the readiness loop below will retry.
+  const captureAndReview = useCallback(async () => {
     try {
       const camera = cameraRef.current;
-      if (!camera) return { text: "", blocks: [] };
+      if (!camera) {
+        setPhase("waiting");
+        return;
+      }
       const photo = await camera.takePhoto({ flash: "off", enableShutterSound: false });
       const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
-      const result = await recognizeText(uri);
-      const blocks = toSpatialBlocks(result);
-      if (__DEV__) {
-        // Diagnostic only (docs/06): confirms Vision's own documented
-        // coordinate conversion (VisionOcrPhotoModule.swift) actually lines
-        // up with the real label — y should ascend in true top-to-bottom
-        // reading order and height should read as plausible single-line
-        // thickness. Grep Metro for "BLOCKS".
-        // eslint-disable-next-line no-console
-        console.log(
-          `\n▓▓▓ PHOTO BLOCKS (${blocks.length}) ▓▓▓\n` +
-            blocks
-              .map(
-                (b, i) =>
-                  `[${i}] y=${Math.round(b.y)} h=${Math.round(b.height)} x=${Math.round(b.x)} w=${Math.round(
-                    b.width
-                  )} :: ${JSON.stringify(
-                    b.text.length > 100 ? `${b.text.slice(0, 100)}… (+${b.text.length - 100})` : b.text
-                  )}`
-              )
-              .join("\n")
-        );
-      }
-      return { text: photoResultToParagraph(result), blocks };
+      const detected = await detectDocumentCorners(uri);
+      const corners = detected.corners ?? defaultCorners(detected.width, detected.height);
+      setCaptured({ uri, width: detected.width, height: detected.height, corners });
+      setPhase("reviewing");
     } catch {
-      return { text: "", blocks: [] };
+      setPhase("waiting");
     }
   }, []);
 
-  const finish = useCallback(
-    (paragraph: string) => {
-      if (finishedRef.current) return;
-      finishedRef.current = true;
-      setPhase("done");
-      onCapture(paragraph);
-    },
-    [onCapture]
-  );
-
-  // The whole capture sequence: wait for a strong, sustained live read (the
-  // "in focus and readable" proxy), take one photo, and finish immediately
-  // if it shows a complete panel (the common case — see file header for
-  // why no confirmation shots), or ask for a second, different photo if
-  // the first didn't (looksSpatiallyComplete/looksTextuallyComplete — the
-  // label's own printed layout, not a guess).
+  // Waits for a strong, sustained live read (the "in focus and readable"
+  // proxy), then a brief green flash, then takes the photo — every time
+  // `phase` becomes "waiting", including the very first mount and every
+  // "Add more" cycle.
   useEffect(() => {
-    if (!hasPermission || !device || sequenceStartedRef.current) return;
-    sequenceStartedRef.current = true;
+    if (!hasPermission || !device || phase !== "waiting") return;
 
     let cancelled = false;
     const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-    // Waits for a strong sustained read, or gives up after READY_TIMEOUT_MS
-    // so a bad angle/lighting can't hang the scan forever.
     const waitForReadyRead = async () => {
       const start = Date.now();
       while (!readyRef.current && Date.now() - start < READY_TIMEOUT_MS) {
@@ -212,49 +207,68 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       setPhase("ready");
       await sleep(GREEN_FLASH_MS);
       if (cancelled) return;
-
-      setPhase("analyzing");
-      const shot1 = await takeShot();
-      if (cancelled) return;
-
-      // Either signal is enough — see completeness.ts for why they're
-      // deliberately independent checks (one geometric, one structural).
-      // The common case: one photo already covers the whole panel — Vision's
-      // accuracy is reliable enough on its own now (see file header), no
-      // redundant confirmation shots.
-      if (looksSpatiallyComplete(shot1.blocks) || looksTextuallyComplete(shot1.text)) {
-        finish(shot1.text);
-        return;
-      }
-
-      // Ask for a second, DIFFERENT photo covering the rest of a long/
-      // curved label — reset the readiness signal so we wait for a FRESH
-      // strong read of the new (rotated) view, not the stale one from the
-      // original framing.
-      setPhase("needMore");
-      readyRef.current = false;
-      streakRef.current = 0;
-      sawTextRef.current = false;
-      setSawText(false);
-      await sleep(ROTATE_PROMPT_MS);
-      if (cancelled) return;
-
-      await waitForReadyRead();
-      if (cancelled) return;
-      setPhase("ready");
-      await sleep(GREEN_FLASH_MS);
-      if (cancelled) return;
-
-      setPhase("analyzing");
-      const shot2 = await takeShot();
-      if (cancelled) return;
-      finish(combineBurst([shot1, shot2]));
+      setPhase("capturing");
+      await captureAndReview();
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [hasPermission, device, takeShot, finish]);
+  }, [hasPermission, device, phase, captureAndReview]);
+
+  const handleConfirmCorners = useCallback(async (corners: DocumentCorners) => {
+    const photo = captured;
+    if (!photo) return;
+    setPhase("correcting");
+    try {
+      const correctedUri = await correctPerspective(photo.uri, corners);
+      const result = await recognizeText(correctedUri);
+      if (__DEV__) {
+        // Diagnostic only (docs/06/14): confirms the perspective-corrected
+        // image's blocks read as plausible, non-tilted lines. Grep Metro
+        // for "BLOCKS".
+        // eslint-disable-next-line no-console
+        console.log(
+          `\n▓▓▓ CORRECTED PHOTO BLOCKS (${result.blocks.length}) ▓▓▓\n` +
+            result.blocks
+              .map(
+                (b, i) =>
+                  `[${i}] y=${Math.round(b.y)} h=${Math.round(b.height)} x=${Math.round(b.x)} w=${Math.round(
+                    b.width
+                  )} :: ${JSON.stringify(
+                    b.text.length > 100 ? `${b.text.slice(0, 100)}… (+${b.text.length - 100})` : b.text
+                  )}`
+              )
+              .join("\n")
+        );
+      }
+      accumulatedRef.current = stitch(accumulatedRef.current, photoResultToParagraph(result));
+    } catch {
+      // Leave accumulatedRef as-is — the user can still choose Done/Add more
+      // with whatever was captured so far, or Retake this one.
+    }
+    setPreviewText(accumulatedRef.current);
+    setCaptured(null);
+    setPhase("confirmDone");
+  }, [captured]);
+
+  const handleRetake = useCallback(() => {
+    setCaptured(null);
+    resetReadiness();
+    setPhase("waiting");
+  }, [resetReadiness]);
+
+  const handleAddMore = useCallback(() => {
+    resetReadiness();
+    setPhase("waiting");
+  }, [resetReadiness]);
+
+  const handleDone = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setPhase("done");
+    onCapture(accumulatedRef.current);
+  }, [onCapture]);
 
   if (!device) {
     return (
@@ -277,14 +291,51 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     );
   }
 
+  if (phase === "reviewing" && captured) {
+    return (
+      <CornerAdjustOverlay
+        photoUri={captured.uri}
+        photoWidth={captured.width}
+        photoHeight={captured.height}
+        initialCorners={captured.corners}
+        onConfirm={handleConfirmCorners}
+        onRetake={handleRetake}
+      />
+    );
+  }
+
+  if (phase === "correcting") {
+    return (
+      <View style={[styles.fill, styles.center, { backgroundColor: t.colors.canvas }]}>
+        <Text tone="cyan" bold>
+          Straightening and reading the label…
+        </Text>
+      </View>
+    );
+  }
+
+  if (phase === "confirmDone") {
+    return (
+      <View style={[styles.fill, { backgroundColor: t.colors.canvas, padding: t.spacing.md }]}>
+        <Text bold style={{ marginBottom: t.spacing.sm }}>
+          Got it — anything else to add?
+        </Text>
+        <ScrollView style={{ flex: 1 }}>
+          <Card>
+            <Text>{previewText || "(nothing read yet)"}</Text>
+          </Card>
+        </ScrollView>
+        <View style={{ gap: t.spacing.sm, paddingTop: t.spacing.md }}>
+          <Button title="Done" onPress={handleDone} />
+          <Button title="Add more (list continues on another part of the package)" kind="secondary" onPress={handleAddMore} />
+          <Button title="Cancel" kind="secondary" onPress={onCancel} />
+        </View>
+      </View>
+    );
+  }
+
   const { message, tone, borderColor } =
-    phase === "needMore"
-      ? {
-          message: "Didn't catch the whole list — slowly rotate the package so we can see the rest",
-          tone: "warning" as const,
-          borderColor: t.colors.warning,
-        }
-      : phase === "ready" || phase === "analyzing"
+    phase === "ready" || phase === "capturing"
       ? { message: "Clear view — capturing…", tone: "success" as const, borderColor: t.colors.success }
       : sawText
       ? { message: "Reading label…", tone: "cyan" as const, borderColor: t.colors.cyan }
@@ -308,9 +359,8 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
 
       {/* Centre framing guide — aim the ingredient list inside it. Green
           means the live view is reading clearly and a photo is about to be
-          taken; amber + the rotate message only appears when the
-          completeness check below finds the panel genuinely isn't fully in
-          frame. */}
+          taken; the actual crop happens on the review screen after
+          capture, not here. */}
       <View style={styles.guideWrap} pointerEvents="none">
         <View style={[styles.guide, { borderColor }]} />
         <View style={[styles.pill, { backgroundColor: t.colors.card, maxWidth: 300 }]}>
