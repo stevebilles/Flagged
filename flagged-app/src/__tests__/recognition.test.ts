@@ -55,4 +55,23 @@ describe("photoResultToParagraph", () => {
     const out = photoResultToParagraph(result([block("value", 100, 0), block("label", 0, 0)]));
     expect(out).toBe("label value");
   });
+
+  it("doesn't let a large-font region elsewhere on the label widen the row tolerance for small, tightly-spaced text", () => {
+    // Reproduces a real device miss (2026-09-13): a Nutrition Facts panel's
+    // large numbers (height ~280) sat on the same photo as a small, dense
+    // ingredients paragraph whose lines are only ~50px apart (height ~60
+    // each). A row tolerance based on the whole photo's median height came
+    // out wide enough (~55px) to misjudge two sequential ingredient-list
+    // lines as "the same row" and sort them by x instead of y — scrambling
+    // their order and injecting a stray mid-list header-like fragment that
+    // truncated the real list before it reached a later, genuinely
+    // dangerous ingredient (a safety-critical miss, not just a cosmetic
+    // ordering issue). Tolerance must come from the LOCAL pair being
+    // compared, not a global figure for the whole photo.
+    const bigNutritionBlock = block("Nutrition Facts", 500, 100, 300, 280);
+    const line1 = block("Ingredients: water, sugar,", 460, 2099, 1300, 62);
+    const line2 = block("salt, dangerous nut oil.", 460, 2149, 1300, 62);
+    const out = photoResultToParagraph(result([bigNutritionBlock, line2, line1]));
+    expect(out).toBe("Nutrition Facts Ingredients: water, sugar, salt, dangerous nut oil.");
+  });
 });

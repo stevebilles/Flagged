@@ -53,13 +53,25 @@ function toSpatialBlocks(result: VisionOcrResult): SpatialBlock[] {
  * list. Row grouping uses a tolerance relative to the blocks' own typical
  * height rather than a fixed pixel number, since raw coordinates scale with
  * photo resolution and this needs to hold up across different phones/photos.
+ *
+ * The tolerance is computed LOCALLY, from the pair of blocks actually being
+ * compared — not a single global median across the whole photo. A real
+ * device capture (2026-09-13) proved a global median breaks down whenever
+ * one photo mixes very different font sizes (a Nutrition Facts panel's
+ * large numbers next to a much smaller, tightly-spaced ingredients
+ * paragraph): the large blocks pulled the photo-wide median height up
+ * enough that two genuinely sequential ingredient-list lines, only 50px
+ * apart, were misjudged as "the same row" and sorted by x instead of y —
+ * scrambling their order and injecting a stray mid-list fragment that
+ * looked enough like a second "Ingredients:" header to truncate the real
+ * list early (extractIngredientList, normalize.ts). Using the smaller of
+ * the two compared blocks' own heights keeps dense small-text regions and
+ * sparse large-text regions from contaminating each other's tolerance.
  */
 function sortByPosition(blocks: SpatialBlock[]): SpatialBlock[] {
   if (blocks.length === 0) return blocks;
-  const heights = blocks.map((b) => b.height).filter((h) => h > 0).sort((a, b) => a - b);
-  const medianHeight = heights.length ? heights[Math.floor(heights.length / 2)] : 20;
-  const rowTolerance = medianHeight * 0.6;
   return [...blocks].sort((a, b) => {
+    const rowTolerance = Math.min(a.height, b.height) * 0.6;
     if (Math.abs(a.y - b.y) > rowTolerance) return a.y - b.y;
     return a.x - b.x;
   });
