@@ -2,12 +2,13 @@ import { looksSpatiallyComplete } from "../ocr/completeness";
 import { combineBurst } from "../ocr/burst";
 import type { SpatialBlock } from "../ocr/recognition";
 
-const block = (text: string, y: number, height = 20, x = 0): SpatialBlock => ({
+const block = (text: string, y: number, height = 20, x = 0, width = 100): SpatialBlock => ({
   id: `${x}:${y}:${text.length}`,
   text,
   x,
   y,
   height,
+  width,
 });
 
 describe("looksSpatiallyComplete", () => {

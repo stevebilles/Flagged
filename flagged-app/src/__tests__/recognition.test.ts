@@ -1,4 +1,4 @@
-import { toRecognizedBlocks, photoResultToParagraph, MLKitText } from "../ocr/recognition";
+import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText } from "../ocr/recognition";
 import { assembleParagraph } from "../ocr/stitch";
 
 /**
@@ -78,6 +78,50 @@ describe("adapter feeds the stitch pipeline", () => {
   });
 });
 
+describe("toSpatialBlocks (landscape-sensor -> portrait-visual remap)", () => {
+  it("swaps x/y and negates the horizontal axis, matching the real device evidence", () => {
+    // Reproduces the exact real-world proof (2026-09-13): on the actual
+    // label, "Sodium 95 mg" and its own "4%" daily-value figure print side
+    // by side (same row). The raw capture had them at very close raw x
+    // values and very different raw y values — Sodium's raw y LARGER than
+    // 4%'s, even though Sodium (the label) prints to the LEFT of 4% (the
+    // value) — which only makes sense if true-left-to-right position is
+    // NEGATED raw y, and true-top-to-bottom position is raw x unchanged.
+    const out = toSpatialBlocks(
+      result([
+        block("Sodium 95 mg", 774, 2252), // raw x≈774, raw y≈2252 (left/label)
+        block("4%", 789, 1332), // raw x≈789, raw y≈1332 (right/value)
+      ])
+    );
+    const sodium = out.find((b) => b.text === "Sodium 95 mg")!;
+    const value = out.find((b) => b.text === "4%")!;
+    // Same row: true y (top-to-bottom) should be very close for both.
+    expect(Math.abs(sodium.y - value.y)).toBeLessThan(50);
+    // Sodium (the label) must land to the LEFT of its own value.
+    expect(sodium.x).toBeLessThan(value.x);
+  });
+
+  it("maps raw width/height to true height/width (swapped, not passed through)", () => {
+    const out = toSpatialBlocks(result([block("Ingredients: water, salt", 100, 200)]));
+    // block() fixture sets raw width=100, raw height=20 (see helper above).
+    expect(out[0].height).toBe(100); // true (vertical) height <- raw width
+    expect(out[0].width).toBe(20); // true (horizontal) width <- raw height
+  });
+});
+
+// toSpatialBlocks (recognition.ts) remaps the plugin's raw sensor-landscape
+// frame into true portrait coordinates — a real device capture (2026-09-13)
+// proved the plugin's reported x/y are NOT already portrait-oriented
+// despite requesting `orientation: "portrait"`: true top-to-bottom position
+// comes from raw x, and true left-to-right position comes from NEGATED raw
+// y. This helper lets fixtures below be authored in terms of the INTENDED
+// true (row, col) position — matching how a person reading the fixture
+// would expect "row 0 is above row 20" to work — instead of requiring every
+// test to hand-derive the rotated raw values.
+function blockAt(text: string, trueRow: number, trueCol: number) {
+  return block(text, trueRow, -trueCol);
+}
+
 describe("photoResultToParagraph", () => {
   it("returns trimmed resultText", () => {
     expect(photoResultToParagraph({ resultText: "  ingredients: oats  ", blocks: [] })).toBe(
@@ -92,13 +136,13 @@ describe("photoResultToParagraph", () => {
     // scramble clause order on a dense layout, so it's no longer trusted
     // when position data is available to reconstruct order ourselves.
     const out = photoResultToParagraph(
-      result([block("ingredients: oats", 0, 0), block("salt", 0, 20)], "salt ingredients: oats")
+      result([blockAt("ingredients: oats", 0, 0), blockAt("salt", 20, 0)], "salt ingredients: oats")
     );
     expect(out).toBe("ingredients: oats salt");
   });
 
   it("orders blocks top-to-bottom by measured position even when the block array arrives out of order", () => {
-    const out = photoResultToParagraph(result([block("salt", 0, 100), block("ingredients: oats", 0, 0)]));
+    const out = photoResultToParagraph(result([blockAt("salt", 100, 0), blockAt("ingredients: oats", 0, 0)]));
     expect(out).toBe("ingredients: oats salt");
   });
 

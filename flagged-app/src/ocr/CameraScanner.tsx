@@ -143,18 +143,22 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       const result = await PhotoRecognizer({ uri, orientation: "portrait" });
       const blocks = toSpatialBlocks(result as any);
       if (__DEV__) {
-        // Diagnostic only (docs/06): the OCR plugin's own documented shape
-        // has already proven unreliable once (recognition.ts's header
-        // comment) — this shows exactly what one real block looks like
-        // (position + how much text it carries) instead of guessing at a
-        // deeper line/element-level parse blind. Grep Metro for "BLOCKS".
+        // Diagnostic only (docs/06): confirms the landscape->portrait
+        // coordinate remap in toSpatialBlocks is actually correcting things
+        // — after the fix, y should ascend in real top-to-bottom label
+        // order and height should read as plausible single-line thickness,
+        // not the wildly inflated values seen before the remap. Positions
+        // are already corrected here (recognition.ts), not raw. Grep Metro
+        // for "BLOCKS".
         // eslint-disable-next-line no-console
         console.log(
           `\n▓▓▓ PHOTO BLOCKS (${blocks.length}) ▓▓▓\n` +
             blocks
               .map(
                 (b, i) =>
-                  `[${i}] y=${Math.round(b.y)} h=${Math.round(b.height)} x=${Math.round(b.x)} :: ${JSON.stringify(
+                  `[${i}] y=${Math.round(b.y)} h=${Math.round(b.height)} x=${Math.round(b.x)} w=${Math.round(
+                    b.width
+                  )} :: ${JSON.stringify(
                     b.text.length > 100 ? `${b.text.slice(0, 100)}… (+${b.text.length - 100})` : b.text
                   )}`
               )

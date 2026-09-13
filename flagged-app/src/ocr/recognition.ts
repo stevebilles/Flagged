@@ -145,15 +145,46 @@ export function toRecognizedBlocks(result: RawResult): RecognizedBlock[] {
   return out;
 }
 
-/** A recognized block plus its height — needed to reason about the vertical
- * gap to the next block (see completeness.ts), which plain x/y can't do. */
+/** A recognized block plus its full geometry (docs/06) — needed to reason
+ * about reading order and the vertical gap to the next block (see
+ * sortByPosition/completeness.ts), which plain x/y can't do. */
 export interface SpatialBlock extends RecognizedBlock {
   height: number;
+  width: number;
 }
 
-/** Same as `toRecognizedBlocks`, but keeps each block's height too (docs/06,
- * used only by the burst-photo completeness check, not the live frame
- * processor's cosmetic "sawText" indicator, which doesn't need it). */
+/**
+ * Same as `toRecognizedBlocks`, but keeps each block's full geometry —
+ * REMAPPED from the plugin's raw frame into true portrait-visual
+ * coordinates, not passed through as-is.
+ *
+ * A real device capture (2026-09-13) proved, from the raw data itself, that
+ * PhotoRecognizer's reported x/y/width/height are NOT already in visual
+ * portrait orientation despite being called with `orientation: "portrait"`
+ * — they're still in the camera sensor's native landscape frame, rotated
+ * 90° from what a caller would reasonably assume. The proof: on the real
+ * label, "Sodium 95 mg" and its own "4%" daily-value figure print side by
+ * side on one row — in the raw data they instead have very close raw `x`
+ * values and very different raw `y` values (confirmed across four separate
+ * label/value pairs: Sodium/4%, Potassium/1%, Calcium/1%, Iron/2%). That's
+ * the signature of a 90°-rotated frame, not a portrait one.
+ *
+ * This was previously a known but purely cosmetic issue — the old scattered
+ * per-block overlay boxes never lined up with the text either (see git
+ * history) — and got deferred as low priority. It became correctness-
+ * critical the moment this data started deciding ingredient-list READING
+ * ORDER instead of just drawing an overlay box: sorting by the raw,
+ * unrotated coordinates actively scrambled text worse than trusting the
+ * plugin's own resultText did.
+ *
+ * The remap (derived from the evidence above, not assumed): true top-to-
+ * bottom position <- raw x (already ascends correctly); true left-to-right
+ * position <- NEGATED raw y (raw y descends left-to-right); true vertical
+ * line-thickness <- raw width; true horizontal extent <- raw height. Doing
+ * this once here, at the boundary, means every consumer (sortByPosition
+ * below, completeness.ts's looksSpatiallyComplete) can keep treating
+ * x/y/width/height with their normal, expected meanings.
+ */
 export function toSpatialBlocks(result: RawResult): SpatialBlock[] {
   const out: SpatialBlock[] = [];
   for (const b of collectBlocks(result)) {
@@ -163,9 +194,10 @@ export function toSpatialBlocks(result: RawResult): SpatialBlock[] {
     out.push({
       id: blockId(frame, text),
       text,
-      x: frame?.x ?? 0,
-      y: frame?.y ?? 0,
-      height: frame?.height ?? 0,
+      x: frame ? -frame.y : 0,
+      y: frame?.x ?? 0,
+      height: frame?.width ?? 0,
+      width: frame?.height ?? 0,
     });
   }
   return out;
