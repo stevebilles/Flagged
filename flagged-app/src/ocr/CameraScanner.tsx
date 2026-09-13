@@ -7,7 +7,6 @@ import { Text, Button, Card } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { photoResultToParagraph } from "./recognition";
 import { stitch } from "./stitch";
-import { reconcileTexts } from "./reconcile";
 import { CropBox, CropBoxHandle } from "./CornerAdjustOverlay";
 
 /**
@@ -28,24 +27,19 @@ import { CropBox, CropBoxHandle } from "./CornerAdjustOverlay";
  * user to box in exactly the ingredient panel, excluding the Nutrition
  * Facts grid and second-language repeat from the image entirely.
  *
- * Once confirmed, the SAME crop rectangle is used to silently take TWO
- * MORE quick photos of that already-positioned view (the camera stays
- * mounted, never re-shown to the user) and all three independent reads are
- * reconciled word-by-word (reconcileTexts, reconcile.ts) to vote out
- * letter-level OCR noise ("Sunfiower" vs "Sunflower", a dropped bracket) —
- * every observed on-device misread has been a dropped or substituted
- * letter, never the identical mistake twice across separate captures, so
- * independent re-reads of the same content can vote it out. An earlier
- * attempt at this (2026-09-13) was removed after real captures showed it
- * making things WORSE — but that was because the reading-order logic
- * feeding it was unreliable at the time (scrambled text going in meant
- * scrambled votes coming out). That's since been fixed and verified
- * against real device data (recognition.ts), and the crop tool now removes
- * the mixed dense-multi-column content that caused the worst of it — this
- * reintroduces reconciliation on top of that fixed foundation.
+ * Once confirmed, that one photo is perspective-corrected and OCR'd —
+ * exactly one read, no multi-shot voting. An earlier version silently took
+ * two more photos of the same confirmed crop afterward and reconciled all
+ * three (word-level majority vote) to cancel out letter-level OCR noise.
+ * That was removed (2026-09-13, real device regression): those extra shots
+ * fired AFTER the human pause of reviewing/confirming the crop, and by then
+ * the phone had moved enough that the same pixel rectangle no longer
+ * excluded the French text/Nutrition Facts it was drawn to exclude on the
+ * first photo — so the "vote" could pick a wrong read from a misaligned
+ * frame. Single-shot is simpler and doesn't have that failure mode.
  *
- * After each capture+adjust+correct+vote cycle, the user is asked directly
- * — "Done" or "Add more" — rather than the app guessing whether the whole
+ * After each capture+adjust+correct cycle, the user is asked directly —
+ * "Done" or "Add more" — rather than the app guessing whether the whole
  * label was captured. "Add more" repeats the whole cycle for a second,
  * different photo (e.g. the label wraps around a curved package) and joins
  * the two texts (stitch, stitch.ts).
@@ -53,8 +47,6 @@ import { CropBox, CropBoxHandle } from "./CornerAdjustOverlay";
  * NOTE: requires a dev/EAS build (native camera + vision-ocr modules).
  * Cannot run in Expo Go or the sandbox. See docs/14 "Definition of done".
  */
-
-const CONFIRM_SHOT_COUNT = 3; // total independent reads of the confirmed crop, for word-level reconciliation
 
 type Phase = "waiting" | "capturing" | "reviewing" | "correcting" | "confirmDone";
 
@@ -162,16 +154,16 @@ export function useCameraCapture({
     }
   }, []);
 
-  // One already-confirmed crop -> one corrected+OCR'd paragraph. Kept
-  // separate from the confirm handler so it can be called CONFIRM_SHOT_COUNT
-  // times against fresh photos of the exact same view.
-  const captureAndReadWithCorners = useCallback(async (corners: DocumentCorners): Promise<string | null> => {
-    const camera = cameraRef.current;
-    if (!camera) return null;
+  const handleConfirmCorners = useCallback(async () => {
+    const photo = captured;
+    if (!photo) return;
+    const corners = cropBoxRef.current?.getCorners() ?? photo.corners;
+    setCaptured(null);
+    setPhase("correcting");
+
+    let text = "";
     try {
-      const photo = await camera.takePhoto({ flash: "off" });
-      const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
-      const correctedUri = await correctPerspective(uri, corners);
+      const correctedUri = await correctPerspective(photo.uri, corners);
       const result = await recognizeText(correctedUri);
       if (__DEV__) {
         // Diagnostic only (docs/06/14): confirms the perspective-corrected
@@ -192,45 +184,15 @@ export function useCameraCapture({
               .join("\n")
         );
       }
-      return photoResultToParagraph(result);
+      text = photoResultToParagraph(result);
     } catch {
-      return null;
-    }
-  }, []);
-
-  const handleConfirmCorners = useCallback(async () => {
-    const photo = captured;
-    if (!photo) return;
-    const corners = cropBoxRef.current?.getCorners() ?? photo.corners;
-    setCaptured(null);
-    setPhase("correcting");
-
-    // The first read reuses the ALREADY-CAPTURED photo the user just
-    // cropped — no need to take it again.
-    let firstText: string | null = null;
-    try {
-      const correctedUri = await correctPerspective(photo.uri, corners);
-      const result = await recognizeText(correctedUri);
-      firstText = photoResultToParagraph(result);
-    } catch {
-      firstText = null;
+      text = "";
     }
 
-    // Two more independent reads of the SAME confirmed crop — the camera
-    // stays mounted (never re-shown to the user) so this can happen
-    // silently, without asking them to re-crop or even look at the screen.
-    const extraTexts: string[] = [];
-    for (let i = 1; i < CONFIRM_SHOT_COUNT; i++) {
-      const text = await captureAndReadWithCorners(corners);
-      if (text) extraTexts.push(text);
-    }
-
-    const texts = [firstText, ...extraTexts].filter((s): s is string => !!s);
-    const reconciled = reconcileTexts(...texts);
-    accumulatedRef.current = stitch(accumulatedRef.current, reconciled);
+    accumulatedRef.current = stitch(accumulatedRef.current, text);
     setPreviewText(accumulatedRef.current);
     setPhase("confirmDone");
-  }, [captured, captureAndReadWithCorners]);
+  }, [captured]);
 
   const handleRetake = useCallback(() => {
     setCaptured(null);
@@ -278,11 +240,10 @@ export function useCameraCapture({
     }
 
     // The camera stays mounted for the whole active session (not just
-    // "waiting"/"capturing") so the confirm step can silently take two more
-    // photos of the same confirmed crop for reconciliation, without ever
-    // remounting the camera or showing its feed again. Phase-specific
-    // content is layered OVER it, opaque, so nothing but the live feed
-    // itself is actually hidden — the hardware keeps running underneath.
+    // "waiting"/"capturing") so switching phases (review, correcting,
+    // confirmDone, retake) never pays the cost of tearing down and
+    // reinitializing the hardware. Phase-specific content is layered OVER
+    // it, opaque, so nothing but the live feed itself is actually hidden.
     const cameraLayer = (
       <Camera ref={cameraRef} style={StyleSheet.absoluteFill} device={device} isActive={active} photo={true} />
     );
@@ -315,7 +276,7 @@ export function useCameraCapture({
       overlay = (
         <View style={[styles.center, styles.overlayOpaque, { backgroundColor: t.colors.canvas }]}>
           <Text tone="cyan" bold>
-            Double-checking a couple more shots for accuracy…
+            Reading the label…
           </Text>
         </View>
       );
