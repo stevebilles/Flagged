@@ -11,7 +11,7 @@ import { getProfile, getProfiles } from "../../src/db/repositories";
 import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
-import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
+import { recognizeText } from "vision-ocr";
 import { CameraScanner } from "../../src/ocr/CameraScanner";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
 import { displayName } from "../../src/domain/types";
@@ -20,7 +20,7 @@ import { displayName } from "../../src/domain/types";
  * SCAN — the core action tab (docs/05 Tab 2).
  * State 1 Standby · State 2 Hard paywall lockout · State 3 live scan (camera).
  *
- * State 3 uses the live CameraScanner (VisionCamera + ML Kit OCR, docs/14). Paste
+ * State 3 uses the live CameraScanner (VisionCamera + Apple Vision OCR, docs/14). Paste
  * reads the clipboard; Choose Photo runs on-device OCR on a picked image. All
  * paths funnel a paragraph string into runScan().
  */
@@ -145,8 +145,8 @@ export default function Scan() {
 
       // On-device OCR on the still image (docs/06/14). Requires a dev/EAS build
       // (native module) — will not run in Expo Go.
-      const result = await PhotoRecognizer({ uri: picked.assets[0].uri, orientation: "portrait" });
-      runScan(photoResultToParagraph(result as any), "photo");
+      const result = await recognizeText(picked.assets[0].uri);
+      runScan(photoResultToParagraph(result), "photo");
     } catch (e: any) {
       setError(e?.message ?? "Couldn't read that photo.");
     }

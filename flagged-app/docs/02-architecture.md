@@ -12,15 +12,25 @@ the implementation technology changes.
 
 ### The one real tradeoff
 
-On-device OCR engine quality. Apple's Vision framework is excellent; **Google ML Kit** (the standard
-RN on-device text recognizer) is also excellent and runs **fully offline on both iOS and Android**.
-For printed food labels this is not a meaningful difference. **No cloud OCR API is used, ever.**
+On-device OCR engine quality. **Google ML Kit** (the standard cross-platform RN on-device text
+recognizer, runs fully offline on both iOS and Android) was the original choice here, on the
+assumption that for printed food labels the difference from Apple's own Vision framework wouldn't
+be meaningful. Real on-device testing (2026-09-13) proved that assumption wrong: ML Kit's iOS port
+treats iOS as a secondary target behind Android, and its raw letter-level accuracy on small, dense,
+glossy print was not good enough for a safety-critical ingredient match — no amount of app-level
+fusion/voting logic could fully compensate for wrong letters at the OCR engine itself. iOS now uses
+a small local native module (`modules/vision-ocr`) calling Apple's Vision framework
+(`VNRecognizeTextRequest`) directly — one engine for both the live-preview readiness check and the
+actual photo analysis (see `docs/06`, `docs/14`). Android, not yet built, would still need its own
+engine (likely ML Kit, which is a first-class citizen on its own platform, not a secondary port —
+this is a normal per-platform engine choice, not the same problem). **No cloud OCR API is used,
+ever.**
 
 ## Native → React Native mapping
 
 | Original (brief) | React Native + Expo equivalent | On-device / Offline |
 |---|---|---|
-| VisionKit `DataScannerViewController` (live OCR) | `react-native-vision-camera` **frame processors** + on-device OCR plugin (VisionCamera OCR / ML Kit) | ✅ |
+| VisionKit `DataScannerViewController` (live OCR) | `react-native-vision-camera` **frame processors** + a local native module wrapping Apple's own Vision framework (`modules/vision-ocr`) | ✅ |
 | Vision item tracking (`RecognizedItem.id`) | Frame-processor dedup keyed on recognized-block geometry/text (worklet) | ✅ |
 | Longest Common Substring / Levenshtein stitching | Pure TypeScript (identical algorithm) | ✅ |
 | SwiftData persistence | **`expo-sqlite`** + **Drizzle ORM** (typed migrations) | ✅ |
@@ -38,8 +48,8 @@ For printed food labels this is not a meaningful difference. **No cloud OCR API 
 - **Navigation:** `expo-router` (file-based) or React Navigation. Bottom tab navigator for the 4-tab
   hub, native stack for onboarding + results + modals.
 - **Local database:** `expo-sqlite` with **Drizzle ORM**. All persistence is local. See `03`.
-- **Camera + OCR:** `react-native-vision-camera` (camera + frame processors) with an on-device
-  text-recognition frame processor (ML Kit / VisionCamera OCR). No network calls.
+- **Camera + OCR:** `react-native-vision-camera` (camera + frame processors) with `modules/vision-ocr`,
+  a local native module wrapping Apple's on-device Vision framework directly (iOS). No network calls.
 - **Purchases:** `react-native-purchases` (RevenueCat), configured for an **auto-renewing annual
   subscription**, with **offline entitlement caching** (grace window, not indefinite — see `08`).
 - **State:** Lightweight — Zustand or React Context for the active profile + trial state; the DB is

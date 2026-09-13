@@ -7,14 +7,14 @@ import {
   useFrameProcessor,
   runAtTargetFps,
 } from "react-native-vision-camera";
-import { useTextRecognition, PhotoRecognizer } from "react-native-vision-camera-text-recognition";
+import { recognizeText, visionScanText } from "vision-ocr";
 import { useRunOnJS } from "react-native-worklets-core";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { looksSpatiallyComplete, looksTextuallyComplete } from "./completeness";
 import { combineBurst, BurstShot } from "./burst";
 import { reconcileTexts } from "./reconcile";
-import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText } from "./recognition";
+import { toSpatialBlocks, photoResultToParagraph } from "./recognition";
 
 /**
  * Adaptive 1-or-2-photo scanner (docs/06 Step 1 / docs/14), triggered by a
@@ -99,7 +99,6 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   const t = useTheme();
   const device = useCameraDevice("back");
   const { hasPermission, requestPermission } = useCameraPermission();
-  const { scanText } = useTextRecognition({ language: "latin" });
   const cameraRef = useRef<Camera>(null);
 
   const [phase, setPhase] = useState<Phase>("waiting");
@@ -121,10 +120,9 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   // cosmetic "Reading label…"/green cues. Not used for the text that's
   // actually scanned — that always comes from a real photo (takeShot).
   const onFrameResult = useRunOnJS(
-    (result: MLKitText[]) => {
+    (result: { text: string }) => {
       if (finishedRef.current) return;
-      const blocks = toRecognizedBlocks(result);
-      const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
+      const totalChars = result.text.length;
       if (totalChars > 0) {
         sawTextRef.current = true;
         setSawText(true);
@@ -144,11 +142,11 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       "worklet";
       runAtTargetFps(3, () => {
         "worklet";
-        const result = scanText(frame) as unknown as MLKitText[];
+        const result = visionScanText(frame);
         onFrameResult(result);
       });
     },
-    [scanText, onFrameResult]
+    [onFrameResult]
   );
 
   // Take one real photo and OCR it. A failed shot (camera busy, a hiccup
@@ -160,16 +158,14 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       if (!camera) return { text: "", blocks: [] };
       const photo = await camera.takePhoto({ flash: "off", enableShutterSound: false });
       const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
-      const result = await PhotoRecognizer({ uri, orientation: "portrait" });
-      const blocks = toSpatialBlocks(result as any);
+      const result = await recognizeText(uri);
+      const blocks = toSpatialBlocks(result);
       if (__DEV__) {
-        // Diagnostic only (docs/06): confirms the landscape->portrait
-        // coordinate remap in toSpatialBlocks is actually correcting things
-        // — after the fix, y should ascend in real top-to-bottom label
-        // order and height should read as plausible single-line thickness,
-        // not the wildly inflated values seen before the remap. Positions
-        // are already corrected here (recognition.ts), not raw. Grep Metro
-        // for "BLOCKS".
+        // Diagnostic only (docs/06): confirms Vision's own documented
+        // coordinate conversion (VisionOcrPhotoModule.swift) actually lines
+        // up with the real label — y should ascend in true top-to-bottom
+        // reading order and height should read as plausible single-line
+        // thickness. Grep Metro for "BLOCKS".
         // eslint-disable-next-line no-console
         console.log(
           `\n▓▓▓ PHOTO BLOCKS (${blocks.length}) ▓▓▓\n` +
@@ -185,7 +181,7 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
               .join("\n")
         );
       }
-      return { text: photoResultToParagraph(result as any), blocks };
+      return { text: photoResultToParagraph(result), blocks };
     } catch {
       return { text: "", blocks: [] };
     }

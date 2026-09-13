@@ -1,0 +1,12 @@
+{
+  "name": "vision-ocr",
+  "version": "0.1.0",
+  "description": "On-device Apple Vision text recognition for Flagged (docs/06) — replaces Google ML Kit entirely so the whole app reads labels through one engine.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "license": "MIT",
+  "private": true,
+  "peerDependencies": {
+    "react-native-vision-camera": "*"
+  }
+}

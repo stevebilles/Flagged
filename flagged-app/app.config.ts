@@ -4,7 +4,8 @@ import { ExpoConfig, ConfigContext } from "expo/config";
  * Flagged — Expo app config.
  *
  * Native modules used (require a custom dev client / EAS build, NOT Expo Go):
- *  - react-native-vision-camera (on-device OCR frame processors) — see docs/06
+ *  - react-native-vision-camera (camera + frame processors) — see docs/06
+ *  - modules/vision-ocr (local module, Apple Vision on-device OCR, iOS) — see docs/14
  *  - react-native-purchases (RevenueCat) — see docs/08
  *
  * The app is 100% offline: no network is required for scanning, matching,
