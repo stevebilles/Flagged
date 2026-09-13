@@ -7,6 +7,7 @@ import { Text, Button, Card } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { photoResultToParagraph } from "./recognition";
 import { stitch } from "./stitch";
+import { reconcileTexts } from "./reconcile";
 import { CropBox, CropBoxHandle } from "./CornerAdjustOverlay";
 
 /**
@@ -17,35 +18,43 @@ import { CropBox, CropBoxHandle } from "./CornerAdjustOverlay";
  * drop into the same box/button slots its idle state uses.
  *
  * Capture is a plain tap of a shutter button — deliberately NOT triggered
- * automatically off a live frame-processor readiness signal. That signal
- * (`useFrameProcessor` + a live-preview OCR proxy) was the single most
- * repeated point of failure across a long run of real-device fixes on
- * 2026-09-13 ("Can't load the visionScanText frame processor plugin"), and
- * was never actually asked for — a manual button removes that entire
- * dependency and failure surface, at the cost of one tap.
+ * automatically off a live frame-processor readiness signal, which was the
+ * single most repeated point of failure across a long run of real-device
+ * fixes on 2026-09-13 and was never actually asked for.
  *
  * After the shutter fires, the SAME box that showed the live camera now
- * shows the CAPTURED PHOTO with four draggable corners — Vision's own
- * rectangle detector suggests a starting position — for the user to box in
- * exactly the ingredient panel. That confirmed quad is then perspective-
- * corrected (flattened into an upright rectangle, the same technique
- * document-scanner apps use) BEFORE running OCR on it — this is what
- * actually fixed the reading-order bugs found earlier on 2026-09-13 (a
- * tilted photo makes Vision's axis-aligned text boxes come back
- * inflated/skewed, which no amount of downstream sorting logic could
- * reliably compensate for), and manual cropping removes the Nutrition
- * Facts grid and second-language repeat from the image entirely, rather
- * than needing text-side logic to guess where the real list starts/ends.
+ * shows the CAPTURED PHOTO with four corner handles (a plain resizable
+ * rectangle — drag one corner, the opposite corner stays anchored) for the
+ * user to box in exactly the ingredient panel, excluding the Nutrition
+ * Facts grid and second-language repeat from the image entirely.
  *
- * After each capture+adjust+correct cycle, the user is asked directly —
- * "Done" or "Add more" — rather than the app guessing whether the whole
- * label was captured. "Add more" repeats capture-then-adjust for a second,
+ * Once confirmed, the SAME crop rectangle is used to silently take TWO
+ * MORE quick photos of that already-positioned view (the camera stays
+ * mounted, never re-shown to the user) and all three independent reads are
+ * reconciled word-by-word (reconcileTexts, reconcile.ts) to vote out
+ * letter-level OCR noise ("Sunfiower" vs "Sunflower", a dropped bracket) —
+ * every observed on-device misread has been a dropped or substituted
+ * letter, never the identical mistake twice across separate captures, so
+ * independent re-reads of the same content can vote it out. An earlier
+ * attempt at this (2026-09-13) was removed after real captures showed it
+ * making things WORSE — but that was because the reading-order logic
+ * feeding it was unreliable at the time (scrambled text going in meant
+ * scrambled votes coming out). That's since been fixed and verified
+ * against real device data (recognition.ts), and the crop tool now removes
+ * the mixed dense-multi-column content that caused the worst of it — this
+ * reintroduces reconciliation on top of that fixed foundation.
+ *
+ * After each capture+adjust+correct+vote cycle, the user is asked directly
+ * — "Done" or "Add more" — rather than the app guessing whether the whole
+ * label was captured. "Add more" repeats the whole cycle for a second,
  * different photo (e.g. the label wraps around a curved package) and joins
  * the two texts (stitch, stitch.ts).
  *
  * NOTE: requires a dev/EAS build (native camera + vision-ocr modules).
  * Cannot run in Expo Go or the sandbox. See docs/14 "Definition of done".
  */
+
+const CONFIRM_SHOT_COUNT = 3; // total independent reads of the confirmed crop, for word-level reconciliation
 
 type Phase = "waiting" | "capturing" | "reviewing" | "correcting" | "confirmDone";
 
@@ -153,13 +162,16 @@ export function useCameraCapture({
     }
   }, []);
 
-  const handleConfirmCorners = useCallback(async () => {
-    const photo = captured;
-    if (!photo) return;
-    const corners = cropBoxRef.current?.getCorners() ?? photo.corners;
-    setPhase("correcting");
+  // One already-confirmed crop -> one corrected+OCR'd paragraph. Kept
+  // separate from the confirm handler so it can be called CONFIRM_SHOT_COUNT
+  // times against fresh photos of the exact same view.
+  const captureAndReadWithCorners = useCallback(async (corners: DocumentCorners): Promise<string | null> => {
+    const camera = cameraRef.current;
+    if (!camera) return null;
     try {
-      const correctedUri = await correctPerspective(photo.uri, corners);
+      const photo = await camera.takePhoto({ flash: "off" });
+      const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
+      const correctedUri = await correctPerspective(uri, corners);
       const result = await recognizeText(correctedUri);
       if (__DEV__) {
         // Diagnostic only (docs/06/14): confirms the perspective-corrected
@@ -180,15 +192,45 @@ export function useCameraCapture({
               .join("\n")
         );
       }
-      accumulatedRef.current = stitch(accumulatedRef.current, photoResultToParagraph(result));
+      return photoResultToParagraph(result);
     } catch {
-      // Leave accumulatedRef as-is — the user can still choose Done/Add more
-      // with whatever was captured so far, or Retake this one.
+      return null;
     }
-    setPreviewText(accumulatedRef.current);
+  }, []);
+
+  const handleConfirmCorners = useCallback(async () => {
+    const photo = captured;
+    if (!photo) return;
+    const corners = cropBoxRef.current?.getCorners() ?? photo.corners;
     setCaptured(null);
+    setPhase("correcting");
+
+    // The first read reuses the ALREADY-CAPTURED photo the user just
+    // cropped — no need to take it again.
+    let firstText: string | null = null;
+    try {
+      const correctedUri = await correctPerspective(photo.uri, corners);
+      const result = await recognizeText(correctedUri);
+      firstText = photoResultToParagraph(result);
+    } catch {
+      firstText = null;
+    }
+
+    // Two more independent reads of the SAME confirmed crop — the camera
+    // stays mounted (never re-shown to the user) so this can happen
+    // silently, without asking them to re-crop or even look at the screen.
+    const extraTexts: string[] = [];
+    for (let i = 1; i < CONFIRM_SHOT_COUNT; i++) {
+      const text = await captureAndReadWithCorners(corners);
+      if (text) extraTexts.push(text);
+    }
+
+    const texts = [firstText, ...extraTexts].filter((s): s is string => !!s);
+    const reconciled = reconcileTexts(...texts);
+    accumulatedRef.current = stitch(accumulatedRef.current, reconciled);
+    setPreviewText(accumulatedRef.current);
     setPhase("confirmDone");
-  }, [captured]);
+  }, [captured, captureAndReadWithCorners]);
 
   const handleRetake = useCallback(() => {
     setCaptured(null);
@@ -235,9 +277,22 @@ export function useCameraCapture({
       };
     }
 
+    // The camera stays mounted for the whole active session (not just
+    // "waiting"/"capturing") so the confirm step can silently take two more
+    // photos of the same confirmed crop for reconciliation, without ever
+    // remounting the camera or showing its feed again. Phase-specific
+    // content is layered OVER it, opaque, so nothing but the live feed
+    // itself is actually hidden — the hardware keeps running underneath.
+    const cameraLayer = (
+      <Camera ref={cameraRef} style={StyleSheet.absoluteFill} device={device} isActive={active} photo={true} />
+    );
+
+    let overlay: React.ReactNode = null;
+    let footer: React.ReactNode;
+
     if (phase === "reviewing" && captured && boxWidth > 0 && boxHeight > 0) {
-      return {
-        boxContent: (
+      overlay = (
+        <View style={[styles.overlayOpaque, { backgroundColor: t.colors.canvas }]}>
           <CropBox
             ref={cropBoxRef}
             containerWidth={boxWidth}
@@ -248,32 +303,26 @@ export function useCameraCapture({
             initialCorners={captured.corners}
             color={t.colors.cyan}
           />
-        ),
-        footer: (
-          <View style={{ gap: t.spacing.sm }}>
-            <Button title="Use this photo" onPress={handleConfirmCorners} />
-            <Button title="Retake" kind="secondary" onPress={handleRetake} />
-          </View>
-        ),
-      };
-    }
-
-    if (phase === "correcting") {
-      return {
-        boxContent: (
-          <View style={styles.center}>
-            <Text tone="cyan" bold>
-              Straightening and reading the label…
-            </Text>
-          </View>
-        ),
-        footer: null,
-      };
-    }
-
-    if (phase === "confirmDone") {
-      return {
-        boxContent: (
+        </View>
+      );
+      footer = (
+        <View style={{ gap: t.spacing.sm }}>
+          <Button title="Use this photo" onPress={handleConfirmCorners} />
+          <Button title="Retake" kind="secondary" onPress={handleRetake} />
+        </View>
+      );
+    } else if (phase === "correcting") {
+      overlay = (
+        <View style={[styles.center, styles.overlayOpaque, { backgroundColor: t.colors.canvas }]}>
+          <Text tone="cyan" bold>
+            Double-checking a couple more shots for accuracy…
+          </Text>
+        </View>
+      );
+      footer = null;
+    } else if (phase === "confirmDone") {
+      overlay = (
+        <View style={[styles.overlayOpaque, { backgroundColor: t.colors.canvas }]}>
           <ScrollView style={{ flex: 1, width: "100%" }} contentContainerStyle={{ padding: t.spacing.md }}>
             <Text bold style={{ marginBottom: t.spacing.sm }}>
               Got it — anything else to add?
@@ -282,26 +331,23 @@ export function useCameraCapture({
               <Text>{previewText || "(nothing read yet)"}</Text>
             </Card>
           </ScrollView>
-        ),
-        footer: (
-          <View style={{ gap: t.spacing.sm }}>
-            <Button title="Done" onPress={handleDone} />
-            <Button
-              title="Add more (list continues elsewhere on the package)"
-              kind="secondary"
-              onPress={handleAddMore}
-            />
-            <Button title="Cancel" kind="secondary" onPress={onCancel} />
-          </View>
-        ),
-      };
-    }
-
-    // waiting / capturing — live camera feed + a plain shutter button.
-    return {
-      boxContent: (
-        <View style={styles.fill}>
-          <Camera ref={cameraRef} style={StyleSheet.absoluteFill} device={device} isActive={active} photo={true} />
+        </View>
+      );
+      footer = (
+        <View style={{ gap: t.spacing.sm }}>
+          <Button title="Done" onPress={handleDone} />
+          <Button
+            title="Add more (list continues elsewhere on the package)"
+            kind="secondary"
+            onPress={handleAddMore}
+          />
+          <Button title="Cancel" kind="secondary" onPress={onCancel} />
+        </View>
+      );
+    } else {
+      // waiting / capturing — live camera feed + aim guide + shutter button.
+      overlay = (
+        <>
           <View style={styles.guideWrap} pointerEvents="none">
             <View style={styles.guide} />
           </View>
@@ -314,9 +360,9 @@ export function useCameraCapture({
               </View>
             </View>
           )}
-        </View>
-      ),
-      footer: (
+        </>
+      );
+      footer = (
         <View style={{ gap: t.spacing.sm }}>
           <Button
             title={phase === "capturing" ? "Reading…" : "📸  Capture"}
@@ -325,7 +371,17 @@ export function useCameraCapture({
           />
           <Button title="Cancel" kind="secondary" onPress={onCancel} />
         </View>
+      );
+    }
+
+    return {
+      boxContent: (
+        <View style={styles.fill}>
+          {cameraLayer}
+          {overlay}
+        </View>
       ),
+      footer,
     };
   }, [
     active,
@@ -357,6 +413,10 @@ const styles = StyleSheet.create({
   // single vertical dashed line instead of a camera preview).
   fill: { flex: 1, width: "100%" },
   center: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
+  // Opaque layers stacked over the (still-running) camera feed for phases
+  // that shouldn't show it — the hardware stays mounted underneath so
+  // takePhoto() keeps working without remounting the Camera component.
+  overlayOpaque: { ...StyleSheet.absoluteFillObject },
   guideWrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
