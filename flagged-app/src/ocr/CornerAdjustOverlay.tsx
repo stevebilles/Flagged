@@ -44,7 +44,13 @@ import type { DocumentCorners, CornerPoint } from "vision-ocr";
 type CornerKey = keyof DocumentCorners;
 const CORNER_KEYS: CornerKey[] = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
 const HANDLE_SIZE = 40;
-const MIN_BOX_SIZE = 48; // corners can't be dragged past this minimum box size
+// Just enough to keep the box's own math well-defined (never truly zero or
+// negative size) — NOT a practical crop-size limit. A real device test
+// (2026-09-13) found 48pt stopped the box shrinking well before the user
+// was actually done cropping tighter (excluding a second-language line
+// sitting right below the English list), letting that text leak into the
+// scan. The user should be able to crop as tight as they want.
+const MIN_BOX_SIZE = 12;
 
 interface Rect {
   left: number;
