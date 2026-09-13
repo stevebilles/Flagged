@@ -248,8 +248,9 @@ class VisionOcrPhotoModule: NSObject {
       reject("Error", "Perspective correction failed", nil)
       return
     }
+    let scaledOutput = VisionOcrPhotoModule.upscaledForRecognition(output)
     let context = CIContext()
-    guard let cgOutput = context.createCGImage(output, from: output.extent) else {
+    guard let cgOutput = context.createCGImage(scaledOutput, from: scaledOutput.extent) else {
       reject("Error", "Couldn't render corrected image", nil)
       return
     }
@@ -265,6 +266,31 @@ class VisionOcrPhotoModule: NSObject {
     } catch {
       reject("Error", "Couldn't save corrected image: \(error.localizedDescription)", nil)
     }
+  }
+
+  /**
+   * A tight crop, or a photo taken a bit farther from the package, can leave
+   * genuinely few raw pixels behind each character even though the photo
+   * itself is high-resolution — Apple's own Vision documentation notes
+   * recognition quality depends on text height relative to the image, and
+   * small text is read worse (2026-09-13). Scaling the CROPPED image up with
+   * a real resampling filter before recognition — not just displaying it
+   * bigger, which does nothing since recognition never sees the screen —
+   * normalizes it into the pixel density Vision's own pipeline handles best.
+   * Capped at 3x: beyond that there's no real detail left to bring out, just
+   * blur/noise amplification, so a badly out-of-focus or very distant shot
+   * isn't helped further by this.
+   */
+  private static func upscaledForRecognition(_ image: CIImage) -> CIImage {
+    let targetMinDimension: CGFloat = 1200
+    let shortSide = min(image.extent.width, image.extent.height)
+    guard shortSide > 0, shortSide < targetMinDimension else { return image }
+    let scale = min(3.0, targetMinDimension / shortSide)
+    guard let filter = CIFilter(name: "CILanczosScaleTransform") else { return image }
+    filter.setValue(image, forKey: kCIInputImageKey)
+    filter.setValue(scale, forKey: kCIInputScaleKey)
+    filter.setValue(1.0, forKey: kCIInputAspectRatioKey)
+    return filter.outputImage ?? image
   }
 
   /** Redraws the image into a fresh bitmap context so its pixel data
