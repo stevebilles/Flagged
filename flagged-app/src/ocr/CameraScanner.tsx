@@ -11,41 +11,52 @@ import { useTextRecognition, PhotoRecognizer } from "react-native-vision-camera-
 import { useRunOnJS } from "react-native-worklets-core";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
+import { looksSpatiallyComplete } from "./completeness";
 import { combineBurst, BurstShot } from "./burst";
 import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText } from "./recognition";
 
 /**
- * Burst-photo scanner (docs/06 Step 1 / docs/14). The user points and holds
- * steady; the app takes SHOT_COUNT real, full-resolution still photos spread
- * across the hold window (so a deliberate pan across a curved can, jar, or a
- * label too long for one frame is captured across the burst, right from the
- * start — not as a reactive "that wasn't enough, try again" second pass),
- * OCRs each photo, and combines them (see burst.ts) into one paragraph.
+ * Adaptive 1-or-2-photo scanner (docs/06 Step 1 / docs/14).
  *
- * Replaces an earlier design that ran OCR continuously on the live preview
- * and stitched together the small text blocks recognized across ~9 lower-
- * resolution frames. That approach had a real bug (found 2026-09-13 from a
+ * Takes ONE real, full-resolution photo once the live preview has seen the
+ * label and the camera's had a brief moment to settle focus/exposure, OCRs
+ * it, then checks — automatically, using the label's own printed
+ * whitespace/border layout (looksSpatiallyComplete, completeness.ts) —
+ * whether that one photo alone shows a complete ingredients panel. Most
+ * packaging is flat or only mildly curved and fits in one photo: that's the
+ * common case, and a single well-settled shot is both faster (one shutter
+ * sound, not three) and more accurate than firing shots on a fixed schedule
+ * regardless of whether the camera was ready.
+ *
+ * Only when that check says the panel isn't fully captured — a long or
+ * curved label that plainly continues past the frame — does the app ask
+ * the user to rotate the package and take a second photo, merging the two
+ * (combineBurst, burst.ts). The decision to ask is automatic and structural
+ * (the same whitespace/border signal, not a guess), so "please rotate" only
+ * ever shows up when something genuinely wasn't captured — never routinely.
+ *
+ * Replaces an earlier design that always took a fixed burst of 3 photos on
+ * a timer, and before that, one that ran OCR continuously on the live
+ * preview and stitched together small text blocks recognized across ~9
+ * lower-resolution frames — which had a real bug (found 2026-09-13 from a
  * real device scan): blocks from different, only slightly time-shifted
  * frames got concatenated in temporal (arrival) order with no cross-frame
  * spatial alignment, so a hand's natural micro-drift during the hold could
  * scramble English/French/nutrition-panel text together in the wrong order.
- * A handful of real, full-resolution photos — each internally coherent,
- * captured in a genuine left-to-right/top-to-bottom pan order — avoids that
- * failure mode entirely. The live frame processor below is kept ONLY for
- * the cosmetic "Reading label…" cue; it no longer supplies the text that
- * actually gets scanned.
+ * The live frame processor below is kept ONLY for the cosmetic "Reading
+ * label…" cue and to know when the label has come into view; it no longer
+ * supplies the text that actually gets scanned — every scan is built from
+ * real still photos.
  *
  * NOTE: requires a dev/EAS build (native modules). Cannot run in Expo Go or
  * the sandbox. See docs/14 "Definition of done".
  */
 
-const SCAN_SECONDS = 3;
-const SHOT_COUNT = 3;
-// Spread evenly across the hold window (e.g. 500ms/1500ms/2500ms for a
-// 3s/3-shot burst) so a natural pan is captured across the whole burst.
-const SHOT_DELAYS_MS = Array.from({ length: SHOT_COUNT }, (_, i) =>
-  Math.round(((i + 0.5) / SHOT_COUNT) * SCAN_SECONDS * 1000)
-);
+const SAW_TEXT_TIMEOUT_MS = 4000; // don't wait forever if the live preview never sees text
+const SETTLE_MS = 700; // let focus/exposure lock briefly before the real photo
+const ROTATE_PROMPT_MS = 2200; // time given to physically rotate the package
+
+type Phase = "waiting" | "analyzing" | "needMore" | "done";
 
 export interface CameraScannerProps {
   onCapture: (paragraph: string) => void;
@@ -59,25 +70,27 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
   const { scanText } = useTextRecognition({ language: "latin" });
   const cameraRef = useRef<Camera>(null);
 
-  const [countdown, setCountdown] = useState(SCAN_SECONDS);
-  const [scanning, setScanning] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [phase, setPhase] = useState<Phase>("waiting");
   const [sawText, setSawText] = useState(false);
-
+  const sawTextRef = useRef(false);
   const finishedRef = useRef(false);
-  const shotPromisesRef = useRef<Promise<BurstShot>[]>([]);
+  const sequenceStartedRef = useRef(false);
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  // Cosmetic only: turns the guide cyan + "Reading label…" once the live
-  // preview sees any text, so the user gets feedback while framing the
-  // shot. Not used for the text that's actually scanned (see burst.ts).
+  // Cosmetic + timing signal: turns the guide cyan + "Reading label…" once
+  // the live preview sees any text, and tells the capture sequence below
+  // the label has actually come into view. Not used for the text that's
+  // actually scanned — that always comes from a real photo (takeShot).
   const onFrameResult = useRunOnJS(
     (result: MLKitText[]) => {
       if (finishedRef.current) return;
-      if (toRecognizedBlocks(result).length > 0) setSawText(true);
+      if (toRecognizedBlocks(result).length > 0) {
+        sawTextRef.current = true;
+        setSawText(true);
+      }
     },
     []
   );
@@ -94,9 +107,9 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     [scanText, onFrameResult]
   );
 
-  // Take one real photo and OCR it. A single failed shot (camera busy, a
-  // hiccup mid-capture) shouldn't sink the whole burst — return an empty
-  // shot and let the other photos carry the scan.
+  // Take one real photo and OCR it. A failed shot (camera busy, a hiccup
+  // mid-capture) shouldn't crash the sequence — return an empty shot;
+  // combineBurst and the downstream "couldn't read a label" gate handle it.
   const takeShot = useCallback(async (): Promise<BurstShot> => {
     try {
       const camera = cameraRef.current;
@@ -113,38 +126,59 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     }
   }, []);
 
-  // Schedule the burst once the camera is ready — SHOT_COUNT stills spread
-  // across the hold window.
-  useEffect(() => {
-    if (!hasPermission || !device) return;
-    const timers = SHOT_DELAYS_MS.map((delay) =>
-      setTimeout(() => {
-        if (finishedRef.current) return;
-        shotPromisesRef.current.push(takeShot());
-      }, delay)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [hasPermission, device, takeShot]);
+  const finish = useCallback(
+    (shots: BurstShot[]) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      setPhase("done");
+      onCapture(combineBurst(shots));
+    },
+    [onCapture]
+  );
 
-  const finish = useCallback(async () => {
-    if (finishedRef.current) return;
-    finishedRef.current = true;
-    setScanning(false);
-    setProcessing(true);
-    const shots = await Promise.all(shotPromisesRef.current);
-    onCapture(combineBurst(shots));
-  }, [onCapture]);
-
-  // Countdown → finish once every scheduled shot has been taken and OCR'd.
+  // The whole capture sequence: wait for a steady view of the label, take
+  // one photo, and only ask for a second if the first didn't show a
+  // complete panel (looksSpatiallyComplete — the label's own printed
+  // whitespace/border, not a guess).
   useEffect(() => {
-    if (!scanning) return;
-    if (countdown <= 0) {
-      finish();
-      return;
-    }
-    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(id);
-  }, [countdown, scanning, finish]);
+    if (!hasPermission || !device || sequenceStartedRef.current) return;
+    sequenceStartedRef.current = true;
+
+    let cancelled = false;
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    (async () => {
+      const start = Date.now();
+      while (!sawTextRef.current && Date.now() - start < SAW_TEXT_TIMEOUT_MS) {
+        await sleep(100);
+      }
+      if (cancelled) return;
+      await sleep(SETTLE_MS);
+      if (cancelled) return;
+
+      setPhase("analyzing");
+      const shot1 = await takeShot();
+      if (cancelled) return;
+
+      if (looksSpatiallyComplete(shot1.blocks)) {
+        finish([shot1]);
+        return;
+      }
+
+      setPhase("needMore");
+      await sleep(ROTATE_PROMPT_MS);
+      if (cancelled) return;
+
+      setPhase("analyzing");
+      const shot2 = await takeShot();
+      if (cancelled) return;
+      finish([shot1, shot2]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasPermission, device, takeShot, finish]);
 
   if (!device) {
     return (
@@ -167,42 +201,49 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
     );
   }
 
+  const { message, tone, borderColor } =
+    phase === "needMore"
+      ? {
+          message: "Didn't catch the whole list — slowly rotate the package so we can see the rest",
+          tone: "warning" as const,
+          borderColor: t.colors.warning,
+        }
+      : phase === "analyzing"
+      ? { message: "Reading label…", tone: "cyan" as const, borderColor: t.colors.cyan }
+      : sawText
+      ? { message: "Reading label…", tone: "cyan" as const, borderColor: t.colors.cyan }
+      : {
+          message: "Point at the ingredient list",
+          tone: "muted" as const,
+          borderColor: "rgba(255,255,255,0.6)",
+        };
+
   return (
     <View style={styles.fill}>
       <Camera
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={scanning}
+        isActive={phase !== "done"}
         frameProcessor={frameProcessor}
         photo={true}
         pixelFormat="yuv"
       />
 
-      {/* Centre framing guide — aim the ingredient list inside it. */}
+      {/* Centre framing guide — aim the ingredient list inside it. Amber +
+          the rotate message only appears when the completeness check below
+          finds the panel genuinely isn't fully in frame. */}
       <View style={styles.guideWrap} pointerEvents="none">
-        <View
-          style={[
-            styles.guide,
-            { borderColor: sawText ? t.colors.cyan : "rgba(255,255,255,0.6)" },
-          ]}
-        />
-        <View style={[styles.pill, { backgroundColor: t.colors.card }]}>
-          <Text tone={sawText ? "cyan" : "muted"} bold>
-            {processing ? "Reading label…" : sawText ? "Reading label…" : "Point at the ingredient list"}
+        <View style={[styles.guide, { borderColor }]} />
+        <View style={[styles.pill, { backgroundColor: t.colors.card, maxWidth: 300 }]}>
+          <Text tone={tone} bold style={{ textAlign: "center" }}>
+            {message}
           </Text>
         </View>
       </View>
 
-      {/* Countdown pill + cancel — swaps to a processing note once the hold
-          window ends and the burst's photos are still being OCR'd. */}
       <View style={styles.hud} pointerEvents="box-none">
-        <View style={[styles.pill, { backgroundColor: t.colors.card }]}>
-          <Text tone="cyan" bold>
-            {processing ? "Analyzing photos…" : `Hold steady, pan if needed… ${countdown}s`}
-          </Text>
-        </View>
-        {!processing && <Button title="Cancel" kind="secondary" onPress={onCancel} />}
+        <Button title="Cancel" kind="secondary" onPress={onCancel} />
       </View>
     </View>
   );
