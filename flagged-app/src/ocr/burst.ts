@@ -1,5 +1,5 @@
 import { longestCommonSubstringLength } from "../matching/levenshtein";
-import { looksSpatiallyComplete } from "./completeness";
+import { looksSpatiallyComplete, looksTextuallyComplete } from "./completeness";
 import { stitch } from "./stitch";
 import type { SpatialBlock } from "./recognition";
 
@@ -39,7 +39,9 @@ export function combineBurst(shots: BurstShot[]): string {
   if (candidates.length === 0) return "";
   if (candidates.length === 1) return candidates[0].text;
 
-  const complete = candidates.filter((s) => looksSpatiallyComplete(s.blocks));
+  // Either signal is enough — see completeness.ts for why they're
+  // deliberately independent checks (one geometric, one structural).
+  const complete = candidates.filter((s) => looksSpatiallyComplete(s.blocks) || looksTextuallyComplete(s.text));
   if (complete.length > 0) {
     return complete.reduce((best, c) => (c.text.length > best.text.length ? c : best)).text;
   }

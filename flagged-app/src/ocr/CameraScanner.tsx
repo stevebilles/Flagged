@@ -11,7 +11,7 @@ import { useTextRecognition, PhotoRecognizer } from "react-native-vision-camera-
 import { useRunOnJS } from "react-native-worklets-core";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
-import { looksSpatiallyComplete } from "./completeness";
+import { looksSpatiallyComplete, looksTextuallyComplete } from "./completeness";
 import { combineBurst, BurstShot } from "./burst";
 import { reconcileTexts } from "./reconcile";
 import { toRecognizedBlocks, toSpatialBlocks, photoResultToParagraph, MLKitText } from "./recognition";
@@ -234,7 +234,9 @@ export function CameraScanner({ onCapture, onCancel }: CameraScannerProps) {
       const shot1 = await takeShot();
       if (cancelled) return;
 
-      if (looksSpatiallyComplete(shot1.blocks)) {
+      // Either signal is enough — see completeness.ts for why they're
+      // deliberately independent checks (one geometric, one structural).
+      if (looksSpatiallyComplete(shot1.blocks) || looksTextuallyComplete(shot1.text)) {
         // The common case: one photo already covers the whole panel. Take
         // a couple more quick, independent reads of that SAME view and
         // reconcile them word by word (reconcile.ts) to catch the kind of
