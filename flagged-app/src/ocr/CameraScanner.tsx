@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
 import { recognizeText, getImageSize, correctPerspective } from "vision-ocr";
 import { Text, Button } from "../design/components";
@@ -209,8 +209,9 @@ export function useCameraCapture({
 
     if (phase === "processing") {
       overlay = (
-        <View style={[styles.center, styles.overlayOpaque, { backgroundColor: t.colors.canvas }]}>
-          <Text tone="cyan" bold>
+        <View style={[styles.center, styles.overlayOpaque, { backgroundColor: t.colors.canvas, gap: t.spacing.md }]}>
+          <ActivityIndicator size="large" color={t.colors.cyan} />
+          <Text variant="heading" tone="cyan" bold style={{ textAlign: "center" }}>
             Reading the label…
           </Text>
         </View>
