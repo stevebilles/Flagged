@@ -229,7 +229,7 @@ export function useCameraCapture({
             Got it!
           </Text>
           <Text variant="title" style={{ textAlign: "center" }}>
-            Was the whole{"\n"}ingredient list in frame?
+            Caught the whole list?{"\n"}Tap Done — or Scan More{"\n"}if it continues elsewhere.
           </Text>
         </View>
       );
@@ -237,7 +237,7 @@ export function useCameraCapture({
         <View style={{ gap: t.spacing.sm }}>
           <Button title="Done" onPress={handleDone} />
           <Button
-            title="Scan more (list continues elsewhere on the package)"
+            title="Scan More"
             kind="secondary"
             onPress={handleAddMore}
           />
