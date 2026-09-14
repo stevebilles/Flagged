@@ -13,8 +13,12 @@ function block(text: string, x: number, y: number, width = 100, height = 20) {
   return { text, x, y, width, height };
 }
 
-function result(blocks: ReturnType<typeof block>[], text = ""): VisionOcrResult {
-  return { text, blocks };
+function result(
+  blocks: ReturnType<typeof block>[],
+  text = "",
+  imageSize = { imageWidth: 2000, imageHeight: 2000 }
+): VisionOcrResult {
+  return { text, blocks, ...imageSize };
 }
 
 describe("toSpatialBlocks", () => {
@@ -100,5 +104,32 @@ describe("photoResultToParagraph", () => {
         "Yeast extract, Onion powder, Food acid (270, 327, 330) " +
         "Anti-caking agent (551)], Sunflower oil, Herb extract"
     );
+  });
+
+  it("drops text sliced off by the crop boundary when dropEdgeClippedText is set", () => {
+    // Real device capture (2026-09-13): the user's crop box sat well inside
+    // the Nutrition Facts footnote above and a French repeat below, but
+    // Vision still recognized the slivers of those lines that survived the
+    // hard crop, bleeding "a plus c'est beaucoup" and the French repeat into
+    // the result. Both clipped lines are flush against the cropped image's
+    // own top/bottom edge (no margin) — a real included line never is,
+    // since nobody drags a crop edge to land exactly on a letter's pixel.
+    const imageWidth = 1200;
+    const imageHeight = 800;
+    const clippedTop = block("a plus cest beaucoup", 50, 0, 900, 15);
+    const line1 = block("Ingredients: Maize, Rice, seasoning", 100, 50, 900, 60);
+    const line2 = block("Milk solids, Salt, Sunflower oil", 100, 115, 900, 60);
+    const clippedBottom = block("Ingredients: Mais, Riz. Assairor", 50, 780, 900, 20);
+    const withoutFilter = photoResultToParagraph(
+      result([clippedTop, line1, line2, clippedBottom], "", { imageWidth, imageHeight })
+    );
+    expect(withoutFilter).toContain("beaucoup");
+    expect(withoutFilter).toContain("Assairor");
+
+    const filtered = photoResultToParagraph(
+      result([clippedTop, line1, line2, clippedBottom], "", { imageWidth, imageHeight }),
+      { dropEdgeClippedText: true }
+    );
+    expect(filtered).toBe("Ingredients: Maize, Rice, seasoning Milk solids, Salt, Sunflower oil");
   });
 });

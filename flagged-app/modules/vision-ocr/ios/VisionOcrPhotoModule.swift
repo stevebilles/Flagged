@@ -67,6 +67,8 @@ class VisionOcrPhotoModule: NSObject {
       resolve([
         "text": fullText.joined(separator: "\n"),
         "blocks": blocks,
+        "imageWidth": uprightWidth,
+        "imageHeight": uprightHeight,
       ])
     }
     request.recognitionLevel = .accurate

@@ -138,13 +138,58 @@ function sortByPosition(blocks: SpatialBlock[]): SpatialBlock[] {
 }
 
 /**
+ * A hard pixel crop (see `correctPerspective`) can slice straight through
+ * the MIDDLE of a text line that sits just outside the box the user
+ * actually drew — a Nutrition Facts footnote sitting right above it, a
+ * second-language repeat sitting right below it. Vision still recognizes
+ * whatever sliver of that line survived the cut (2026-09-13, real device
+ * capture: "5% or less is a little, 15% or more is a lot" and a French
+ * ingredient repeat both bled into a crop the user drew well inside them).
+ *
+ * The fix relies on how a hard crop necessarily behaves: a line the user
+ * genuinely meant to include sits somewhere INSIDE the box, with real
+ * margin on every side, because nobody drags a crop edge to land exactly on
+ * a letter's own boundary pixel. A line the crop sliced through has no such
+ * margin — Vision can only draw a box around the pixels that actually
+ * survived the cut, so that box's edge lands flush against the image's own
+ * edge (y at ~0, or the opposite edge at ~imageHeight, same for x). That's
+ * a purely geometric fact about how the crop was made, not a guess tuned
+ * against any one photo — so it holds regardless of language, font, or
+ * how tight the crop is.
+ */
+const EDGE_TOUCH_FRACTION = 0.006; // how close to the image's own edge counts as "cut off", as a fraction of that dimension
+
+function touchesEdge(value: number, dimension: number): boolean {
+  const margin = Math.max(2, dimension * EDGE_TOUCH_FRACTION);
+  return value <= margin || value >= dimension - margin;
+}
+
+function isEdgeClipped(block: SpatialBlock, imageWidth: number, imageHeight: number): boolean {
+  return (
+    touchesEdge(block.y, imageHeight) ||
+    touchesEdge(block.y + block.height, imageHeight) ||
+    touchesEdge(block.x, imageWidth) ||
+    touchesEdge(block.x + block.width, imageWidth)
+  );
+}
+
+/**
  * Convert a still-photo Vision result into a paragraph string. Used by the
- * "Choose Photo" path and the burst-photo scanner (docs/06/14). Built from
+ * "Choose Photo" path and the crop-confirm scanner (docs/06/14). Built from
  * position-sorted blocks (see sortByPosition) rather than the plugin's own
  * concatenated text — see that function's doc comment for why.
+ *
+ * `dropEdgeClippedText`: pass true ONLY when `result` came from a hard-
+ * cropped image (`correctPerspective`'s output) — see `isEdgeClipped`
+ * above. The "Choose Photo" path runs on the original, uncropped picture,
+ * where a real line legitimately sitting at the edge of the FRAME (not a
+ * crop) is common and must not be dropped.
  */
-export function photoResultToParagraph(result: VisionOcrResult): string {
-  const blocks = toSpatialBlocks(result);
+export function photoResultToParagraph(result: VisionOcrResult, options?: { dropEdgeClippedText?: boolean }): string {
+  let blocks = toSpatialBlocks(result);
+  if (options?.dropEdgeClippedText) {
+    blocks = blocks.filter((b) => !isEdgeClipped(b, result.imageWidth, result.imageHeight));
+  }
   if (blocks.length > 0) {
     return sortByPosition(blocks)
       .map((b) => b.text)

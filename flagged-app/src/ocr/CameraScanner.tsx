@@ -184,7 +184,12 @@ export function useCameraCapture({
               .join("\n")
         );
       }
-      text = photoResultToParagraph(result);
+      // This image is the hard-cropped output of correctPerspective, not an
+      // original uncropped photo — drop any line the crop boundary sliced
+      // through (recognition.ts) rather than letting a Nutrition Facts
+      // footnote or second-language repeat bleed in from just outside the
+      // box the user actually drew.
+      text = photoResultToParagraph(result, { dropEdgeClippedText: true });
     } catch {
       text = "";
     }

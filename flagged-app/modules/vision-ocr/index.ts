@@ -13,6 +13,13 @@ export interface VisionOcrBlock {
 export interface VisionOcrResult {
   text: string;
   blocks: VisionOcrBlock[];
+  /** The recognized image's own upright pixel dimensions — the SAME image
+   * `blocks` coordinates are measured against. Lets a caller that knows it
+   * handed in a hard-CROPPED image (see `correctPerspective`) tell a block
+   * that's fully inside the crop from one that's merely a sliver of a line
+   * the crop boundary cut through (see recognition.ts). */
+  imageWidth: number;
+  imageHeight: number;
 }
 
 /** A single corner, in plain top-left-origin pixel coordinates of the
