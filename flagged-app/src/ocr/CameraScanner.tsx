@@ -229,7 +229,7 @@ export function useCameraCapture({
             Got it!
           </Text>
           <Text variant="title" style={{ textAlign: "center" }}>
-            Caught the whole list?{"\n"}Tap Done — or Scan More{"\n"}if it continues elsewhere.
+            Tap Done if you got{"\n"}the whole list — or Scan More{"\n"}to capture the rest.
           </Text>
         </View>
       );
