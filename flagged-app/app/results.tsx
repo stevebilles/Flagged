@@ -11,10 +11,22 @@ import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 import { cleanForDisplay } from "../src/matching/normalize";
 import type { Match } from "../src/matching/matcher";
 
+/** The correctly-spelled term itself, not the raw (possibly OCR-garbled)
+ * label text that triggered it — 2026-09-13: OCR will never be 100%
+ * typo-free on real glossy print, on any engine, and showing its raw output
+ * as if it were a finished transcript made the app look unreliable even
+ * when the underlying match was already correct. A term is always shown
+ * exactly as configured (the profile's own filter list), never as read. */
+function displayTerm(m: Match): string {
+  return m.term.charAt(0).toUpperCase() + m.term.slice(1);
+}
+
 /** "matches Sofia's Big-9 Allergens filter" / "...Sofia & Steve's..." (docs/17 "All" mode). */
 function matchCaption(m: Match): string {
   const filter = m.categoryName ?? m.term;
-  const fuzzy = m.kind === "fuzzy" ? ` (likely "${m.term}", ${(m.score * 100).toFixed(0)}%)` : "";
+  // A fuzzy match's confidence is worth surfacing (it's not a certain read),
+  // but never alongside the raw token that triggered it — see displayTerm.
+  const fuzzy = m.kind === "fuzzy" ? ` · ${(m.score * 100).toFixed(0)}% match` : "";
   if (m.profileNames && m.profileNames.length > 0) {
     const names = m.profileNames;
     const who =
@@ -146,19 +158,24 @@ export default function Results() {
           </Text>
         </Card>
 
-        {/* Ingredient paragraph with the matched words highlighted */}
-        <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">INGREDIENTS</Text>
-          <Card>
-            <Text style={{ lineHeight: 24 }}>
-              {segments.map((seg, idx) => (
-                <Text key={idx} tone={seg.flag ? "red" : "primary"} bold={seg.flag}>
-                  {seg.text}
-                </Text>
-              ))}
-            </Text>
-          </Card>
-        </View>
+        {/* Ingredient paragraph with the matched words highlighted — only for
+            a CLEAN result. A flagged result shows just the matched red-flag
+            terms below (their own correct spelling, not the raw OCR read) —
+            not a raw transcript for the user to proofread (2026-09-13). */}
+        {clean && (
+          <View style={{ gap: t.spacing.sm }}>
+            <Text tone="muted" variant="caption">INGREDIENTS</Text>
+            <Card>
+              <Text style={{ lineHeight: 24 }}>
+                {segments.map((seg, idx) => (
+                  <Text key={idx} tone={seg.flag ? "red" : "primary"} bold={seg.flag}>
+                    {seg.text}
+                  </Text>
+                ))}
+              </Text>
+            </Card>
+          </View>
+        )}
 
         <View style={{ gap: t.spacing.sm }}>
           <Text tone="muted" variant="caption">
@@ -182,7 +199,7 @@ export default function Results() {
                   }}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text bold>{m.token}</Text>
+                    <Text bold>{displayTerm(m)}</Text>
                     <Text tone="muted" variant="caption">
                       {matchCaption(m)}
                     </Text>

@@ -13,6 +13,7 @@ import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
 import { useCameraCapture } from "../../src/ocr/CameraScanner";
+import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION } from "../../src/ocr/guideBox";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
 import { displayName } from "../../src/domain/types";
 
@@ -245,8 +246,8 @@ export default function Scan() {
         ) : (
           <View
             style={{
-              width: "70%",
-              height: "48%",
+              width: `${GUIDE_WIDTH_FRACTION * 100}%`,
+              height: `${GUIDE_HEIGHT_FRACTION * 100}%`,
               borderWidth: 2,
               borderStyle: "dashed",
               borderRadius: t.radius.md,

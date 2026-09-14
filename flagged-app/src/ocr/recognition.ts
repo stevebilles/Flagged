@@ -77,10 +77,10 @@ function toSpatialBlocks(result: VisionOcrResult): SpatialBlock[] {
  * after it broke a much messier photo — a full, uncropped label mixing a
  * dense Nutrition Facts grid (many small side-by-side value/% pairs) with
  * the ingredients paragraph, where transitively grouping "same row" pairs
- * over-merged several actually-different rows into one clump. The crop
- * tool (CornerAdjustOverlay) added since then means the photo handed to
- * this function is now always just the cropped ingredient panel — plain
- * stacked paragraph lines, never a dense multi-column grid — which is
+ * over-merged several actually-different rows into one clump. The
+ * fixed-guide-box crop added since then (guideBox.ts) means the photo
+ * handed to this function is now always just the cropped ingredient panel —
+ * plain stacked paragraph lines, never a dense multi-column grid — which is
  * exactly the case this approach handles well and the earlier one didn't.
  *
  * Grouping uses union-find (not a single pairwise sort comparator) so the
