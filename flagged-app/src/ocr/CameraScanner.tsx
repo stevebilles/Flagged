@@ -218,9 +218,18 @@ export function useCameraCapture({
       footer = null;
     } else if (phase === "shotDone") {
       overlay = (
-        <View style={[styles.center, styles.overlayOpaque, { backgroundColor: t.colors.canvas, padding: t.spacing.md }]}>
-          <Text bold style={{ textAlign: "center" }}>
-            Got it — is the whole ingredient list in frame?
+        <View
+          style={[
+            styles.center,
+            styles.overlayOpaque,
+            { backgroundColor: t.colors.canvas, padding: t.spacing.lg, gap: t.spacing.sm },
+          ]}
+        >
+          <Text variant="heading" bold tone="cyan" style={{ textAlign: "center" }}>
+            Got it!
+          </Text>
+          <Text variant="title" style={{ textAlign: "center" }}>
+            Was the whole{"\n"}ingredient list in frame?
           </Text>
         </View>
       );
