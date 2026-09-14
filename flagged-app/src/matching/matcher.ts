@@ -20,12 +20,18 @@ import type { Classification } from "../domain/types";
  * This directly caused a safety gap, not just a cosmetic display issue: the
  * red-flag TERM could still be present on the label while failing to match.
  *
- * Doesn't touch words under 4 letters — those stay exact-match-only, same
- * as before (see the `term.length < 4` / `termWord.length < 4` guards
- * below): a 3-letter word is too short to fuzzy-match safely regardless of
- * scaling ("oil" is 1 edit from "ail", "owl", "oid" — real, unrelated
- * words), which is exactly what the "still requires a short word... to
- * match exactly" regression test guards.
+ * Doesn't touch words 4 letters or under — those stay exact-match-only
+ * (see the `term.length < 5` / `termWord.length < 5` guards below), a
+ * boundary raised from 4 to 5 after a real device false positive
+ * (2026-09-13): "malt" and "salt" are both genuine, common, unrelated
+ * words, exactly 1 edit apart — allowing even 1 edit at length 4 flagged
+ * "malt" on a label that only ever said "salt" (present in nearly every
+ * ingredient list). At 4 letters, 1 edit changes a quarter of the word —
+ * too big a fraction to reliably tell "the same word, misread" from "a
+ * different, extremely common word." 5-letter words keep 1-edit tolerance
+ * (needed for "Neast" -> "Yeast", the original real miss this was built
+ * for) since 5-letter English/ingredient collisions a single edit apart
+ * are markedly rarer than 4-letter ones.
  *
  * Stays at 1 edit all the way up to 9 letters, not 2 (real device miss,
  * 2026-09-13): "sunflower" and "safflower" are both genuine, different
@@ -142,7 +148,7 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
     const termWords = term.split(" ");
     if (termWords.length === 1) {
       // Fuzzy — single-word terms, against individual label words.
-      if (term.length < 4) continue;
+      if (term.length < 5) continue;
       let best: Hit | null = null;
       for (const w of words) {
         if (Math.abs(w.length - term.length) > 2) continue;
@@ -182,7 +188,7 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
         if (labelWord === termWord) {
           score = 1;
         } else if (
-          termWord.length < 4 ||
+          termWord.length < 5 ||
           Math.abs(labelWord.length - termWord.length) > 2 ||
           levenshtein(labelWord, termWord) > maxAllowedEdits(termWord.length)
         ) {

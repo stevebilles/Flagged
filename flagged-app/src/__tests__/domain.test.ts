@@ -265,17 +265,30 @@ describe("matcher", () => {
     // (a single edit on a 5-letter word only scores 80%), so this fell
     // through the fuzzy net entirely: the red-flag term was present on the
     // label but the scan reported clean. maxAllowedEdits fixes this for
-    // words of 4+ letters (still exact-only under 4, e.g. "egg"/"soy").
+    // words of 5+ letters (still exact-only under 5 — see the "malt"/"salt"
+    // regression below for why 4-letter words don't get this tolerance).
     const r = matchParagraph("Ingredients: Maize, Rice, Neast extract, Salt", ["yeast"]);
     expect(r.isClean).toBe(false);
     expect(r.matches[0]).toMatchObject({ term: "yeast", kind: "fuzzy" });
   });
 
-  it("does not go so loose on short words that unrelated words start matching", () => {
-    // "milk" (4 letters) allows 1 edit — "malt" and "bulk" are each 2 edits
-    // away and must stay unmatched, or fuzzy matching would flag almost
-    // anything vaguely milk-shaped.
+  it("does not fuzzy-match a 4-letter term against unrelated words at all", () => {
+    // 4-letter terms are exact-match-only (see the "malt"/"salt" regression
+    // below for why) — "malt" and "bulk" must stay unmatched against "milk".
     const r = matchParagraph("Ingredients: barley malt, bulk fiber, water", ["milk"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not confuse two common, unrelated 4-letter words one edit apart (real device miss, 2026-09-13)", () => {
+    // Real false positive: "malt" (a Gluten Sources term) fuzzy-matched
+    // "salt" — present in nearly every ingredient list — because 1-edit
+    // tolerance at length 4 doesn't distinguish "the same word, misread"
+    // from "a completely different, extremely common word" (a single
+    // substitution changes a quarter of a 4-letter word). 4-letter terms
+    // are exact-match-only now specifically because of this; 5+ letter
+    // words (see "yeast"/"Neast" above) keep 1-edit tolerance since real
+    // collisions there are markedly rarer.
+    const r = matchParagraph("Ingredients: Water, Salt, Sugar, Citric Acid", ["malt"]);
     expect(r.isClean).toBe(true);
   });
 
