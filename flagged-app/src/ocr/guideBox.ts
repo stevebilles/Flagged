@@ -1,15 +1,30 @@
 import type { DocumentCorners } from "vision-ocr";
 
 /**
- * How much of the viewfinder box the dashed guide covers — bumped up
- * 2026-09-13 (was 82%/70%) per real user feedback that the box should be
- * big enough to comfortably fit a whole ingredient list without having to
- * aim unusually precisely. Exported so the Scan tab's idle placeholder (its
- * dashed box shown before the camera opens) can match exactly — same guide,
- * same size, whether or not the camera is live.
+ * How much of the viewfinder box the dashed guide covers.
+ *
+ * Bumped UP to 90%/80% earlier (2026-09-13) per feedback that the box
+ * should comfortably fit a whole list without precise aiming — then
+ * brought back DOWN, smaller than the original 82%/70%, after real
+ * captures showed the bigger box was regularly pulling in the Nutrition
+ * Facts panel and BOTH language sections in one shot. That's not just
+ * cosmetic: it caused two real failures. (1) OCR sometimes renders the
+ * French header identically to the English one once accents get dropped
+ * ("Ingrédients" -> "Ingredients") — with both sections in frame, the
+ * extractor had no reliable way to tell them apart and picked the wrong
+ * one. (2) full-width ingredient lines routinely ran right up to the
+ * (large) box's own edge, which the edge-clip filter (recognition.ts,
+ * built for a user-drawn, deliberately-tight manual crop) then discarded
+ * as if it were unwanted bleed-in — including the "Ingredients:" header
+ * line itself. A smaller box makes it much likelier only the intended
+ * list is ever in frame at all, which is more valuable than fitting more
+ * text in one shot — "Scan More" already exists for a list that doesn't
+ * fit. Exported so the Scan tab's idle placeholder (its dashed box shown
+ * before the camera opens) can match exactly — same guide, same size,
+ * whether or not the camera is live.
  */
-export const GUIDE_WIDTH_FRACTION = 0.9;
-export const GUIDE_HEIGHT_FRACTION = 0.8;
+export const GUIDE_WIDTH_FRACTION = 0.72;
+export const GUIDE_HEIGHT_FRACTION = 0.5;
 
 /**
  * Maps the dashed guide box's fixed on-screen position (centered, a set

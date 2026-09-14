@@ -78,10 +78,12 @@ function toSpatialBlocks(result: VisionOcrResult): SpatialBlock[] {
  * dense Nutrition Facts grid (many small side-by-side value/% pairs) with
  * the ingredients paragraph, where transitively grouping "same row" pairs
  * over-merged several actually-different rows into one clump. The
- * fixed-guide-box crop added since then (guideBox.ts) means the photo
- * handed to this function is now always just the cropped ingredient panel —
- * plain stacked paragraph lines, never a dense multi-column grid — which is
- * exactly the case this approach handles well and the earlier one didn't.
+ * fixed-guide-box crop (guideBox.ts) narrows that risk — a smaller box
+ * makes it much less likely the Nutrition Facts grid is in frame at all —
+ * but unlike the old manually-drawn crop, it can't GUARANTEE the photo is
+ * only the ingredient paragraph, since the user aims it live rather than
+ * confirming the exact captured content afterward. If a dense grid does
+ * end up in frame, this approach's over-merge risk is still there.
  *
  * Grouping uses union-find (not a single pairwise sort comparator) so the
  * result is a proper partition into rows rather than a possibly
@@ -146,16 +148,27 @@ function sortByPosition(blocks: SpatialBlock[]): SpatialBlock[] {
  * capture: "5% or less is a little, 15% or more is a lot" and a French
  * ingredient repeat both bled into a crop the user drew well inside them).
  *
- * The fix relies on how a hard crop necessarily behaves: a line the user
- * genuinely meant to include sits somewhere INSIDE the box, with real
- * margin on every side, because nobody drags a crop edge to land exactly on
- * a letter's own boundary pixel. A line the crop sliced through has no such
- * margin — Vision can only draw a box around the pixels that actually
- * survived the cut, so that box's edge lands flush against the image's own
- * edge (y at ~0, or the opposite edge at ~imageHeight, same for x). That's
- * a purely geometric fact about how the crop was made, not a guess tuned
- * against any one photo — so it holds regardless of language, font, or
- * how tight the crop is.
+ * The fix relies on how a hard crop necessarily behaves VERTICALLY: a line
+ * genuinely meant to be included sits somewhere INSIDE the box top-to-
+ * bottom, with real margin above and below, because nobody drags a crop
+ * edge to land exactly on a letter's own boundary pixel. A line the crop
+ * sliced through has no such margin — Vision can only draw a box around
+ * the pixels that actually survived the cut, so that box's top or bottom
+ * edge lands flush against the image's own edge. That holds regardless of
+ * language, font, or how tight the crop is.
+ *
+ * ONLY the y-axis (top/bottom) is checked — an earlier version also
+ * checked x (left/right), which caused a real regression once cropping
+ * became automatic (the fixed guide box, guideBox.ts) instead of a
+ * precisely user-drawn rectangle: a wrapped paragraph's lines naturally
+ * run close to the crop's left/right edges just because that's how text
+ * wraps to fill the available width, not because anything got cut off.
+ * That check discarded a real, fully-intact "Ingredients:" line (and every
+ * word after it) simply because the guide box wasn't wide enough to leave
+ * horizontal margin — the opposite of what this filter is for. Vertically,
+ * a genuinely separate section (a footnote above, a repeat below) is a
+ * completely different line with its own real top/bottom margin, so that
+ * check stays.
  */
 const EDGE_TOUCH_FRACTION = 0.006; // how close to the image's own edge counts as "cut off", as a fraction of that dimension
 
@@ -164,13 +177,8 @@ function touchesEdge(value: number, dimension: number): boolean {
   return value <= margin || value >= dimension - margin;
 }
 
-function isEdgeClipped(block: SpatialBlock, imageWidth: number, imageHeight: number): boolean {
-  return (
-    touchesEdge(block.y, imageHeight) ||
-    touchesEdge(block.y + block.height, imageHeight) ||
-    touchesEdge(block.x, imageWidth) ||
-    touchesEdge(block.x + block.width, imageWidth)
-  );
+function isEdgeClipped(block: SpatialBlock, imageHeight: number): boolean {
+  return touchesEdge(block.y, imageHeight) || touchesEdge(block.y + block.height, imageHeight);
 }
 
 /**
@@ -188,7 +196,7 @@ function isEdgeClipped(block: SpatialBlock, imageWidth: number, imageHeight: num
 export function photoResultToParagraph(result: VisionOcrResult, options?: { dropEdgeClippedText?: boolean }): string {
   let blocks = toSpatialBlocks(result);
   if (options?.dropEdgeClippedText) {
-    blocks = blocks.filter((b) => !isEdgeClipped(b, result.imageWidth, result.imageHeight));
+    blocks = blocks.filter((b) => !isEdgeClipped(b, result.imageHeight));
   }
   if (blocks.length > 0) {
     return sortByPosition(blocks)

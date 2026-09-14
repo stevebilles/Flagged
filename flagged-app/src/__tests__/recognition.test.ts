@@ -132,4 +132,22 @@ describe("photoResultToParagraph", () => {
     );
     expect(filtered).toBe("Ingredients: Maize, Rice, seasoning Milk solids, Salt, Sunflower oil");
   });
+
+  it("keeps a full-width line that merely runs close to the crop's left/right edge (real device miss, 2026-09-13)", () => {
+    // Real regression once cropping became automatic (a fixed guide box,
+    // not a precisely user-drawn rectangle): a genuine, fully-intact
+    // "Ingredients:" line ran right up to the crop's own right edge simply
+    // because that's how a wrapped paragraph fills the available width —
+    // nothing was actually cut off. An earlier version of this filter also
+    // checked left/right edges and discarded the entire line (header
+    // included), losing the whole ingredient list. Only top/bottom
+    // (vertical) edge-touching means real clipping now.
+    const imageWidth = 2138;
+    const imageHeight = 2498;
+    const fullWidthLine = block("Ingredients: Maize, Rice, Seasoning, Milk solids, Salt, Flavour", 199, 1271, 1936, 113);
+    const out = photoResultToParagraph(result([fullWidthLine], "", { imageWidth, imageHeight }), {
+      dropEdgeClippedText: true,
+    });
+    expect(out).toBe("Ingredients: Maize, Rice, Seasoning, Milk solids, Salt, Flavour");
+  });
 });

@@ -12,11 +12,30 @@ describe("guideBoxToPhotoCorners", () => {
     // box 400x800 (portrait, taller than wide), photo 1200x1600 (same 3:4
     // ratio as the box here scaled — cover picks the larger of the two
     // per-axis scale factors, so coverScale = max(400/1200, 800/1600) = 0.5.
-    const corners = guideBoxToPhotoCorners(400, 800, 1200, 1600);
-    // Guide is 90%x80% of the box, centered: left=20,top=80,right=380,bottom=720.
-    // Inverting the 0.5 cover scale with offsetX=-100, offsetY=0:
-    expect(corners.topLeft).toEqual({ x: 240, y: 160 });
-    expect(corners.bottomRight).toEqual({ x: 960, y: 1440 });
+    const boxW = 400;
+    const boxH = 800;
+    const photoW = 1200;
+    const photoH = 1600;
+    const corners = guideBoxToPhotoCorners(boxW, boxH, photoW, photoH);
+    // Guide is GUIDE_WIDTH_FRACTION x GUIDE_HEIGHT_FRACTION of the box,
+    // centered. Derived from the fractions rather than hardcoded, so tuning
+    // the box size (guideBox.ts) doesn't also require updating this test.
+    const coverScale = 0.5;
+    const guideW = boxW * GUIDE_WIDTH_FRACTION;
+    const guideH = boxH * GUIDE_HEIGHT_FRACTION;
+    const left = (boxW - guideW) / 2;
+    const top = (boxH - guideH) / 2;
+    const offsetX = (boxW - photoW * coverScale) / 2;
+    const offsetY = (boxH - photoH * coverScale) / 2;
+    const expectedTopLeft = { x: (left - offsetX) / coverScale, y: (top - offsetY) / coverScale };
+    const expectedBottomRight = {
+      x: (left + guideW - offsetX) / coverScale,
+      y: (top + guideH - offsetY) / coverScale,
+    };
+    expect(corners.topLeft.x).toBeCloseTo(expectedTopLeft.x);
+    expect(corners.topLeft.y).toBeCloseTo(expectedTopLeft.y);
+    expect(corners.bottomRight.x).toBeCloseTo(expectedBottomRight.x);
+    expect(corners.bottomRight.y).toBeCloseTo(expectedBottomRight.y);
   });
 
   it("keeps every corner within the photo's own bounds", () => {

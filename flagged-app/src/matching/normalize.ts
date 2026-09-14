@@ -68,7 +68,7 @@ export function tokenize(normalized: string): string[] {
  *      "." — a lowercase word followed by a Title-Case word starts a new item).
  * Falls back to the raw text when no header is found or the result is too short.
  */
-const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR garble
+const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*[:;]/i; // Contains: / Contient: / OCR garble (colon or a misread semicolon)
 // Scoped use only: extractIngredientList below searches for this within a
 // small window right after the chosen ingredient header, to find where the
 // list's own "Contains:" line ends. Kept deliberately unexported — a real
@@ -87,11 +87,17 @@ const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR ga
  * Every position that looks like an ingredient header. OCR mangles the word
  * badly ("Ingredlents:", "Ihgrédients:", "lnaredients:", "Ionredients:"), so any
  * 7–14 letter word before a colon that is ≥60% similar to "ingredients" /
- * "ingrédients" counts.
+ * "ingrédients" counts. Also accepts a semicolon in the colon's place (real
+ * device miss, 2026-09-13: Vision read "Ingredients;" for "Ingredients:" —
+ * missing this ENTIRELY excluded the correctly-spelled English header from
+ * consideration, leaving only a same-looking French header — accented
+ * letters get dropped by OCR often enough that "Ingrédients" and
+ * "Ingredients" can render identically — as the sole candidate, so the
+ * wrong language's list got extracted).
  */
 function findHeaders(text: string): { at: number; after: number }[] {
   const heads: { at: number; after: number }[] = [];
-  const re = /(^|[^a-zà-ÿ])([a-zà-ÿ]{7,14})\s*:/gi;
+  const re = /(^|[^a-zà-ÿ])([a-zà-ÿ]{7,14})\s*[:;]/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const w = m[2].toLowerCase();
