@@ -45,6 +45,11 @@ export default function Scan() {
   useFocusEffect(
     useCallback(() => {
       setRemaining(scansRemaining());
+      // Reset on the way BACK to this tab, not on the way out (see
+      // onCameraCapture) — so a finished scan's last screen doesn't flash
+      // to idle mid-transition, but revisiting Scan later still starts
+      // fresh instead of showing a stale confirmDone/camera screen.
+      setCameraOpen(false);
     }, [])
   );
   const locked = !canScan(isPremium);
@@ -121,7 +126,13 @@ export default function Scan() {
   }
 
   function onCameraCapture(paragraph: string) {
-    setCameraOpen(false);
+    // Deliberately NOT resetting cameraOpen here: doing so used to flip this
+    // screen back to its idle "POINT AT INGREDIENT LIST" state a frame
+    // before the push to /results finished animating in, flashing the idle
+    // box behind the transition (2026-09-13). The camera stays "open"
+    // (still showing its last confirmDone content) all the way through the
+    // navigation instead — see the useFocusEffect below, which resets it
+    // only once this tab is actually revisited, not on the way out.
     runScan(paragraph, "camera");
   }
 
