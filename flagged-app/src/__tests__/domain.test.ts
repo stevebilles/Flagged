@@ -258,6 +258,26 @@ describe("matcher", () => {
     const r = matchParagraph("Yeast • Extrbct powder • Salt", ["yeast extract"]);
     expect(r.isClean).toBe(true);
   });
+
+  it("catches a single-letter OCR misread on a short standalone allergen word (real device miss, 2026-09-13)", () => {
+    // "Neast" for "Yeast" — a real Vision misread. The OLD flat 85%-
+    // similarity threshold required ~7+ letters to survive even one typo
+    // (a single edit on a 5-letter word only scores 80%), so this fell
+    // through the fuzzy net entirely: the red-flag term was present on the
+    // label but the scan reported clean. maxAllowedEdits fixes this for
+    // words of 4+ letters (still exact-only under 4, e.g. "egg"/"soy").
+    const r = matchParagraph("Ingredients: Maize, Rice, Neast extract, Salt", ["yeast"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "yeast", kind: "fuzzy" });
+  });
+
+  it("does not go so loose on short words that unrelated words start matching", () => {
+    // "milk" (4 letters) allows 1 edit — "malt" and "bulk" are each 2 edits
+    // away and must stay unmatched, or fuzzy matching would flag almost
+    // anything vaguely milk-shaped.
+    const r = matchParagraph("Ingredients: barley malt, bulk fiber, water", ["milk"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
 describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {

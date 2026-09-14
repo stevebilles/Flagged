@@ -1,10 +1,37 @@
-import { similarity } from "./levenshtein";
+import { levenshtein, similarity } from "./levenshtein";
 import { normalizeParagraph, regexClean } from "./normalize";
 import type { Classification } from "../domain/types";
 
 /** Hybrid matcher: normalize → whole-word/phrase presence → fuzzy (docs/06 Step 3). */
 
-export const FUZZY_THRESHOLD = 0.85; // 85%+ similarity triggers a flag (docs/06)
+/**
+ * How many OCR-style letter errors (dropped, added, or swapped) a word can
+ * have and still count as the same word — scaled by length instead of a flat
+ * similarity percentage.
+ *
+ * A flat 85%-similarity cutoff sounds forgiving but isn't, for the word
+ * lengths that actually matter here: it takes a word of ~7+ letters to
+ * survive even ONE typo at 85% (a single edit on a 5-letter word like
+ * "yeast" only scores 80%). Most real allergen words are shorter than that
+ * — "milk" (4), "wheat" (5), "yeast" (5), "gluten"/"peanut"/"walnut"/
+ * "cashew"/"almond"/"sesame" (6) — so a single Vision misread on exactly
+ * the word a scan needs to catch ("Neast" for "Yeast", a real 2026-09-13
+ * capture) fell through the fuzzy net entirely under the old threshold.
+ * This directly caused a safety gap, not just a cosmetic display issue: the
+ * red-flag TERM could still be present on the label while failing to match.
+ *
+ * Doesn't touch words under 4 letters — those stay exact-match-only, same
+ * as before (see the `term.length < 4` / `termWord.length < 4` guards
+ * below): a 3-letter word is too short to fuzzy-match safely regardless of
+ * scaling ("oil" is 1 edit from "ail", "owl", "oid" — real, unrelated
+ * words), which is exactly what the "still requires a short word... to
+ * match exactly" regression test guards.
+ */
+function maxAllowedEdits(length: number): number {
+  if (length <= 6) return 1;
+  if (length <= 9) return 2;
+  return 3;
+}
 
 export interface Match {
   token: string; // the offending text from the label
@@ -111,8 +138,9 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
       let best: Hit | null = null;
       for (const w of words) {
         if (Math.abs(w.length - term.length) > 2) continue;
+        if (levenshtein(w, term) > maxAllowedEdits(term.length)) continue;
         const score = similarity(w, term);
-        if (score >= FUZZY_THRESHOLD && (!best || score > best.score)) {
+        if (!best || score > best.score) {
           const at = normalized.indexOf(w);
           best = { token: w, term, kind: "fuzzy", score, start: at, end: at + w.length };
         }
@@ -145,7 +173,11 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
         let score: number;
         if (labelWord === termWord) {
           score = 1;
-        } else if (termWord.length < 4 || Math.abs(labelWord.length - termWord.length) > 2) {
+        } else if (
+          termWord.length < 4 ||
+          Math.abs(labelWord.length - termWord.length) > 2 ||
+          levenshtein(labelWord, termWord) > maxAllowedEdits(termWord.length)
+        ) {
           ok = false;
           break;
         } else {
@@ -153,7 +185,7 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
         }
         if (score < minScore) minScore = score;
       }
-      if (!ok || minScore < FUZZY_THRESHOLD) continue;
+      if (!ok) continue;
       if (!best || minScore > best.score) {
         const start = wordMatches[i].index!;
         const lastWord = wordMatches[i + termWords.length - 1];
