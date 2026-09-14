@@ -278,6 +278,17 @@ describe("matcher", () => {
     const r = matchParagraph("Ingredients: barley malt, bulk fiber, water", ["milk"]);
     expect(r.isClean).toBe(true);
   });
+
+  it("does not confuse two different real ingredients that happen to be 2 edits apart (real device miss, 2026-09-13)", () => {
+    // "sunflower" and "safflower" are both genuine, different oils, exactly
+    // 2 letters apart. A scan of a label that only said "Sunflower oil"
+    // wrongly also reported "safflower oil" as present once 9-letter words
+    // were allowed 2 edits — fabricating a second ingredient that was never
+    // on the label. 9-letter words are capped at 1 edit specifically
+    // because of this.
+    const r = matchParagraph("Ingredients: Maize, Rice, Sunflower oil, Herb extract", ["safflower oil"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
 describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {

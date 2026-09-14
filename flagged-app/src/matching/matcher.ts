@@ -26,10 +26,18 @@ import type { Classification } from "../domain/types";
  * scaling ("oil" is 1 edit from "ail", "owl", "oid" — real, unrelated
  * words), which is exactly what the "still requires a short word... to
  * match exactly" regression test guards.
+ *
+ * Stays at 1 edit all the way up to 9 letters, not 2 (real device miss,
+ * 2026-09-13): "sunflower" and "safflower" are both genuine, different
+ * ingredients, exactly 2 edits apart — a 2-edit allowance at length 9
+ * flagged "safflower oil" on a label that only ever said "sunflower oil".
+ * 2 edits only kicks in for words long enough (10+ letters) that 2 letters
+ * is still a small fraction of the word, the same proportion 1 edit is for
+ * a 5-letter word — not a free pass at any length that happens to reach 9.
  */
 function maxAllowedEdits(length: number): number {
-  if (length <= 6) return 1;
-  if (length <= 9) return 2;
+  if (length <= 9) return 1;
+  if (length <= 14) return 2;
   return 3;
 }
 
