@@ -188,7 +188,22 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
         if (labelWord === termWord) {
           score = 1;
         } else if (
-          termWord.length < 5 ||
+          // A word THIS short only needs exact-match protection when it's
+          // standing alone (see the single-word path's `< 5` floor and the
+          // "malt"/"salt" regression it guards) — here it's locked next to
+          // at least one OTHER word from the same phrase that must ALSO
+          // independently match. A real device miss (2026-09-13):
+          // "Sunflower oll" (an i->l OCR slip, one of the most common OCR
+          // confusions) never matched "sunflower oil" because "oil" (3
+          // letters) was held to the same exact-match floor as a standalone
+          // term. Coincidentally matching BOTH "sunflower" (or another
+          // term word) AND a short word 1 edit from "oil" side by side,
+          // for text that isn't actually about sunflower oil, is
+          // vanishingly unlikely — the adjacent word's own match is the
+          // safety net a standalone short word doesn't have. Floor is 3,
+          // not 0: a 1-2 letter word ("a", "of") is too small to carry any
+          // signal even with a neighbor's help.
+          termWord.length < 3 ||
           Math.abs(labelWord.length - termWord.length) > 2 ||
           levenshtein(labelWord, termWord) > maxAllowedEdits(termWord.length)
         ) {

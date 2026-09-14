@@ -215,12 +215,25 @@ describe("matcher", () => {
     expect(r.isClean).toBe(false);
   });
 
-  it("still requires a short word in a multi-word term to match exactly, not fuzzily", () => {
-    // "oil" is only 3 letters — too short to judge similarity on safely — so
-    // a garbled "oil" (e.g. "0il" already recovered by regexClean upstream,
-    // or something less recoverable) must match it exactly, even though the
-    // longer word "sunflower" is spelled correctly.
-    const r = matchParagraph("Sunflower ail", ["sunflower oil"]);
+  it("fuzzy-matches a short word inside a multi-word term when its neighbor already matched (real device miss, 2026-09-13)", () => {
+    // "Sunflower oll" — an i->l OCR slip, one of the most common OCR
+    // confusions — never matched "sunflower oil" before this fix, because
+    // "oil" (3 letters) was held to the same exact-match-only floor as a
+    // STANDALONE short term (the "malt"/"salt" regression). But here "oil"
+    // isn't standing alone: "sunflower" right next to it already matched
+    // with real confidence, and coincidentally matching both a phrase's
+    // words side by side for text that isn't actually about that phrase is
+    // vanishingly unlikely — the neighbor's own match is a safety net a
+    // standalone short word doesn't have.
+    const r = matchParagraph("Anti-caking agent (551), Sunflower oll, Herb extract", ["sunflower oil"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "sunflower oil", kind: "fuzzy" });
+  });
+
+  it("still won't fuzzy a 1-2 letter connector word, even next to a matched neighbor", () => {
+    // Below the length-3 floor there's no signal left to judge similarity
+    // on at all, neighbor or not.
+    const r = matchParagraph("Sunflower xx", ["sunflower of"]);
     expect(r.isClean).toBe(true);
   });
 
