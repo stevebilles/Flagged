@@ -40,13 +40,18 @@ export default function RecheckCapture() {
   const [error, setError] = useState<string | null>(null);
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
-  function runRecheck(rawParagraph: string) {
+  function runRecheck(rawParagraph: string, source: "camera" | "paste" = "camera") {
     setError(null);
     if (!item) {
       setError("That pantry item no longer exists.");
       return;
     }
-    const paragraph = extractIngredientList(rawParagraph);
+    // See scan.tsx's runScan: a camera capture is already scoped to the
+    // guide box (guideBox.ts) — the box IS the search area, so its text is
+    // used as-is rather than hunting for "the ingredients section" inside
+    // an already-targeted capture (real 2026-09-13 failure: that hunt broke
+    // on an OCR punctuation slip and extracted the wrong language).
+    const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
     const profile = activeProfileId ? getProfile(activeProfileId) : null;
     if (!profile) {
       setError("No active profile.");
@@ -82,7 +87,7 @@ export default function RecheckCapture() {
         setError("Clipboard is empty. Copy the new ingredient list first.");
         return;
       }
-      runRecheck(text);
+      runRecheck(text, "paste");
     } catch {
       setError("Couldn't read the clipboard.");
     }

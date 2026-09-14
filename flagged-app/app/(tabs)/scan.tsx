@@ -78,9 +78,22 @@ export default function Scan() {
 
   function runScan(rawParagraph: string, source: "camera" | "paste" | "photo" = "camera") {
     setError(null);
-    // Strip everything that isn't the ingredient list (2nd language, nutrition
-    // panel, marketing) before it reaches the matcher or the results screen.
-    const paragraph = extractIngredientList(rawParagraph);
+    // A camera capture is already scoped to whatever's inside the guide
+    // box (guideBox.ts, CameraScanner.tsx) — the box IS the search area, so
+    // its text goes straight to the matcher. Trying to additionally find
+    // and isolate "the ingredients section" within an already-targeted
+    // capture was real, unnecessary complexity that actively caused a
+    // scan failure (2026-09-13): OCR misreading the header's colon broke
+    // header detection, so a same-looking French header got chosen
+    // instead, extracting the wrong language's text entirely. Matching
+    // English red-flag terms against a paragraph that happens to include
+    // some French is harmless (French words don't fuzzy-match English
+    // ones) — there was nothing this extraction step was protecting
+    // against here that the matcher doesn't already handle on its own.
+    // "Paste"/"Choose Photo" are different: those really can be a whole,
+    // unbounded label (a photo of the entire package, pasted text copied
+    // from anywhere), where isolating the ingredients section still helps.
+    const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
 
     let evaln;
     let scannedFor: string;
