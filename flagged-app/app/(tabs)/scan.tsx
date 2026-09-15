@@ -281,7 +281,7 @@ export default function Scan() {
       {!cameraOpen && (
         <>
           <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
-            Hold steady over the ingredient list
+            Hold steady over the ingredient list — tilt slightly if the label is glossy
           </Text>
           <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
             {scanContext.ready ? (

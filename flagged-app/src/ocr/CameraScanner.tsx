@@ -249,6 +249,18 @@ export function useCameraCapture({
       // waiting — live camera feed + aim guide + shutter button.
       overlay = (
         <>
+          {/* Glossy labels shot straight-on catch a light reflection right
+              across the text — tilting the phone a few degrees up or down
+              moves the glare off the printed area. This only helps while
+              the user is still aiming, so it's shown here, not on the idle
+              screen before the camera even opens. */}
+          <View style={styles.tipWrap} pointerEvents="none">
+            <View style={[styles.pill, styles.tipPill, { backgroundColor: t.colors.card }]}>
+              <Text bold style={{ textAlign: "center" }} variant="body">
+                💡 Getting glare? Tilt the phone slightly up or down
+              </Text>
+            </View>
+          </View>
           <View style={styles.guideWrap} pointerEvents="none">
             <View style={styles.guide} />
           </View>
@@ -328,10 +340,24 @@ const styles = StyleSheet.create({
     bottom: 12,
     alignItems: "center",
   },
+  tipWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 12,
+    alignItems: "center",
+  },
   pill: {
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 14,
     maxWidth: "90%",
+  },
+  // Bigger text needs more room than the compact error pill — wider max
+  // width and taller padding so it doesn't feel cramped at body size.
+  tipPill: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    maxWidth: "92%",
   },
 });
