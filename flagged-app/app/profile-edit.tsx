@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { View, ScrollView, TextInput, Pressable, Switch, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen, Text, Card, Pill, Badge } from "../src/design/components";
+import { Screen, Text, Card, Pill, Badge, ClassificationGuide } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import {
@@ -21,17 +21,10 @@ import {
   toggleIngredientExcluded,
 } from "../src/domain/activation";
 import { profileColor } from "../src/design/avatar";
-import type { Classification } from "../src/design/components";
 import { displayName } from "../src/domain/types";
 import type { Category, Profile, ParentGroup } from "../src/domain/types";
 
 const GROUP_ORDER: ParentGroup[] = ["Allergens", "Sugars", "Additives", "Dietary"];
-
-const CLASSIFICATION_GUIDE: { classification: Classification; description: string }[] = [
-  { classification: "regulated", description: "Legally required to be declared on food labels (e.g. allergens, nitrates)." },
-  { classification: "advisory", description: "Not required by law but flagged based on scientific or health research." },
-  { classification: "preference", description: "Personal dietary choices — no established health risk, your call." },
-];
 
 /**
  * Profile editor (docs/05 Home → Edit, docs/17 profile_edit mockups).
@@ -324,18 +317,7 @@ export default function ProfileEdit() {
           </View>
         </View>
 
-        {/* CLASSIFICATION GUIDE */}
-        <Card style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">CLASSIFICATION GUIDE</Text>
-          {CLASSIFICATION_GUIDE.map((row) => (
-            <View key={row.classification} style={{ flexDirection: "row", alignItems: "flex-start", gap: t.spacing.sm }}>
-              <Badge classification={row.classification} />
-              <Text tone="muted" variant="caption" style={{ flex: 1 }}>
-                {row.description}
-              </Text>
-            </View>
-          ))}
-        </Card>
+        <ClassificationGuide />
 
         {/* CATEGORIES grouped by parent — one row each, grouped into one card per section */}
         {grouped.map(({ group, cats }) => (

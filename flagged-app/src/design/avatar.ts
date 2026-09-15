@@ -6,19 +6,26 @@
  * mod palette-length can put two different profiles on the same color even
  * with just two profiles in the house, which defeats the point of a color
  * cue. Position-based assignment guarantees every profile gets its own color
- * for as long as there are fewer profiles than palette entries. The palette
- * itself is spread evenly around the hue wheel so no two entries read as
- * "close" to each other.
+ * for as long as there are fewer profiles than palette entries.
+ *
+ * Deliberately contains NO red-family or cyan-family hue (2026-09-14): the
+ * Results screen's FLAGGED and CLEAN states are red and cyan respectively
+ * (docs/09), and this palette is used to color that same screen's "for
+ * {name}" text by profile — the original palette's "red" (#F87171) and
+ * "cyan" (#22D3EE, an EXACT hex match to the dark-mode Clean color) would
+ * have made some profile's name literally unreadable-from-state on their
+ * own results. Every entry here stays outside both hue ranges in both
+ * color modes (hue doesn't shift between light/dark, only lightness does).
  */
 
 const PALETTE = [
-  "#F87171", // red
   "#F59E0B", // amber
   "#A3E635", // lime
-  "#34D399", // green
-  "#22D3EE", // cyan
-  "#60A5FA", // blue
-  "#A78BFA", // purple
+  "#4ADE80", // green
+  "#34D399", // emerald
+  "#818CF8", // indigo
+  "#A78BFA", // violet
+  "#E879F9", // fuchsia
   "#F472B6", // pink
 ] as const;
 

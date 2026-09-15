@@ -2,13 +2,24 @@ import React, { useEffect, useMemo } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen, Text, Card, Button, Badge } from "../src/design/components";
+import {
+  Screen,
+  Text,
+  Card,
+  Button,
+  Badge,
+  IngredientChip,
+  VerdictStamp,
+  ClassificationGuide,
+  type Classification,
+} from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getProfile } from "../src/db/repositories";
+import { getProfile, getProfiles } from "../src/db/repositories";
 import { commitScanStats, commitScanStatsForAll, canScan } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 import { cleanForDisplay } from "../src/matching/normalize";
+import { profileColor } from "../src/design/avatar";
 import type { Match } from "../src/matching/matcher";
 
 /** The correctly-spelled term itself, not the raw (possibly OCR-garbled)
@@ -19,21 +30,6 @@ import type { Match } from "../src/matching/matcher";
  * exactly as configured (the profile's own filter list), never as read. */
 function displayTerm(m: Match): string {
   return m.term.charAt(0).toUpperCase() + m.term.slice(1);
-}
-
-/** "matches Sofia's Big-9 Allergens filter" / "...Sofia & Steve's..." (docs/17 "All" mode). */
-function matchCaption(m: Match): string {
-  const filter = m.categoryName ?? m.term;
-  // A fuzzy match's confidence is worth surfacing (it's not a certain read),
-  // but never alongside the raw token that triggered it — see displayTerm.
-  const fuzzy = m.kind === "fuzzy" ? ` · ${(m.score * 100).toFixed(0)}% match` : "";
-  if (m.profileNames && m.profileNames.length > 0) {
-    const names = m.profileNames;
-    const who =
-      names.length === 1 ? `${names[0]}'s` : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}'s`;
-    return `matches ${who} ${filter} filter${fuzzy}`;
-  }
-  return `matches ${filter}${fuzzy}`;
 }
 
 /**
@@ -50,6 +46,16 @@ export default function Results() {
   // not re-derived from the current active profile, which may have changed
   // since this scan ran.
   const scannedFor = lastScan?.scannedFor ?? "";
+
+  // Only a SINGLE named profile gets its own color — "all N profiles" has
+  // no one profile to represent, and the palette itself (avatar.ts) is
+  // already guaranteed to stay clear of the verdict's own red/cyan.
+  const scannedForColor = useMemo(() => {
+    const ids = lastScan?.profileIds ?? [];
+    if (ids.length !== 1) return null;
+    const index = getProfiles().findIndex((p) => p.profileId === ids[0]);
+    return index >= 0 ? profileColor(index) : null;
+  }, [lastScan]);
 
   useEffect(() => {
     if (!lastScan) return;
@@ -87,6 +93,22 @@ export default function Results() {
     }
     if (last < para.length) out.push({ text: para.slice(last), flag: false });
     return out;
+  }, [lastScan]);
+
+  // Group matches by category (docs/17 redesign) so the card grid reads as
+  // "here's what's wrong and why" instead of a flat list of terms — the
+  // category is what the classification badge actually describes, so one
+  // badge per group (not one per term) also removes a lot of repetition.
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; title: string; classification: Classification; matches: Match[] }>();
+    for (const m of lastScan?.matches ?? []) {
+      const title = m.categoryName ?? displayTerm(m);
+      const key = title.toLowerCase();
+      const existing = map.get(key);
+      if (existing) existing.matches.push(m);
+      else map.set(key, { key, title, classification: m.classification ?? "preference", matches: [m] });
+    }
+    return Array.from(map.values());
   }, [lastScan]);
 
   if (!lastScan) {
@@ -129,33 +151,34 @@ export default function Results() {
           <Text variant="title" bold>Result</Text>
         </View>
 
-        <Card style={{ alignItems: "center", gap: t.spacing.sm }}>
-          <View
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: clean ? "rgba(34,211,238,0.12)" : "rgba(239,68,68,0.12)",
-            }}
-          >
-            <Ionicons
-              name={clean ? "checkmark-circle" : "close-circle"}
-              size={40}
-              color={clean ? t.colors.cyan : t.colors.red}
-            />
-          </View>
-          <Text variant="title" bold tone={clean ? "cyan" : "red"}>
-            {clean ? "No red flags" : "Red flags detected"}
-          </Text>
-          <Text tone="muted">
+        <Card style={{ alignItems: "center", gap: t.spacing.md }}>
+          <VerdictStamp
+            tone={clean ? "cyan" : "red"}
+            icon={clean ? "checkmark" : "flag"}
+            label={clean ? "CLEAN" : "FLAGGED"}
+            count={clean ? undefined : lastScan.matches.length}
+          />
+          <Text variant="title" bold tone={clean ? "cyan" : "red"} style={{ textAlign: "center" }}>
             {clean
-              ? `All ingredients clear${scannedFor ? ` for ${scannedFor}` : ""}`
-              : `${lastScan.matches.length} match${lastScan.matches.length === 1 ? "" : "es"} found${
-                  scannedFor ? ` for ${scannedFor}` : ""
-                }`}
+              ? "No red flags found"
+              : `${lastScan.matches.length} red flag${lastScan.matches.length === 1 ? "" : "s"} on your list`}
           </Text>
+          {clean ? (
+            <Text tone="muted" style={{ textAlign: "center" }}>
+              {`None of the ingredients flagged${scannedFor ? ` for ${scannedFor}` : ""} appear on the label we read.`}
+            </Text>
+          ) : (
+            scannedFor && (
+              <Text
+                variant="title"
+                bold
+                tone="muted"
+                style={[{ textAlign: "center" }, scannedForColor ? { color: scannedForColor } : undefined]}
+              >
+                for {scannedFor}
+              </Text>
+            )
+          )}
         </Card>
 
         {/* Ingredient paragraph with the matched words highlighted — only for
@@ -177,38 +200,45 @@ export default function Results() {
           </View>
         )}
 
-        <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">
-            MATCHES — {lastScan.matches.length} FOUND
+        {!clean &&
+          groups.map((g) => (
+            <Card key={g.key} style={{ gap: t.spacing.md }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: t.spacing.sm,
+                }}
+              >
+                <Text variant="title" bold style={{ flex: 1 }}>
+                  {g.title}
+                </Text>
+                <Badge classification={g.classification} />
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+                {g.matches.map((m, i) => (
+                  <IngredientChip key={i} label={displayTerm(m)} />
+                ))}
+              </View>
+            </Card>
+          ))}
+
+        {/* Reminder of what REGULATED/ADVISORY/PREFERENCE mean — same card
+            as the profile editor (docs/05/09), shown here too since a user
+            landing straight on a flagged result may never have visited
+            Profile to see it explained the first time. */}
+        {!clean && <ClassificationGuide />}
+
+        {/* Compliance disclaimer (Terms of Service §2, condensed) — the app
+            flags candidate matches from OCR'd text, it doesn't verify safety. */}
+        <View style={{ flexDirection: "row", gap: t.spacing.sm, alignItems: "flex-start" }}>
+          <Ionicons name="shield-outline" size={16} color={t.colors.textMuted} style={{ marginTop: 2 }} />
+          <Text tone="muted" variant="caption" style={{ flex: 1, lineHeight: 18 }}>
+            Flagged is an informational tool that reads the label text you scan. Always verify the
+            physical label. This isn't medical advice, and it can't guarantee a food is free of any
+            ingredient.
           </Text>
-          <Card style={{ gap: t.spacing.md }}>
-            {clean ? (
-              <Text tone="muted">Nothing matched any active filters in this label.</Text>
-            ) : (
-              lastScan.matches.map((m, i) => (
-                <View
-                  key={i}
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: t.spacing.sm,
-                    borderTopWidth: i === 0 ? 0 : 1,
-                    borderTopColor: t.colors.canvas,
-                    paddingTop: i === 0 ? 0 : t.spacing.sm,
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text bold>{displayTerm(m)}</Text>
-                    <Text tone="muted" variant="caption">
-                      {matchCaption(m)}
-                    </Text>
-                  </View>
-                  <Badge classification={m.classification ?? "preference"} />
-                </View>
-              ))
-            )}
-          </Card>
         </View>
 
         <View style={{ gap: t.spacing.sm }}>
