@@ -6,22 +6,23 @@ import {
   extractIngredientList,
   cleanForDisplay,
 } from "../matching/normalize";
-import { matchParagraph } from "../matching/matcher";
-import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
+import { matchParagraph, type Match } from "../matching/matcher";
+import { attributeRecheckMatches, evaluateRecheck } from "../domain/recheckEngine";
 import {
   selectPack,
   effectiveRedFlagTerms,
   effectiveRedFlagMetaForAll,
+  snapshotFromProfile,
+  diffProfileChanges,
 } from "../domain/activation";
 import { displayName } from "../domain/types";
-import type { Category, Profile, QuickPack } from "../domain/types";
+import type { Category, Profile, ProfileSnapshot, QuickPack } from "../domain/types";
 
 /** Per-profile dashboard counters (docs/17) — zeroed for fixtures that don't care. */
 const zeroProfileStats = {
   totalLabelsRead: 0,
   totalRedFlagsCaught: 0,
   totalCleanScans: 0,
-  totalSkimpflationCaught: 0,
   totalReformulationsCaught: 0,
 };
 
@@ -444,27 +445,118 @@ describe("effectiveRedFlagMetaForAll (docs/17 'All' mode)", () => {
   });
 });
 
-describe("diff engine (pantry recheck)", () => {
-  it("detects identical", () => {
-    const d = diffIngredients(["a", "b", "c"], ["a", "b", "c"]);
-    expect(d.changed).toBe(false);
+describe("recheck engine (pantry, docs/07 §7.1 — profile-snapshot comparison, 2026-09-14)", () => {
+  const snapshot = (over: Partial<ProfileSnapshot> = {}): ProfileSnapshot => ({
+    activeCategoryIds: ["cat-dyes"],
+    excludedIngredientIds: [],
+    customIngredients: ["shellac"],
+    ...over,
   });
-  it("detects additions/removals", () => {
-    const d = diffIngredients(["a", "b"], ["a", "b", "red 40"]);
-    expect(d.added).toContain("red 40");
-    expect(d.changed).toBe(true);
+  const match = (over: Partial<Match> = {}): Match => ({
+    token: "red 40",
+    term: "red 40",
+    kind: "exact",
+    score: 1,
+    categoryId: "cat-dyes",
+    categoryName: "Artificial Dyes",
+    ...over,
   });
-  it("detects order shift among survivors", () => {
-    const d = diffIngredients(["a", "b", "c"], ["a", "c", "b"]);
-    expect(d.orderShifted).toBe(true);
+
+  it("evaluateRecheck: a clean rescan is identical, regardless of the old snapshot", () => {
+    const outcome = evaluateRecheck(true, [], snapshot());
+    expect(outcome.kind).toBe("identical");
   });
-  it("changed + flagged when a new red flag appears", () => {
-    const outcome = evaluateRecheck(["oats", "honey"], ["oats", "honey", "red 40"], ["red 40"]);
+
+  it("evaluateRecheck: a flagged rescan carries attributed matches", () => {
+    const outcome = evaluateRecheck(false, [match()], snapshot());
     expect(outcome.kind).toBe("changed_flagged");
+    if (outcome.kind === "changed_flagged") {
+      expect(outcome.matches[0].attribution.kind).toBe("reformulation");
+    }
   });
-  it("changed but safe when no red flags", () => {
-    const outcome = evaluateRecheck(["oats", "honey"], ["oats", "honey", "salt"], ["red 40"]);
-    expect(outcome.kind).toBe("changed_safe");
+
+  it("attributes a match as reformulation when its category was already being screened for", () => {
+    // The old snapshot already had cat-dyes active — the product was clean
+    // under that exact filter before, so the ingredient itself is presumably new.
+    const [attributed] = attributeRecheckMatches([match({ categoryId: "cat-dyes" })], snapshot());
+    expect(attributed.attribution.kind).toBe("reformulation");
+  });
+
+  it("attributes a match as a profile change when its category was NOT in the old snapshot", () => {
+    // cat-msg was not active at save time — the filter is what's new, not
+    // necessarily the ingredient (docs/07 §7.1).
+    const [attributed] = attributeRecheckMatches(
+      [match({ categoryId: "cat-msg", categoryName: "MSG & Glutamates" })],
+      snapshot()
+    );
+    expect(attributed.attribution.kind).toBe("profile_change");
+  });
+
+  it("attributes a custom-ingredient match by comparing the term itself, not a category id", () => {
+    const already = match({ term: "shellac", categoryId: null, categoryName: "Custom ingredient" });
+    const [attributedAlready] = attributeRecheckMatches([already], snapshot());
+    expect(attributedAlready.attribution.kind).toBe("reformulation");
+
+    const newCustom = match({ term: "carmine", categoryId: null, categoryName: "Custom ingredient" });
+    const [attributedNew] = attributeRecheckMatches([newCustom], snapshot());
+    expect(attributedNew.attribution.kind).toBe("profile_change");
+  });
+});
+
+describe("snapshotFromProfile + diffProfileChanges (docs/03 §3.2/3.2a)", () => {
+  const categories: Category[] = [
+    { id: "cat-dyes", name: "Artificial Dyes", parentGroup: "Additives", classification: "advisory", ingredientIds: [] },
+  ];
+  const baseProfile: Profile = {
+    profileId: "p1",
+    name: "Steve",
+    activeCategoryIds: ["cat-dyes"],
+    excludedIngredientIds: [],
+    customIngredients: ["shellac"],
+    createdAt: 0,
+    ...zeroProfileStats,
+  };
+
+  it("snapshotFromProfile copies exactly the fields that determine the effective red-flag set", () => {
+    const snap = snapshotFromProfile(baseProfile);
+    expect(snap).toEqual({
+      activeCategoryIds: ["cat-dyes"],
+      excludedIngredientIds: [],
+      customIngredients: ["shellac"],
+    });
+  });
+
+  it("snapshotFromProfile returns independent arrays, not references into the profile", () => {
+    const snap = snapshotFromProfile(baseProfile);
+    snap.activeCategoryIds.push("cat-msg");
+    expect(baseProfile.activeCategoryIds).toEqual(["cat-dyes"]);
+  });
+
+  it("diffProfileChanges reports nothing for an unrelated change (e.g. renaming)", () => {
+    const renamed = { ...baseProfile, name: "Stacy" };
+    expect(diffProfileChanges(baseProfile, renamed, categories)).toEqual([]);
+  });
+
+  it("diffProfileChanges reports a category_on entry when a category is newly activated", () => {
+    const next = { ...baseProfile, activeCategoryIds: ["cat-dyes", "cat-msg"] };
+    const changes = diffProfileChanges(baseProfile, next, categories);
+    expect(changes).toEqual([
+      { profileId: "p1", timestamp: expect.any(Number), changeType: "category_on", categoryId: "cat-msg", categoryName: "cat-msg", ingredientTerm: null },
+    ]);
+  });
+
+  it("diffProfileChanges reports both a category_off and a custom_added entry from one combined save", () => {
+    // Mirrors activateIngredient in profile-edit.tsx, which can persist() two
+    // logical changes (a category toggle and an exclusion toggle) at once.
+    const next = { ...baseProfile, activeCategoryIds: [], customIngredients: ["shellac", "carmine"] };
+    const changes = diffProfileChanges(baseProfile, next, categories);
+    expect(changes).toContainEqual(
+      expect.objectContaining({ changeType: "category_off", categoryId: "cat-dyes" })
+    );
+    expect(changes).toContainEqual(
+      expect.objectContaining({ changeType: "custom_added", ingredientTerm: "carmine" })
+    );
+    expect(changes).toHaveLength(2);
   });
 });
 

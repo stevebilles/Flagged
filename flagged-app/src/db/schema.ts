@@ -55,17 +55,35 @@ export const profiles = sqliteTable("profiles", {
   excludedIngredientIds: text("excluded_ingredient_ids").notNull().default("[]"),
   customIngredients: text("custom_ingredients").notNull().default("[]"),
   createdAt: integer("created_at").notNull(),
+  totalLabelsRead: integer("total_labels_read").notNull().default(0),
+  totalRedFlagsCaught: integer("total_red_flags_caught").notNull().default(0),
+  totalCleanScans: integer("total_clean_scans").notNull().default(0),
+  totalReformulationsCaught: integer("total_reformulations_caught").notNull().default(0),
 });
 
 export const pantryItems = sqliteTable("pantry_items", {
   itemId: text("item_id").primaryKey(),
+  profileId: text("profile_id").notNull().default(""),
   brandName: text("brand_name").notNull(),
   productName: text("product_name").notNull(),
   imageFilePath: text("image_file_path").notNull().default(""),
-  originalIngredients: text("original_ingredients").notNull().default("[]"),
+  // Replaces originalIngredients (2026-09-14, docs/07 §7.1) — see ProfileSnapshot.
+  profileSnapshot: text("profile_snapshot").notNull().default("{}"),
   dateAdded: integer("date_added").notNull(),
   lastVerifiedDate: integer("last_verified_date").notNull(),
   deletedAt: integer("deleted_at"),
+});
+
+/** One profile-editor mutation (docs/03 §3.2a) — lets a recheck cite exactly
+ * when a filter changed, not just that it did. */
+export const profileChangeLog = sqliteTable("profile_change_log", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull(),
+  timestamp: integer("timestamp").notNull(),
+  changeType: text("change_type").notNull(),
+  categoryId: text("category_id"),
+  categoryName: text("category_name"),
+  ingredientTerm: text("ingredient_term"),
 });
 
 export const stats = sqliteTable("stats", {
@@ -74,8 +92,6 @@ export const stats = sqliteTable("stats", {
   totalLabelsRead: integer("total_labels_read").notNull().default(0),
   totalRedFlagsCaught: integer("total_red_flags_caught").notNull().default(0),
   totalCleanScans: integer("total_clean_scans").notNull().default(0),
-  // Pantry-recheck outcomes (docs/03, docs/07). A single recheck may bump both.
-  totalSkimpflationCaught: integer("total_skimpflation_caught").notNull().default(0),
   totalReformulationsCaught: integer("total_reformulations_caught").notNull().default(0),
 });
 

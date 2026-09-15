@@ -46,7 +46,14 @@ profile {
   activeCategoryIds: json,     // string[] — category ids currently ON
   excludedIngredientIds: json, // string[] — user-toggled-OFF individual ingredients
   customIngredients: json,     // string[] — user-typed terms not in the dictionary
-  createdAt: int               // epoch ms
+  createdAt: int,              // epoch ms
+  // Per-profile dashboard counters (Home "Protection Summary", 2026-09-14 —
+  // moved off the old account-wide Stats singleton; "All" sums these across
+  // every profile rather than sharing one global counter):
+  totalLabelsRead: int,             // +1 per successful scan (incl. rechecks)
+  totalRedFlagsCaught: int,         // += number of matches on a flagged scan
+  totalCleanScans: int,             // +1 per clean scan result
+  totalReformulationsCaught: int    // +1 per recheck that surfaces a new match (07 §7.1)
 }
 ```
 
@@ -65,10 +72,11 @@ profile {
 ```ts
 pantryItem {
   itemId: text PK,             // UUID
+  profileId: text,             // which profile this card belongs to (Pantry filters by profile)
   brandName: text,
   productName: text,
   imageFilePath: text,         // local URI to compressed thumbnail; exclude from backup
-  originalIngredients: json,   // string[] — ordered, exactly as saved from the scan
+  profileSnapshot: json,       // ProfileSnapshot — see below (07 §7.1, 2026-09-14)
   dateAdded: int,              // epoch ms
   lastVerifiedDate: int,       // epoch ms — most recent verifying scan; drives 30-day recheck
   deletedAt: int | null        // epoch ms — set for the 24-hour soft-delete window
@@ -79,27 +87,52 @@ pantryItem {
   supports it (thumbnails are regenerable and shouldn't bloat backups).
 - `lastVerifiedDate` older than **30 days** → item surfaces in the Pantry "Recheck" section (`05`).
 - `deletedAt` set → item is in the **24-hour undo** window; purge permanently after 24h.
+- **`profileSnapshot` replaces the old `originalIngredients` (2026-09-14).** The app no longer
+  stores or diffs raw ingredient text — real-device testing found OCR text too inconsistent
+  (spelling variance run-to-run) to reliably diff two scans of the same product. Instead, since a
+  Pantry save only ever happens on a **clean** result, the snapshot records **what was being
+  screened for** at save time — the exact inputs to that profile's effective red-flag set:
+  ```ts
+  ProfileSnapshot {
+    activeCategoryIds: string[],
+    excludedIngredientIds: string[],
+    customIngredients: string[]
+  }
+  ```
+  See `07` §7.1 for how this drives the recheck comparison, and 3.2a below for the change log that
+  lets a recheck cite *when* a filter changed, not just that it did.
 
-### 3.3 Stats (Lifetime Stats & Free Trial) — Singleton
+### 3.2a ProfileChangeLog (2026-09-14)
 
-Exactly **one** row per device install.
+One row per profile-editor mutation (a category toggled, an ingredient excluded/included, a
+custom ingredient added/removed) — written at every `persist()` call in the profile editor by
+diffing the profile before/after. Purely additive, never edited or deleted; exists so a recheck can
+tell the user *when* a filter changed rather than just that it did (07 §7.1).
 
 ```ts
-stats {
-  statsId: text PK,                  // UUID (single row)
-  freeScansUsed: int,                // starts 0, caps at 10, triggers hard paywall
-  totalLabelsRead: int,              // +1 per successful scan
-  totalRedFlagsCaught: int,          // += number of highlighted ingredients on flagged scans
-  totalCleanScans: int,              // +1 per clean result
-  totalSkimpflationCaught: int,      // +1 per recheck that detects a surviving-ingredient order shift (07)
-  totalReformulationsCaught: int     // +1 per recheck that detects an ingredient added or removed (07)
+profileChangeLog {
+  id: text PK,             // UUID
+  profileId: text,         // which profile changed
+  timestamp: int,          // epoch ms
+  changeType: text,        // category_on | category_off | ingredient_excluded | ingredient_included | custom_added | custom_removed
+  categoryId: text | null, // set for category_on/category_off
+  categoryName: text | null, // denormalized display name (categories are static, safe to copy)
+  ingredientTerm: text | null // set for ingredient_excluded/included and custom_added/removed
 }
 ```
 
-> `totalSkimpflationCaught` and `totalReformulationsCaught` are driven by the Pantry recheck
-> diff engine (`07`). A single recheck may increment **both** (a recipe that both reorders and
-> adds/removes ingredients). They increment on the diff result itself, independent of whether
-> the change also trips a red flag.
+### 3.3 Stats (Free Trial) — Singleton
+
+Exactly **one** row per device install. Only the shared trial counter lives here — everything else
+moved to per-profile counters on `Profile` (3.1) when Home stopped sharing one global counter
+across profiles.
+
+```ts
+stats {
+  statsId: text PK,      // UUID (single row)
+  freeScansUsed: int     // starts 0, caps at 10, triggers hard paywall — account-wide regardless of profile count
+}
+```
 
 > **What counts as a scan (critical):** `freeScansUsed` increments **only** when a scan successfully
 > extracts text and routes to a Results Screen. An aborted/illegible scan does **not** consume a

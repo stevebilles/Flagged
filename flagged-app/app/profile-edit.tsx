@@ -13,12 +13,14 @@ import {
   createProfile,
   updateProfile,
   deleteProfile,
+  logProfileChanges,
 } from "../src/db/repositories";
 import {
   addCustomIngredient,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
+  diffProfileChanges,
 } from "../src/domain/activation";
 import { profileColor } from "../src/design/avatar";
 import { displayName } from "../src/domain/types";
@@ -100,6 +102,11 @@ export default function ProfileEdit() {
   }, [query, categories, termById]);
 
   function persist(next: Profile) {
+    // Log filter changes BEFORE updating local state, so the diff compares
+    // the truly-previous state, not a state that's already been overwritten
+    // (docs/03 §3.2a, docs/07 §7.1 recheck attribution needs this history).
+    const changes = diffProfileChanges(profile, next, categories);
+    if (changes.length > 0) logProfileChanges(changes);
     setProfile(next);
     updateProfile(next);
   }

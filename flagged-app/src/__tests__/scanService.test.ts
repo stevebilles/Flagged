@@ -24,8 +24,8 @@ import {
   evaluateScanForAll,
 } from "../domain/scanService";
 import type { Stats, Profile, Category } from "../domain/types";
-import type { ScanResult } from "../matching/matcher";
-import type { DiffResult } from "../domain/diffEngine";
+import type { ScanResult, Match } from "../matching/matcher";
+import type { RecheckOutcome, AttributedMatch, MatchAttribution } from "../domain/recheckEngine";
 
 const zeroStats = (): Stats => ({
   statsId: "s1",
@@ -33,7 +33,6 @@ const zeroStats = (): Stats => ({
   totalLabelsRead: 0,
   totalRedFlagsCaught: 0,
   totalCleanScans: 0,
-  totalSkimpflationCaught: 0,
   totalReformulationsCaught: 0,
 });
 
@@ -79,7 +78,6 @@ const emptyProfile: Profile = {
   totalLabelsRead: 0,
   totalRedFlagsCaught: 0,
   totalCleanScans: 0,
-  totalSkimpflationCaught: 0,
   totalReformulationsCaught: 0,
 };
 
@@ -236,74 +234,58 @@ describe("evaluateScanForAll (docs/17 'All' mode)", () => {
   });
 });
 
-describe("commitRecheckStats", () => {
-  const diff = (over: Partial<DiffResult> = {}): DiffResult => ({
-    added: [],
-    removed: [],
-    orderShifted: false,
-    changed: true,
+describe("commitRecheckStats (docs/07 §7.1, redesigned 2026-09-14 — profile-snapshot comparison, no ingredient-order data)", () => {
+  const attributedMatch = (attribution: MatchAttribution, over: Partial<Match> = {}): AttributedMatch => ({
+    token: "red 40",
+    term: "red 40",
+    kind: "exact",
+    score: 1,
+    attribution,
     ...over,
   });
 
-  it("identical: +1 shared free scan, +1 label on the profile, no change counters", () => {
+  it("identical: +1 shared free scan, +1 label on the profile, no reformulation", () => {
     const readStats = withStats();
     commitRecheckStats({ kind: "identical" }, emptyProfile, false);
     expect(readStats().freeScansUsed).toBe(1);
     const p = lastUpdatedProfile();
     expect(p.totalLabelsRead).toBe(1);
     expect(p.totalReformulationsCaught).toBe(0);
-    expect(p.totalSkimpflationCaught).toBe(0);
+    expect(p.totalRedFlagsCaught).toBe(0);
   });
 
-  it("reformulation (add/remove): +1 reformulations on the profile", () => {
+  it("changed_flagged with a reformulation-attributed match: +1 reformulations, red flags added", () => {
     withStats();
-    commitRecheckStats(
-      { kind: "changed_safe", diff: diff({ added: ["red 40"], changed: true }) },
-      emptyProfile,
-      false
-    );
+    const outcome: RecheckOutcome = { kind: "changed_flagged", matches: [attributedMatch({ kind: "reformulation" })] };
+    commitRecheckStats(outcome, emptyProfile, false);
     const p = lastUpdatedProfile();
+    expect(p.totalRedFlagsCaught).toBe(1);
     expect(p.totalReformulationsCaught).toBe(1);
-    expect(p.totalSkimpflationCaught).toBe(0);
   });
 
-  it("order shift only: +1 skimpflation on the profile", () => {
+  it("changed_flagged with ONLY a profile-change-attributed match: red flags added, but NOT counted as a reformulation", () => {
+    // A filter the user just turned on catching an unrelated, unchanged
+    // product isn't evidence the product itself changed (docs/07 §7.1).
     withStats();
-    commitRecheckStats(
-      { kind: "changed_safe", diff: diff({ orderShifted: true, changed: true }) },
-      emptyProfile,
-      false
-    );
+    const outcome: RecheckOutcome = { kind: "changed_flagged", matches: [attributedMatch({ kind: "profile_change" })] };
+    commitRecheckStats(outcome, emptyProfile, false);
     const p = lastUpdatedProfile();
-    expect(p.totalSkimpflationCaught).toBe(1);
+    expect(p.totalRedFlagsCaught).toBe(1);
     expect(p.totalReformulationsCaught).toBe(0);
   });
 
-  it("both at once: +1 each", () => {
+  it("mixed matches: reformulation counter moves once if ANY match is a reformulation", () => {
     withStats();
-    commitRecheckStats(
-      { kind: "changed_safe", diff: diff({ added: ["x"], orderShifted: true, changed: true }) },
-      emptyProfile,
-      false
-    );
+    const outcome: RecheckOutcome = {
+      kind: "changed_flagged",
+      matches: [
+        attributedMatch({ kind: "profile_change" }, { term: "msg" }),
+        attributedMatch({ kind: "reformulation" }, { term: "red 40" }),
+      ],
+    };
+    commitRecheckStats(outcome, emptyProfile, false);
     const p = lastUpdatedProfile();
-    expect(p.totalReformulationsCaught).toBe(1);
-    expect(p.totalSkimpflationCaught).toBe(1);
-  });
-
-  it("changed_flagged also adds red flags", () => {
-    withStats();
-    commitRecheckStats(
-      {
-        kind: "changed_flagged",
-        diff: diff({ added: ["red 40"], changed: true }),
-        matches: [{ token: "red 40", term: "red 40", kind: "exact", score: 1 }],
-      },
-      emptyProfile,
-      false
-    );
-    const p = lastUpdatedProfile();
-    expect(p.totalRedFlagsCaught).toBe(1);
+    expect(p.totalRedFlagsCaught).toBe(2);
     expect(p.totalReformulationsCaught).toBe(1);
   });
 

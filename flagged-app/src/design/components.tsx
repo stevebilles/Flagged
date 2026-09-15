@@ -290,6 +290,52 @@ export function ClassificationGuide() {
   );
 }
 
+/** One row in a bordered settings list (docs/17 Settings redesign) — icon,
+ * label, and either a chevron or a loading spinner while `onPress` is
+ * in flight. `divider` matches the profile editor's own bordered-list
+ * convention: false for the first row in a card, true (default) for every
+ * row after it, so cards read as one continuous list, not stacked boxes. */
+export function SettingsRow({
+  icon,
+  label,
+  onPress,
+  loading,
+  divider = true,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  divider?: boolean;
+}) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      disabled={loading}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: t.spacing.sm,
+        paddingVertical: 14,
+        paddingHorizontal: t.spacing.md,
+        borderTopWidth: divider ? 1 : 0,
+        borderTopColor: t.colors.canvas,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Ionicons name={icon} size={18} color={t.colors.textMuted} />
+      <Text style={{ flex: 1 }}>{label}</Text>
+      {loading ? (
+        <ActivityIndicator size="small" color={t.colors.textMuted} />
+      ) : (
+        <Ionicons name="chevron-forward" size={16} color={t.colors.textMuted} />
+      )}
+    </Pressable>
+  );
+}
+
 /**
  * Full-screen page wrapper. Insets for the notch/status bar and the home
  * indicator — the app never wired up safe-area handling before, so content

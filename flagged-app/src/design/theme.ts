@@ -74,11 +74,24 @@ export const fontFamily = {
   boldItalic: "AtkinsonHyperlegible-BoldItalic",
 } as const;
 
+/**
+ * Sized to Apple's Human Interface Guidelines Dynamic Type scale (docs/09
+ * "Apple Dynamic Type reference"), not arbitrary round numbers — every value
+ * here is a real iOS text style's default point size, so text this app
+ * shows is never smaller (or a mismatched size) relative to what iOS's own
+ * UI and other apps use at the same semantic weight.
+ *
+ * caption -> Footnote (13), body -> Body (17, not 16 — Callout, a size down,
+ * was being used for primary text), title -> Title 3 (20), heading ->
+ * Title 1 (28, matches its actual use as a top-level page title — "Scan",
+ * "Settings" — not Title 2/22, which is a level below that), display ->
+ * Large Title (34).
+ */
 export const fontSize = {
   caption: 13,
-  body: 16,
+  body: 17,
   title: 20,
-  heading: 26,
+  heading: 28,
   display: 34,
 } as const;
 

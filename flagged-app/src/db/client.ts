@@ -64,7 +64,6 @@ export function ensureTables(): void {
       total_labels_read INTEGER NOT NULL DEFAULT 0,
       total_red_flags_caught INTEGER NOT NULL DEFAULT 0,
       total_clean_scans INTEGER NOT NULL DEFAULT 0,
-      total_skimpflation_caught INTEGER NOT NULL DEFAULT 0,
       total_reformulations_caught INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS pantry_items (
@@ -73,10 +72,19 @@ export function ensureTables(): void {
       brand_name TEXT NOT NULL,
       product_name TEXT NOT NULL,
       image_file_path TEXT NOT NULL DEFAULT '',
-      original_ingredients TEXT NOT NULL DEFAULT '[]',
+      profile_snapshot TEXT NOT NULL DEFAULT '{}',
       date_added INTEGER NOT NULL,
       last_verified_date INTEGER NOT NULL,
       deleted_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS profile_change_log (
+      id TEXT PRIMARY KEY NOT NULL,
+      profile_id TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      change_type TEXT NOT NULL,
+      category_id TEXT,
+      category_name TEXT,
+      ingredient_term TEXT
     );
     CREATE TABLE IF NOT EXISTS stats (
       stats_id TEXT PRIMARY KEY NOT NULL,
@@ -106,11 +114,6 @@ export function runMigrations(): void {
     .getAllSync<{ name: string }>("PRAGMA table_info(stats)")
     .map((c) => c.name);
 
-  if (!statsCols.includes("total_skimpflation_caught")) {
-    s.execSync(
-      "ALTER TABLE stats ADD COLUMN total_skimpflation_caught INTEGER NOT NULL DEFAULT 0"
-    );
-  }
   if (!statsCols.includes("total_reformulations_caught")) {
     s.execSync(
       "ALTER TABLE stats ADD COLUMN total_reformulations_caught INTEGER NOT NULL DEFAULT 0"
@@ -118,17 +121,14 @@ export function runMigrations(): void {
   }
 
   // Per-profile dashboard counters (docs/17) — additive for installs created
-  // before Home/Scan/Results were profile-aware.
+  // before Home/Scan/Results were profile-aware. Deliberately does NOT
+  // include total_skimpflation_caught (retired 2026-09-14, docs/07 §7.1) —
+  // a fresh install never gets that column; an existing dev install that
+  // already has it just keeps an unused, harmless column.
   const profileCols = s
     .getAllSync<{ name: string }>("PRAGMA table_info(profiles)")
     .map((c) => c.name);
-  for (const col of [
-    "total_labels_read",
-    "total_red_flags_caught",
-    "total_clean_scans",
-    "total_skimpflation_caught",
-    "total_reformulations_caught",
-  ]) {
+  for (const col of ["total_labels_read", "total_red_flags_caught", "total_clean_scans", "total_reformulations_caught"]) {
     if (!profileCols.includes(col)) {
       s.execSync(`ALTER TABLE profiles ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
     }
@@ -142,5 +142,12 @@ export function runMigrations(): void {
     .map((c) => c.name);
   if (!pantryCols.includes("profile_id")) {
     s.execSync("ALTER TABLE pantry_items ADD COLUMN profile_id TEXT NOT NULL DEFAULT ''");
+  }
+  // profile_snapshot replaces original_ingredients (2026-09-14, docs/07
+  // §7.1/docs/03 §3.2) — additive for installs created before the recheck
+  // redesign; original_ingredients is left in place, unused, rather than
+  // risking a DROP COLUMN across expo-sqlite/SQLite version differences.
+  if (!pantryCols.includes("profile_snapshot")) {
+    s.execSync("ALTER TABLE pantry_items ADD COLUMN profile_snapshot TEXT NOT NULL DEFAULT '{}'");
   }
 }

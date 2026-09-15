@@ -10,6 +10,38 @@ ingredient text.
 - Define weights (Regular / Bold, plus Italic variants) and expose through the theme.
 - Never fall back to a system font for primary content.
 
+### Apple Dynamic Type reference
+
+Every font size anywhere in the app must be one of these values — Apple's own named text
+styles and their default point sizes (Human Interface Guidelines, iOS default/"Large" content
+size, before any user Dynamic Type scaling). Picking a size off this list, not a rounder or
+smaller-looking number, is what keeps this app's text sized the same as iOS's own UI and every
+well-built app at the same semantic weight — and per Accessibility (docs/09 below), never smaller
+than what a given weight of content calls for.
+
+| Apple text style | Point size | Weight | Flagged token (`src/design/theme.ts`) |
+|---|---|---|---|
+| Large Title | 34 | Regular (Bold as used here) | `display` |
+| Title 1 | 28 | Regular | `heading` — top-level page titles ("Scan", "Settings") |
+| Title 2 | 22 | Regular | *(unused — available if a level between heading/title is ever needed)* |
+| Title 3 | 20 | Regular | `title` |
+| Headline | 17 | **Semibold** | *(unused — reach for this, not `body`+bold, for genuinely headline-weight emphasis)* |
+| Body | 17 | Regular | `body` — default/primary reading text |
+| Callout | 16 | Regular | *(unused)* |
+| Subheadline | 15 | Regular | *(unused — a real step between `body` and `caption`, not currently in the token set)* |
+| Footnote | 13 | Regular | `caption` |
+| Caption 1 | 12 | Regular | *(unused)* |
+| Caption 2 | 11 | Regular | *(unused — avoid; Apple positions this as the smallest, least important label on the whole screen, not a general "small text" default)* |
+
+**Before adding a new font size anywhere** (a one-off `style={{ fontSize: n }}`, or a new theme
+token), pick the nearest matching value from this table rather than an arbitrary number — if
+nothing in the current 5-token set fits, add a new named token here and in `theme.ts` rather than
+hard-coding a raw number in a component. A real bug this caused (2026-09-14): the camera's glare
+tip used `caption` (13pt/Footnote) for text the user was meant to read and act on mid-shot, over a
+busy live camera feed — Footnote is Apple's own designation for the *least* important text on a
+screen, not a safe default for anything actionable. Match the size to the content's actual
+importance, not just how "small" a caption is expected to look by convention.
+
 ## Dynamic color system
 
 **No single hex code is shared between modes.** Provide two complete palettes and switch on the

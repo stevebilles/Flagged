@@ -5,6 +5,8 @@ import type {
   Ingredient,
   PantryItem,
   Profile,
+  ProfileChangeLogEntry,
+  ProfileSnapshot,
   QuickPack,
   Stats,
 } from "../domain/types";
@@ -77,7 +79,6 @@ function mapProfile(r: any): Profile {
     totalLabelsRead: r.total_labels_read ?? 0,
     totalRedFlagsCaught: r.total_red_flags_caught ?? 0,
     totalCleanScans: r.total_clean_scans ?? 0,
-    totalSkimpflationCaught: r.total_skimpflation_caught ?? 0,
     totalReformulationsCaught: r.total_reformulations_caught ?? 0,
   };
 }
@@ -104,7 +105,6 @@ export function createProfile(name: string): Profile {
     totalLabelsRead: 0,
     totalRedFlagsCaught: 0,
     totalCleanScans: 0,
-    totalSkimpflationCaught: 0,
     totalReformulationsCaught: 0,
   };
   sqlite().runSync(
@@ -118,7 +118,7 @@ export function updateProfile(p: Profile): void {
   sqlite().runSync(
     `UPDATE profiles SET name = ?, active_category_ids = ?, excluded_ingredient_ids = ?, custom_ingredients = ?,
      total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?,
-     total_skimpflation_caught = ?, total_reformulations_caught = ? WHERE profile_id = ?`,
+     total_reformulations_caught = ? WHERE profile_id = ?`,
     [
       p.name,
       JSON.stringify(p.activeCategoryIds),
@@ -127,7 +127,6 @@ export function updateProfile(p: Profile): void {
       p.totalLabelsRead,
       p.totalRedFlagsCaught,
       p.totalCleanScans,
-      p.totalSkimpflationCaught,
       p.totalReformulationsCaught,
       p.profileId,
     ]
@@ -148,13 +147,24 @@ export function deleteProfile(profileId: string): void {
 // ---------------- Pantry ----------------
 
 function mapPantry(r: any): PantryItem {
+  // Rows saved before 2026-09-14 (docs/07 §7.1) have no real snapshot — the
+  // column defaults to the string '{}', which parses to an object missing
+  // all three fields, not an already-shaped ProfileSnapshot. Filling each
+  // field independently means every match on a pre-migration item reads as
+  // a profile-change with no dated log entry, the honest fallback for "we
+  // truly don't know what this item was screening for."
+  const snapshot = r.profile_snapshot ? parse<Partial<ProfileSnapshot>>(r.profile_snapshot) : {};
   return {
     itemId: r.item_id,
     profileId: r.profile_id ?? "",
     brandName: r.brand_name,
     productName: r.product_name,
     imageFilePath: r.image_file_path,
-    originalIngredients: parse<string[]>(r.original_ingredients),
+    profileSnapshot: {
+      activeCategoryIds: snapshot.activeCategoryIds ?? [],
+      excludedIngredientIds: snapshot.excludedIngredientIds ?? [],
+      customIngredients: snapshot.customIngredients ?? [],
+    },
     dateAdded: r.date_added,
     lastVerifiedDate: r.last_verified_date,
     deletedAt: r.deleted_at ?? null,
@@ -186,14 +196,14 @@ export function addPantryItem(
   const now = Date.now();
   const item: PantryItem = { ...input, itemId: randomUUID(), dateAdded: now, lastVerifiedDate: now, deletedAt: null };
   sqlite().runSync(
-    "INSERT INTO pantry_items (item_id, profile_id, brand_name, product_name, image_file_path, original_ingredients, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+    "INSERT INTO pantry_items (item_id, profile_id, brand_name, product_name, image_file_path, profile_snapshot, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
     [
       item.itemId,
       item.profileId,
       item.brandName,
       item.productName,
       item.imageFilePath,
-      JSON.stringify(item.originalIngredients),
+      JSON.stringify(item.profileSnapshot),
       item.dateAdded,
       item.lastVerifiedDate,
     ]
@@ -209,11 +219,13 @@ export function undoDeletePantryItem(itemId: string): void {
   sqlite().runSync("UPDATE pantry_items SET deleted_at = NULL WHERE item_id = ?", [itemId]);
 }
 
-/** Keep-item: update baseline ingredients and reset the 30-day timer (docs/07). */
-export function rebaselinePantryItem(itemId: string, newIngredients: string[]): void {
+/** Keep-item: baseline against the profile's CURRENT filters and reset the
+ * 30-day timer (docs/07 §7.1) — the new snapshot, not the old one, since a
+ * "Keep" means the user has accepted today's flagged state as the new normal. */
+export function rebaselinePantryItem(itemId: string, snapshot: ProfileSnapshot): void {
   sqlite().runSync(
-    "UPDATE pantry_items SET original_ingredients = ?, last_verified_date = ? WHERE item_id = ?",
-    [JSON.stringify(newIngredients), Date.now(), itemId]
+    "UPDATE pantry_items SET profile_snapshot = ?, last_verified_date = ? WHERE item_id = ?",
+    [JSON.stringify(snapshot), Date.now(), itemId]
   );
 }
 
@@ -243,6 +255,56 @@ export function purgeExpiredDeletions(nowMs = Date.now()): string[] {
   return doomed.map((d) => d.image_file_path).filter(Boolean);
 }
 
+// ---------------- Profile change log ----------------
+// One row per profile-editor mutation (docs/03 §3.2a) — lets a recheck cite
+// exactly when a filter changed, not just that it did (docs/07 §7.1).
+
+function mapChangeLog(r: any): ProfileChangeLogEntry {
+  return {
+    id: r.id,
+    profileId: r.profile_id,
+    timestamp: r.timestamp,
+    changeType: r.change_type,
+    categoryId: r.category_id ?? null,
+    categoryName: r.category_name ?? null,
+    ingredientTerm: r.ingredient_term ?? null,
+  };
+}
+
+/** Log any number of profile-editor mutations from one `persist()` call
+ * (e.g. `activateIngredient` can both toggle a category on and un-exclude
+ * an ingredient in a single save). */
+export function logProfileChanges(entries: Omit<ProfileChangeLogEntry, "id">[]): void {
+  const s = sqlite();
+  for (const e of entries) {
+    s.runSync(
+      "INSERT INTO profile_change_log (id, profile_id, timestamp, change_type, category_id, category_name, ingredient_term) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [randomUUID(), e.profileId, e.timestamp, e.changeType, e.categoryId, e.categoryName, e.ingredientTerm]
+    );
+  }
+}
+
+/** Most recent log entry that turned ON a given category for a profile
+ * (docs/07 §7.1 recheck attribution) — null if none exists (e.g. the
+ * category was already active before this logging system existed). */
+export function findCategoryEnabledChange(profileId: string, categoryId: string): ProfileChangeLogEntry | null {
+  const r = sqlite().getFirstSync<any>(
+    "SELECT * FROM profile_change_log WHERE profile_id = ? AND category_id = ? AND change_type = 'category_on' ORDER BY timestamp DESC LIMIT 1",
+    [profileId, categoryId]
+  );
+  return r ? mapChangeLog(r) : null;
+}
+
+/** Most recent log entry that added a given custom ingredient term for a
+ * profile (docs/07 §7.1 recheck attribution). */
+export function findCustomIngredientAddedChange(profileId: string, term: string): ProfileChangeLogEntry | null {
+  const r = sqlite().getFirstSync<any>(
+    "SELECT * FROM profile_change_log WHERE profile_id = ? AND ingredient_term = ? AND change_type = 'custom_added' ORDER BY timestamp DESC LIMIT 1",
+    [profileId, term.toLowerCase()]
+  );
+  return r ? mapChangeLog(r) : null;
+}
+
 // ---------------- Stats (singleton) ----------------
 
 export function getStats(): Stats {
@@ -253,20 +315,18 @@ export function getStats(): Stats {
     totalLabelsRead: r.total_labels_read,
     totalRedFlagsCaught: r.total_red_flags_caught,
     totalCleanScans: r.total_clean_scans,
-    totalSkimpflationCaught: r.total_skimpflation_caught ?? 0,
     totalReformulationsCaught: r.total_reformulations_caught ?? 0,
   };
 }
 
 export function saveStats(s: Stats): void {
   sqlite().runSync(
-    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?, total_skimpflation_caught = ?, total_reformulations_caught = ? WHERE stats_id = ?",
+    "UPDATE stats SET free_scans_used = ?, total_labels_read = ?, total_red_flags_caught = ?, total_clean_scans = ?, total_reformulations_caught = ? WHERE stats_id = ?",
     [
       s.freeScansUsed,
       s.totalLabelsRead,
       s.totalRedFlagsCaught,
       s.totalCleanScans,
-      s.totalSkimpflationCaught,
       s.totalReformulationsCaught,
       s.statsId,
     ]
