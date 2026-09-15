@@ -55,9 +55,10 @@ export interface Profile {
   totalLabelsRead: number;
   totalRedFlagsCaught: number;
   totalCleanScans: number;
-  /** Pantry rechecks where the surviving ingredients changed order (docs/07). */
-  totalSkimpflationCaught: number;
-  /** Pantry rechecks where an ingredient was added or removed (docs/07). */
+  /** Pantry rechecks where a match is attributed to reformulation, not just
+   * a filter change (docs/07 §7.1). Skimpflation detection was retired
+   * 2026-09-14 — it required the old ingredient order, which the recheck
+   * redesign no longer stores. */
   totalReformulationsCaught: number;
 }
 
@@ -73,18 +74,51 @@ export function displayName(name: string): string {
   return name.trim() || "New Profile";
 }
 
+/** The exact inputs to a profile's effective red-flag set (docs/03 §3.2),
+ * frozen at Pantry-save time. Replaces storing the scanned ingredient text
+ * itself (2026-09-14, docs/07 §7.1) — OCR text proved too inconsistent
+ * run-to-run to diff reliably, so the recheck instead compares "what was
+ * being screened for" then vs. now. */
+export interface ProfileSnapshot {
+  activeCategoryIds: string[];
+  excludedIngredientIds: string[];
+  customIngredients: string[];
+}
+
 /** An approved food (docs/03 §3.2). Belongs to whichever profile scanned it —
- * the Pantry tab filters by profile the same way Home does (docs/17). */
+ * the Pantry tab filters by profile the same way Home does (docs/17). Always
+ * recheck against `profileId`, never whichever profile is globally active. */
 export interface PantryItem {
   itemId: string;
   profileId: string;
   brandName: string;
   productName: string;
   imageFilePath: string;
-  originalIngredients: string[];
+  profileSnapshot: ProfileSnapshot;
   dateAdded: number;
   lastVerifiedDate: number;
   deletedAt: number | null;
+}
+
+/** One profile-editor mutation (docs/03 §3.2a) — written at every `persist()`
+ * call in the profile editor so a recheck can cite exactly *when* a filter
+ * changed, not just that it did. Purely additive; never edited or deleted. */
+export type ProfileChangeType =
+  | "category_on"
+  | "category_off"
+  | "ingredient_excluded"
+  | "ingredient_included"
+  | "custom_added"
+  | "custom_removed";
+
+export interface ProfileChangeLogEntry {
+  id: string;
+  profileId: string;
+  timestamp: number;
+  changeType: ProfileChangeType;
+  categoryId: string | null;
+  categoryName: string | null;
+  ingredientTerm: string | null;
 }
 
 /** Account-wide trial singleton (docs/03 §3.3). Only the shared free-scan
@@ -96,7 +130,6 @@ export interface Stats {
   totalLabelsRead: number;
   totalRedFlagsCaught: number;
   totalCleanScans: number;
-  totalSkimpflationCaught: number;
   totalReformulationsCaught: number;
 }
 

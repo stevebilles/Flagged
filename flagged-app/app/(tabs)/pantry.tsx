@@ -42,7 +42,7 @@ export default function Pantry() {
       <ScrollView contentContainerStyle={{ gap: t.spacing.lg }}>
         {needsRecheck.length > 0 && (
           <View style={{ gap: t.spacing.sm }}>
-            <Text variant="title" bold tone="warning">Skimpflation & Reformulation Checks</Text>
+            <Text variant="title" bold tone="warning">Reformulation Checks</Text>
             <Text tone="muted" variant="caption">
               Brands sneakily change recipes all the time. Re-scan these items to ensure they are
               still approved.

@@ -1,7 +1,7 @@
 import { matchParagraph, Match, ScanResult } from "../matching/matcher";
 import { looksLikeIngredientList } from "../matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagMetaForAll, RedFlagMeta, AllProfilesMeta } from "./activation";
-import type { RecheckOutcome } from "./diffEngine";
+import type { RecheckOutcome } from "./recheckEngine";
 import { getCategories, getIngredientTermMap, getStats, saveStats, updateProfile } from "../db/repositories";
 import { displayName, FREE_SCAN_LIMIT, type Profile } from "./types";
 
@@ -30,6 +30,7 @@ export function attributeMatches(
     return {
       ...m,
       categoryName: m.categoryName ?? found?.categoryName,
+      categoryId: m.categoryId ?? found?.categoryId,
       classification: m.classification ?? found?.classification,
       profileNames: m.profileNames ?? (found as AllProfilesMeta | undefined)?.profileNames,
     };
@@ -123,24 +124,20 @@ export function commitScanStatsForAll(result: ScanResult, profiles: Profile[], i
 
 /**
  * Commit stats for a completed pantry recheck (docs/03/07) — recheck stays
- * tied to a single profile (docs/17 scoped "All" to Home/Scan/Results only).
- * A recheck is always a label read, and consumes a trial credit when not
- * premium. The two recheck-specific counters only move when the recipe
- * actually changed; both can move on one recheck.
+ * tied to the item's OWN profile (`item.profileId`), never whichever profile
+ * is globally active; caller passes that profile in. A recheck is always a
+ * label read, and consumes a trial credit when not premium.
+ * `totalReformulationsCaught` moves once per recheck with at least one
+ * reformulation-attributed match — a filter-change-only match doesn't count
+ * (docs/07 §7.1; skimpflation detection was retired the same day).
  */
 export function commitRecheckStats(outcome: RecheckOutcome, profile: Profile, isPremium: boolean): void {
   bumpTrialCounter(isPremium);
   const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
-  if (outcome.kind !== "identical") {
-    const { diff } = outcome;
-    if (diff.added.length > 0 || diff.removed.length > 0) {
+  if (outcome.kind === "changed_flagged") {
+    updated.totalRedFlagsCaught += outcome.matches.length;
+    if (outcome.matches.some((m) => m.attribution.kind === "reformulation")) {
       updated.totalReformulationsCaught += 1;
-    }
-    if (diff.orderShifted) {
-      updated.totalSkimpflationCaught += 1;
-    }
-    if (outcome.kind === "changed_flagged") {
-      updated.totalRedFlagsCaught += outcome.matches.length;
     }
   }
   updateProfile(updated);

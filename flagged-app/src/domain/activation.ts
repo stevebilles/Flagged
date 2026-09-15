@@ -1,4 +1,11 @@
-import { displayName, type Category, type Profile, type QuickPack } from "./types";
+import {
+  displayName,
+  type Category,
+  type Profile,
+  type ProfileChangeLogEntry,
+  type ProfileSnapshot,
+  type QuickPack,
+} from "./types";
 
 /**
  * Quick Pack activation (authoritative: docs/data-schema.md). Packs are only
@@ -147,4 +154,115 @@ export function effectiveRedFlagMetaForAll(
     }
   }
   return map;
+}
+
+/** Freeze the exact inputs to a profile's effective red-flag set (docs/03
+ * §3.2), for a Pantry save (docs/07 §7.1). */
+export function snapshotFromProfile(profile: Profile): ProfileSnapshot {
+  return {
+    activeCategoryIds: [...profile.activeCategoryIds],
+    excludedIngredientIds: [...profile.excludedIngredientIds],
+    customIngredients: [...profile.customIngredients],
+  };
+}
+
+/**
+ * Diff two profile states into loggable change entries (docs/03 §3.2a,
+ * docs/07 §7.1) — called once per `persist()` in the profile editor, so a
+ * single save that both toggles a category on AND un-excludes an ingredient
+ * (see `activateIngredient`) is captured as two entries in one pass, rather
+ * than needing every call site individually instrumented. Pure — the caller
+ * (profile-edit.tsx) does the actual logging via the repository.
+ */
+export function diffProfileChanges(
+  before: Profile,
+  after: Profile,
+  categories: Category[]
+): Omit<ProfileChangeLogEntry, "id">[] {
+  const now = Date.now();
+  const entries: Omit<ProfileChangeLogEntry, "id">[] = [];
+  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
+
+  const beforeCats = new Set(before.activeCategoryIds);
+  const afterCats = new Set(after.activeCategoryIds);
+  for (const id of after.activeCategoryIds) {
+    if (!beforeCats.has(id)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "category_on",
+        categoryId: id,
+        categoryName: categoryName(id),
+        ingredientTerm: null,
+      });
+    }
+  }
+  for (const id of before.activeCategoryIds) {
+    if (!afterCats.has(id)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "category_off",
+        categoryId: id,
+        categoryName: categoryName(id),
+        ingredientTerm: null,
+      });
+    }
+  }
+
+  const beforeExcluded = new Set(before.excludedIngredientIds);
+  const afterExcluded = new Set(after.excludedIngredientIds);
+  for (const id of after.excludedIngredientIds) {
+    if (!beforeExcluded.has(id)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "ingredient_excluded",
+        categoryId: null,
+        categoryName: null,
+        ingredientTerm: id,
+      });
+    }
+  }
+  for (const id of before.excludedIngredientIds) {
+    if (!afterExcluded.has(id)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "ingredient_included",
+        categoryId: null,
+        categoryName: null,
+        ingredientTerm: id,
+      });
+    }
+  }
+
+  const beforeCustom = new Set(before.customIngredients);
+  const afterCustom = new Set(after.customIngredients);
+  for (const term of after.customIngredients) {
+    if (!beforeCustom.has(term)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "custom_added",
+        categoryId: null,
+        categoryName: null,
+        ingredientTerm: term,
+      });
+    }
+  }
+  for (const term of before.customIngredients) {
+    if (!afterCustom.has(term)) {
+      entries.push({
+        profileId: after.profileId,
+        timestamp: now,
+        changeType: "custom_removed",
+        categoryId: null,
+        categoryName: null,
+        ingredientTerm: term,
+      });
+    }
+  }
+
+  return entries;
 }

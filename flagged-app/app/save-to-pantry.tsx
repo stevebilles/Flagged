@@ -5,8 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { addPantryItem } from "../src/db/repositories";
-import { tokenize, normalizeParagraph } from "../src/matching/normalize";
+import { addPantryItem, getProfile } from "../src/db/repositories";
+import { snapshotFromProfile } from "../src/domain/activation";
 import { captureFrontOfPackThumbnail } from "../src/domain/pantryImage";
 
 /**
@@ -39,15 +39,21 @@ export default function SaveToPantry() {
   }
 
   function save() {
-    const ingredients = lastScan ? tokenize(normalizeParagraph(lastScan.paragraph)) : [];
+    // The profile this card belongs to (docs/17 Pantry mockup) — the profile
+    // that was active when the scan ran, even if it was checked via "All".
+    const profileId = activeProfileId ?? lastScan?.profileIds?.[0] ?? "";
+    const profile = profileId ? getProfile(profileId) : null;
+    // No ingredient text is stored (docs/07 §7.1, 2026-09-14) — a Pantry save
+    // only ever happens on a clean result, so what matters for the recheck
+    // later is exactly what this profile was screening for right now.
     addPantryItem({
-      // The profile this card belongs to (docs/17 Pantry mockup) — the profile
-      // that was active when the scan ran, even if it was checked via "All".
-      profileId: activeProfileId ?? lastScan?.profileIds?.[0] ?? "",
+      profileId,
       brandName: brand.trim(),
       productName: product.trim(),
       imageFilePath: photoUri,
-      originalIngredients: ingredients,
+      profileSnapshot: profile
+        ? snapshotFromProfile(profile)
+        : { activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [] },
     });
     useAppStore.getState().setLastScan(null);
     router.replace("/(tabs)/pantry");

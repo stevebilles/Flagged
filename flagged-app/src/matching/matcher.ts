@@ -112,6 +112,10 @@ export interface Match {
    * attributeMatches); the pure matcher leaves both undefined.
    */
   categoryName?: string;
+  /** Stable category id (null for a custom ingredient) — docs/07 §7.1 recheck
+   * attribution needs a real id to compare against a saved snapshot, not the
+   * display name categoryName is. */
+  categoryId?: string | null;
   classification?: Classification;
   /** Which profile(s) this term belongs to — only set for an "All profiles" scan. */
   profileNames?: string[];

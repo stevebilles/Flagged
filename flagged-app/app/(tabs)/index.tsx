@@ -14,7 +14,6 @@ import type { Profile, Category, PantryItem } from "../../src/domain/types";
 const ZERO_DASHBOARD_STATS = {
   totalLabelsRead: 0,
   totalRedFlagsCaught: 0,
-  totalSkimpflationCaught: 0,
   totalReformulationsCaught: 0,
 };
 
@@ -69,7 +68,6 @@ export default function Home() {
         (sum, p) => ({
           totalLabelsRead: sum.totalLabelsRead + p.totalLabelsRead,
           totalRedFlagsCaught: sum.totalRedFlagsCaught + p.totalRedFlagsCaught,
-          totalSkimpflationCaught: sum.totalSkimpflationCaught + p.totalSkimpflationCaught,
           totalReformulationsCaught: sum.totalReformulationsCaught + p.totalReformulationsCaught,
         }),
         ZERO_DASHBOARD_STATS
@@ -165,15 +163,17 @@ export default function Home() {
           )}
         </Card>
 
-        {/* Protection Summary — the pillars of value. Per-profile; "All" sums them. */}
+        {/* Protection Summary — the pillars of value. Per-profile; "All" sums them.
+            Skimpflation Caught retired 2026-09-14 (docs/07 §7.1) — the recheck
+            redesign no longer stores ingredient order, so it can no longer be
+            detected. Reformulation Caught folded into this one row rather than
+            left alone in its own (a lone flex:1 Pillar would stretch to fill
+            the whole row width). */}
         <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
           <Pillar label="Scans" value={dashboardStats.totalLabelsRead} tone="cyan" />
           <Pillar label="Saved" value={savedCount} tone="primary" />
           <Pillar label="Flags" value={dashboardStats.totalRedFlagsCaught} tone="red" />
-        </View>
-        <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-          <Pillar label="Skimpflation Caught" value={dashboardStats.totalSkimpflationCaught} tone="warning" />
-          <Pillar label="Reformulation Caught" value={dashboardStats.totalReformulationsCaught} tone="warning" />
+          <Pillar label="Reformulated" value={dashboardStats.totalReformulationsCaught} tone="warning" />
         </View>
 
         <Button title="📷  Scan a label" onPress={() => router.push("/(tabs)/scan")} />

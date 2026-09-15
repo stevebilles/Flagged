@@ -6,23 +6,23 @@ import * as Clipboard from "expo-clipboard";
 import { Screen, Text, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import {
-  getCategories,
-  getIngredientTermMap,
-  getPantryItem,
-  getProfile,
-} from "../src/db/repositories";
-import { normalizeParagraph, tokenize, extractIngredientList } from "../src/matching/normalize";
-import { effectiveRedFlagMeta, effectiveRedFlagTerms } from "../src/domain/activation";
-import { evaluateRecheck } from "../src/domain/diffEngine";
-import { attributeMatches } from "../src/domain/scanService";
+import { getPantryItem, getProfile } from "../src/db/repositories";
+import { extractIngredientList } from "../src/matching/normalize";
+import { evaluateScan } from "../src/domain/scanService";
+import { evaluateRecheck } from "../src/domain/recheckEngine";
 import { logScanDebug } from "../src/domain/scanDebug";
 import { useCameraCapture } from "../src/ocr/CameraScanner";
 
 /**
  * Recheck capture (docs/07 §7.1). Reached from the Pantry intercept modal after
- * the user confirms they have a NEWLY PURCHASED box. Captures the new ingredient
- * list, diffs it against the saved baseline, and routes to the recheck result.
+ * the user confirms they have a NEWLY PURCHASED box. Runs a completely fresh
+ * scan and compares it against the item's saved profile snapshot — no
+ * ingredient text is stored or diffed (2026-09-14; see docs/07 §7.1 for why).
+ *
+ * Always evaluated against the item's OWN profile (`item.profileId`), never
+ * whichever profile happens to be globally active (a real bug, fixed the same
+ * day) — a card saved under Steve's profile must always recheck against
+ * Steve's filters, regardless of which profile tab is currently open.
  *
  * Renders the camera/crop tool inline in this screen's own icon/title area
  * (docs/14, 2026-09-13) rather than a full-screen takeover, matching the
@@ -32,7 +32,6 @@ export default function RecheckCapture() {
   const t = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const activeProfileId = useAppStore((s) => s.activeProfileId);
   const setLastRecheck = useAppStore((s) => s.setLastRecheck);
 
   const item = useMemo(() => (id ? getPantryItem(id) : null), [id]);
@@ -46,34 +45,33 @@ export default function RecheckCapture() {
       setError("That pantry item no longer exists.");
       return;
     }
+    const profile = getProfile(item.profileId);
+    if (!profile) {
+      setError("This item's profile no longer exists.");
+      return;
+    }
     // See scan.tsx's runScan: a camera capture is already scoped to the
     // guide box (guideBox.ts) — the box IS the search area, so its text is
     // used as-is rather than hunting for "the ingredients section" inside
     // an already-targeted capture (real 2026-09-13 failure: that hunt broke
     // on an OCR punctuation slip and extracted the wrong language).
     const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
-    const profile = activeProfileId ? getProfile(activeProfileId) : null;
-    if (!profile) {
-      setError("No active profile.");
+    // Reusing evaluateScan (matching + attribution, same as a normal Scan)
+    // rather than reimplementing it here also means a recheck now correctly
+    // rejects an illegible capture instead of silently mismatching, which
+    // the old text-diff version never checked for.
+    const evaln = evaluateScan(paragraph, profile);
+    if (evaln.status === "aborted") {
+      setError("Couldn't read an ingredient list. Try again.");
       return;
     }
-    const categories = getCategories();
-    const termMap = getIngredientTermMap();
-    const terms = effectiveRedFlagTerms(profile, categories, termMap);
-    const meta = effectiveRedFlagMeta(profile, categories, termMap);
-    const newIngredients = tokenize(normalizeParagraph(paragraph));
-
-    const outcome = evaluateRecheck(item.originalIngredients, newIngredients, terms);
-    if (outcome.kind === "changed_flagged") {
-      outcome.matches = attributeMatches(outcome.matches, meta);
-    }
+    const outcome = evaluateRecheck(evaln.result.isClean, evaln.result.matches, item.profileSnapshot);
     logScanDebug("recheck", rawParagraph, paragraph, `recheck → ${outcome.kind}`);
 
     setLastRecheck({
       itemId: item.itemId,
       brandName: item.brandName,
       productName: item.productName,
-      newIngredients,
       outcome,
     });
     // Typed-routes types for this new file are generated on dev-server start.
