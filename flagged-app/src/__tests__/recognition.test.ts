@@ -1,93 +1,153 @@
-import { toRecognizedBlocks, photoResultToParagraph, MLKitText } from "../ocr/recognition";
-import { assembleParagraph } from "../ocr/stitch";
+import { toSpatialBlocks, photoResultToParagraph } from "../ocr/recognition";
+import type { VisionOcrResult } from "vision-ocr";
 
 /**
- * Tests for the ML Kit → RecognizedBlock adapter (src/ocr/recognition.ts).
- * Fixtures mirror the on-device v3 shape: `scanText` returns a single object
- * `{ resultText?, blocks: [{ blockText, blockFrame, ... }] }`.
+ * Tests for the vision-ocr → SpatialBlock adapter (src/ocr/recognition.ts).
+ * Fixtures mirror our own native module's contract (modules/vision-ocr):
+ * `{ text, blocks: [{ text, x, y, width, height }] }`, already in plain
+ * top-left-origin pixel coordinates of the upright photo — no reverse-
+ * engineered remap needed here, unlike the old ML Kit adapter.
  */
 
-function block(text: string, x: number, y: number) {
-  return {
-    blockText: text,
-    blockFrame: { x, y, width: 100, height: 20, boundingCenterX: x + 50, boundingCenterY: y + 10 },
-    blockCornerPoints: [{ x, y }],
-    lines: [],
-  };
+function block(text: string, x: number, y: number, width = 100, height = 20) {
+  return { text, x, y, width, height };
 }
 
-function result(blocks: ReturnType<typeof block>[], resultText = ""): MLKitText {
-  return { resultText, blocks };
+function result(
+  blocks: ReturnType<typeof block>[],
+  text = "",
+  imageSize = { imageWidth: 2000, imageHeight: 2000 }
+): VisionOcrResult {
+  return { text, blocks, ...imageSize };
 }
 
-describe("toRecognizedBlocks", () => {
-  it("maps v3 object blocks to {id,text,x,y} and drops empties", () => {
-    const out = toRecognizedBlocks(
-      result([block("water", 10, 20), block("  ", 10, 40), block("sugar", 10, 60)], "water sugar")
-    );
+describe("toSpatialBlocks", () => {
+  it("maps blocks to {id,text,x,y,width,height} and passes coordinates through unchanged", () => {
+    const out = toSpatialBlocks(result([block("water", 10, 20), block("sugar", 10, 60)], "water sugar"));
     expect(out.map((b) => b.text)).toEqual(["water", "sugar"]);
-    expect(out[0]).toMatchObject({ x: 10, y: 20 });
+    expect(out[0]).toMatchObject({ x: 10, y: 20, width: 100, height: 20 });
     expect(out.every((b) => typeof b.id === "string" && b.id.length > 0)).toBe(true);
   });
 
-  it("gives the same id for the same block position+text (dedup across frames)", () => {
-    const a = toRecognizedBlocks(result([block("red 40", 12, 30)]));
-    const b = toRecognizedBlocks(result([block("red 40", 13, 31)]));
-    // rounded to an 8px grid → stable id when the camera nudges slightly
-    expect(a[0].id).toBe(b[0].id);
-  });
-
-  it("falls back to resultText when there are no usable blocks", () => {
-    const out = toRecognizedBlocks({ resultText: "ingredients: salt", blocks: [] });
-    expect(out).toHaveLength(1);
-    expect(out[0].text).toBe("ingredients: salt");
-  });
-
-  it("derives text from blocks when resultText is absent", () => {
-    const out = toRecognizedBlocks(result([block("ingredients: oats", 0, 0)]));
-    expect(out[0].text).toBe("ingredients: oats");
-  });
-
-  it("still accepts the legacy array-of-results shape", () => {
-    const out = toRecognizedBlocks([result([block("water", 1, 2)])] as unknown as MLKitText[]);
-    expect(out.map((b) => b.text)).toEqual(["water"]);
-  });
-
-  it("reads a multi-line blockText verbatim (normalization happens downstream)", () => {
-    const out = toRecognizedBlocks(result([block("INGREDIENTS: WATER\nSUGAR\nSALT", 5, 5)]));
-    expect(out[0].text).toBe("INGREDIENTS: WATER\nSUGAR\nSALT");
-  });
-
-  it("handles null/garbage input safely", () => {
-    expect(toRecognizedBlocks(null)).toEqual([]);
-    expect(toRecognizedBlocks(undefined)).toEqual([]);
-    expect(toRecognizedBlocks({} as MLKitText)).toEqual([]);
-  });
-});
-
-describe("adapter feeds the stitch pipeline", () => {
-  it("assembles a paragraph from multiple frames with dedup", () => {
-    const frame1 = toRecognizedBlocks(result([block("ingredients: water", 0, 0), block("sugar", 0, 20)]));
-    // second frame re-sees "sugar" (same spot) and adds "salt"
-    const frame2 = toRecognizedBlocks(result([block("sugar", 0, 20), block("salt", 0, 40)]));
-    const paragraph = assembleParagraph([frame1, frame2]);
-    expect(paragraph).toContain("ingredients: water");
-    expect(paragraph).toContain("salt");
-    // "sugar" should appear once (deduped by stable id)
-    expect(paragraph.match(/sugar/g)?.length).toBe(1);
+  it("handles an empty block list safely", () => {
+    expect(toSpatialBlocks(result([]))).toEqual([]);
   });
 });
 
 describe("photoResultToParagraph", () => {
-  it("returns trimmed resultText", () => {
-    expect(photoResultToParagraph({ resultText: "  ingredients: oats  ", blocks: [] })).toBe(
-      "ingredients: oats"
+  it("falls back to the plugin's own text when there are no blocks to sort by position", () => {
+    expect(photoResultToParagraph(result([], "ingredients: oats"))).toBe("ingredients: oats");
+  });
+
+  it("builds the paragraph from position-sorted blocks, not the plugin's own concatenated text", () => {
+    // text is deliberately WRONG/scrambled here to prove blocks (with real
+    // position data) win when present — a dense layout can scramble clause
+    // order in a flat concatenated string, so position data (when available)
+    // is trusted instead of reconstructing order from it.
+    const out = photoResultToParagraph(
+      result([block("ingredients: oats", 0, 0), block("salt", 0, 20)], "salt ingredients: oats")
+    );
+    expect(out).toBe("ingredients: oats salt");
+  });
+
+  it("orders blocks top-to-bottom by measured position even when the block array arrives out of order", () => {
+    const out = photoResultToParagraph(result([block("salt", 0, 100), block("ingredients: oats", 0, 0)]));
+    expect(out).toBe("ingredients: oats salt");
+  });
+
+  it("orders blocks left-to-right within the same row", () => {
+    const out = photoResultToParagraph(result([block("value", 100, 0), block("label", 0, 0)]));
+    expect(out).toBe("label value");
+  });
+
+  it("doesn't let a large-font region elsewhere on the label widen the row tolerance for small, tightly-spaced text", () => {
+    // Reproduces a real device miss (2026-09-13): a Nutrition Facts panel's
+    // large numbers (height ~280) sat on the same photo as a small, dense
+    // ingredients paragraph whose lines are only ~50px apart (height ~60
+    // each). A row tolerance based on the whole photo's median height came
+    // out wide enough (~55px) to misjudge two sequential ingredient-list
+    // lines as "the same row" and sort them by x instead of y — scrambling
+    // their order and injecting a stray mid-list header-like fragment that
+    // truncated the real list before it reached a later, genuinely
+    // dangerous ingredient (a safety-critical miss, not just a cosmetic
+    // ordering issue). Tolerance must come from the LOCAL pair being
+    // compared, not a global figure for the whole photo.
+    const bigNutritionBlock = block("Nutrition Facts", 500, 100, 300, 280);
+    const line1 = block("Ingredients: water, sugar,", 460, 2099, 1300, 62);
+    const line2 = block("salt, dangerous nut oil.", 460, 2149, 1300, 62);
+    const out = photoResultToParagraph(result([bigNutritionBlock, line2, line1]));
+    expect(out).toBe("Nutrition Facts Ingredients: water, sugar, salt, dangerous nut oil.");
+  });
+
+  it("orders sequential paragraph lines by y even when their gap-to-height ratio varies between photos", () => {
+    // Two real device captures (2026-09-13), same content, cropped with the
+    // corner tool at slightly different tightness — proved a HEIGHT-derived
+    // row tolerance is fundamentally unstable, not just mistunable: on one
+    // capture the line gap (81px) cleared the tolerance (61px) and sorted
+    // correctly; on the next, near-identical capture the gap (65px) fell
+    // just under a slightly higher tolerance (68px, from slightly taller
+    // text) and got misjudged as "the same row," scrambling two lines and
+    // wrongly showing "CLEAN" for a label that actually contains a flagged
+    // ingredient. Horizontal overlap is stable at ~99% in both captures
+    // regardless of the gap/height ratio, which is why that's the signal
+    // used now instead.
+    const failingCapture = [
+      block("Ingredients: Maize, Rice, seasoning [Milk solids, Salt, Flavour", 186, 50, 1576, 114),
+      block("(Natural, contains soy flour), Sugar, Cheese powder (milk),", 175, 115, 1569, 114),
+      block("Yeast extract, Onion powder, Food acid (270, 327, 330)", 183, 178, 1399, 122),
+      block("Anti-caking agent (551)], Sunflower oil, Herb extract", 189, 243, 1316, 107),
+    ];
+    const out = photoResultToParagraph(result(failingCapture));
+    expect(out).toBe(
+      "Ingredients: Maize, Rice, seasoning [Milk solids, Salt, Flavour " +
+        "(Natural, contains soy flour), Sugar, Cheese powder (milk), " +
+        "Yeast extract, Onion powder, Food acid (270, 327, 330) " +
+        "Anti-caking agent (551)], Sunflower oil, Herb extract"
     );
   });
 
-  it("joins block text when resultText is missing", () => {
-    expect(photoResultToParagraph(result([block("ingredients: oats", 0, 0), block("salt", 0, 20)]))).toBe(
-      "ingredients: oats\nsalt"
+  it("drops text sliced off by the crop boundary when dropEdgeClippedText is set", () => {
+    // Real device capture (2026-09-13): the user's crop box sat well inside
+    // the Nutrition Facts footnote above and a French repeat below, but
+    // Vision still recognized the slivers of those lines that survived the
+    // hard crop, bleeding "a plus c'est beaucoup" and the French repeat into
+    // the result. Both clipped lines are flush against the cropped image's
+    // own top/bottom edge (no margin) — a real included line never is,
+    // since nobody drags a crop edge to land exactly on a letter's pixel.
+    const imageWidth = 1200;
+    const imageHeight = 800;
+    const clippedTop = block("a plus cest beaucoup", 50, 0, 900, 15);
+    const line1 = block("Ingredients: Maize, Rice, seasoning", 100, 50, 900, 60);
+    const line2 = block("Milk solids, Salt, Sunflower oil", 100, 115, 900, 60);
+    const clippedBottom = block("Ingredients: Mais, Riz. Assairor", 50, 780, 900, 20);
+    const withoutFilter = photoResultToParagraph(
+      result([clippedTop, line1, line2, clippedBottom], "", { imageWidth, imageHeight })
     );
+    expect(withoutFilter).toContain("beaucoup");
+    expect(withoutFilter).toContain("Assairor");
+
+    const filtered = photoResultToParagraph(
+      result([clippedTop, line1, line2, clippedBottom], "", { imageWidth, imageHeight }),
+      { dropEdgeClippedText: true }
+    );
+    expect(filtered).toBe("Ingredients: Maize, Rice, seasoning Milk solids, Salt, Sunflower oil");
+  });
+
+  it("keeps a full-width line that merely runs close to the crop's left/right edge (real device miss, 2026-09-13)", () => {
+    // Real regression once cropping became automatic (a fixed guide box,
+    // not a precisely user-drawn rectangle): a genuine, fully-intact
+    // "Ingredients:" line ran right up to the crop's own right edge simply
+    // because that's how a wrapped paragraph fills the available width —
+    // nothing was actually cut off. An earlier version of this filter also
+    // checked left/right edges and discarded the entire line (header
+    // included), losing the whole ingredient list. Only top/bottom
+    // (vertical) edge-touching means real clipping now.
+    const imageWidth = 2138;
+    const imageHeight = 2498;
+    const fullWidthLine = block("Ingredients: Maize, Rice, Seasoning, Milk solids, Salt, Flavour", 199, 1271, 1936, 113);
+    const out = photoResultToParagraph(result([fullWidthLine], "", { imageWidth, imageHeight }), {
+      dropEdgeClippedText: true,
+    });
+    expect(out).toBe("Ingredients: Maize, Rice, Seasoning, Milk solids, Salt, Flavour");
   });
 });

@@ -39,13 +39,20 @@ does not diagnose, treat, or prevent any condition, including food allergies or 
 We grant you a personal, non-exclusive, non-transferable, revocable license to use the app on
 devices you own or control, subject to these Terms and the applicable app store terms.
 
-## 4. Free trial and one-time purchase
+## 4. Free trial and subscription
 
 - Flagged provides a limited number of free scans (currently **10**). A scan counts only when it
   successfully produces a result.
-- After the free scans are used, unlimited scanning requires a **one-time purchase** (currently
-  **$24.99**, non-consumable). Pricing and trial terms may change; the price shown at the time of
-  purchase applies.
+- After the free scans are used, unlimited scanning requires **Flagged Pro**, an auto-renewing
+  subscription currently priced at **$24.99 per year**. Payment is charged to your Apple ID or
+  Google account at confirmation of purchase.
+- **Auto-renewal:** the subscription automatically renews for the same 1-year term unless
+  auto-renew is turned off at least 24 hours before the end of the current period. Your account
+  will be charged for renewal within 24 hours prior to the end of the current period. You can
+  manage or cancel your subscription at any time in your Apple ID / Google account settings —
+  cancellation takes effect at the end of the current billing period.
+- Pricing and trial terms may change; the price shown at the time of purchase applies to that
+  purchase.
 - Purchases are processed and governed by **Apple** or **Google**. Refunds are handled by the
   respective app store under its policies; we do not directly process refunds.
 - You may restore a prior purchase using the in-app "Restore Purchases" feature.

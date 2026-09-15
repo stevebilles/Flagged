@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { markVerified, rebaselinePantryItem, softDeletePantryItem } from "../src/db/repositories";
+import { getProfile, markVerified, rebaselinePantryItem, softDeletePantryItem } from "../src/db/repositories";
 import { commitRecheckStats } from "../src/domain/scanService";
 
 /**
@@ -19,10 +19,14 @@ export default function RecheckResult() {
   const t = useTheme();
   const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
+  const activeProfileId = useAppStore((s) => s.activeProfileId);
   const handoff = useAppStore((s) => s.lastRecheck);
 
   useEffect(() => {
-    if (handoff) commitRecheckStats(handoff.outcome, isPremium);
+    // Recheck stays tied to the one active profile — "All" is scoped to
+    // Home/Scan/Results for now (docs/17).
+    const profile = activeProfileId ? getProfile(activeProfileId) : null;
+    if (handoff && profile) commitRecheckStats(handoff.outcome, profile, isPremium);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

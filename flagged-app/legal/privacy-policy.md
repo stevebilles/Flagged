@@ -48,7 +48,7 @@ backup settings).
 
 ## 5. Purchases
 
-Flagged offers a one-time purchase to unlock unlimited scanning. Purchases are processed by
+Flagged offers an auto-renewing annual subscription to unlock unlimited scanning. Purchases are processed by
 **Apple** or **Google**, and entitlement status is managed via **RevenueCat**. We do not receive
 your full payment details. These providers process limited purchase and device/identifier
 information as needed to complete and validate the purchase and to restore it across your devices.

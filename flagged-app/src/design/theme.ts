@@ -13,6 +13,7 @@ export interface ThemeColors {
   cyan: string; // safe / scanning affordance
   red: string; // flagged / destructive
   warning: string; // "Recipe Change Detected" (still-approved) recheck screen
+  success: string; // camera guide: a clear, confidently-readable view (docs/06)
   // classification badge tints (docs/09)
   badgeRegulated: string;
   badgeAdvisory: string;
@@ -28,6 +29,7 @@ export const DarkColors: ThemeColors = {
   cyan: "#22D3EE",
   red: "#EF4444",
   warning: "#F59E0B",
+  success: "#34D399",
   badgeRegulated: "#EF4444",
   badgeAdvisory: "#F59E0B",
   badgePreference: "#9CA3AF",
@@ -42,6 +44,7 @@ export const LightColors: ThemeColors = {
   cyan: "#0E7490",
   red: "#B91C1C",
   warning: "#B45309",
+  success: "#047857",
   badgeRegulated: "#B91C1C",
   badgeAdvisory: "#B45309",
   badgePreference: "#475569",

@@ -1,51 +1,123 @@
-import React, { useMemo, useState } from "react";
-import { View } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, LayoutChangeEvent } from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
-import { Screen, Text, Button, Card } from "../../src/design/components";
+import { Screen, Text, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
-import { getProfile } from "../../src/db/repositories";
-import { canScan, evaluateScan, scansRemaining } from "../../src/domain/scanService";
+import { getProfile, getProfiles } from "../../src/db/repositories";
+import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
-import { PhotoRecognizer } from "react-native-vision-camera-text-recognition";
-import { CameraScanner } from "../../src/ocr/CameraScanner";
+import { recognizeText } from "vision-ocr";
+import { useCameraCapture } from "../../src/ocr/CameraScanner";
+import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION } from "../../src/ocr/guideBox";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
+import { displayName } from "../../src/domain/types";
 
 /**
  * SCAN — the core action tab (docs/05 Tab 2).
  * State 1 Standby · State 2 Hard paywall lockout · State 3 live scan (camera).
  *
- * State 3 uses the live CameraScanner (VisionCamera + ML Kit OCR, docs/14). Paste
- * reads the clipboard; Choose Photo runs on-device OCR on a picked image. All
- * paths funnel a paragraph string into runScan().
+ * State 3 (VisionCamera + Apple Vision OCR, docs/14) renders INLINE inside
+ * this screen's own existing viewfinder box — never a full-screen takeover.
+ * A real user test (2026-09-13) objected to the whole tab (header, profile,
+ * buttons) disappearing to scan a label, and pointed out the dashed-border
+ * guide already in the box should just become the crop tool in place,
+ * rather than launching a separate screen. `useCameraCapture` supplies the
+ * box content and footer buttons for whichever phase scanning is in; this
+ * screen just drops them into the same slots its idle state uses. Paste
+ * reads the clipboard; Choose Photo runs on-device OCR on a picked image.
+ * All paths funnel a paragraph string into runScan().
  */
 export default function Scan() {
   const t = useTheme();
   const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
   const activeProfileId = useAppStore((s) => s.activeProfileId);
+  const scanAllProfiles = useAppStore((s) => s.scanAllProfiles);
   const setLastScan = useAppStore((s) => s.setLastScan);
 
-  const remaining = useMemo(() => scansRemaining(), []);
+  // Re-read on every focus, not just first mount — a scan completed elsewhere
+  // (or the dev "reset free scans" button) must update this immediately.
+  const [remaining, setRemaining] = useState(() => scansRemaining());
+  useFocusEffect(
+    useCallback(() => {
+      setRemaining(scansRemaining());
+      // Reset on the way BACK to this tab, not on the way out (see
+      // onCameraCapture) — so a finished scan's last screen doesn't flash
+      // to idle mid-transition, but revisiting Scan later still starts
+      // fresh instead of showing a stale confirmDone/camera screen.
+      setCameraOpen(false);
+    }, [])
+  );
   const locked = !canScan(isPremium);
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
+
+  // Who this scan will run for, and whether that's actually possible right now
+  // (mirrors Home's "no silent empty state" rule — explain, don't just vanish).
+  const scanContext = useMemo(() => {
+    if (scanAllProfiles) {
+      const count = getProfiles().length;
+      return count > 0
+        ? { label: `All Profiles (${count})`, ready: true as const }
+        : { label: "No profiles yet — add one from Home before scanning", ready: false as const };
+    }
+    // Check the profile itself, not truthiness of its name — an empty (not
+    // yet named) name is a valid, falsy string that would otherwise wrongly
+    // read as "no profile selected" even though one genuinely is.
+    const profile = activeProfileId ? getProfile(activeProfileId) : null;
+    return profile
+      ? { label: displayName(profile.name), ready: true as const }
+      : { label: "No profile selected — add one from Home before scanning", ready: false as const };
+  }, [scanAllProfiles, activeProfileId]);
 
   function runScan(rawParagraph: string, source: "camera" | "paste" | "photo" = "camera") {
     setError(null);
-    const profile = activeProfileId ? getProfile(activeProfileId) : null;
-    if (!profile) {
-      setError("No active profile.");
-      return;
+    // A camera capture is already scoped to whatever's inside the guide
+    // box (guideBox.ts, CameraScanner.tsx) — the box IS the search area, so
+    // its text goes straight to the matcher. Trying to additionally find
+    // and isolate "the ingredients section" within an already-targeted
+    // capture was real, unnecessary complexity that actively caused a
+    // scan failure (2026-09-13): OCR misreading the header's colon broke
+    // header detection, so a same-looking French header got chosen
+    // instead, extracting the wrong language's text entirely. Matching
+    // English red-flag terms against a paragraph that happens to include
+    // some French is harmless (French words don't fuzzy-match English
+    // ones) — there was nothing this extraction step was protecting
+    // against here that the matcher doesn't already handle on its own.
+    // "Paste"/"Choose Photo" are different: those really can be a whole,
+    // unbounded label (a photo of the entire package, pasted text copied
+    // from anywhere), where isolating the ingredients section still helps.
+    const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
+
+    let evaln;
+    let scannedFor: string;
+    let profileIds: string[];
+    if (scanAllProfiles) {
+      const profiles = getProfiles();
+      if (profiles.length === 0) {
+        setError("No profiles yet — add one from Home first.");
+        return;
+      }
+      evaln = evaluateScanForAll(paragraph, profiles);
+      scannedFor = `all ${profiles.length} profile${profiles.length === 1 ? "" : "s"}`;
+      profileIds = profiles.map((p) => p.profileId);
+    } else {
+      const profile = activeProfileId ? getProfile(activeProfileId) : null;
+      if (!profile) {
+        setError("No active profile.");
+        return;
+      }
+      evaln = evaluateScan(paragraph, profile);
+      scannedFor = displayName(profile.name);
+      profileIds = [profile.profileId];
     }
-    // Strip everything that isn't the ingredient list (2nd language, nutrition
-    // panel, marketing) before it reaches the matcher or the results screen.
-    const paragraph = extractIngredientList(rawParagraph);
-    const evaln = evaluateScan(paragraph, profile);
+
     if (evaln.status === "aborted") {
       logScanDebug(source, rawParagraph, paragraph, "ABORTED (illegible)");
       // Illegible does NOT consume a free scan (docs/06/08).
@@ -63,12 +135,18 @@ export default function Scan() {
               .map((mm) => mm.term + (mm.categoryName ? ` [${mm.categoryName}]` : ""))
               .join(", ")
     );
-    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean });
+    setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean, scannedFor, profileIds });
     router.push("/results");
   }
 
   function onCameraCapture(paragraph: string) {
-    setCameraOpen(false);
+    // Deliberately NOT resetting cameraOpen here: doing so used to flip this
+    // screen back to its idle "POINT AT INGREDIENT LIST" state a frame
+    // before the push to /results finished animating in, flashing the idle
+    // box behind the transition (2026-09-13). The camera stays "open"
+    // (still showing its last confirmDone content) all the way through the
+    // navigation instead — see the useFocusEffect below, which resets it
+    // only once this tab is actually revisited, not on the way out.
     runScan(paragraph, "camera");
   }
 
@@ -100,17 +178,25 @@ export default function Scan() {
 
       // On-device OCR on the still image (docs/06/14). Requires a dev/EAS build
       // (native module) — will not run in Expo Go.
-      const result = await PhotoRecognizer({ uri: picked.assets[0].uri, orientation: "portrait" });
-      runScan(photoResultToParagraph(result as any), "photo");
+      const result = await recognizeText(picked.assets[0].uri);
+      runScan(photoResultToParagraph(result), "photo");
     } catch (e: any) {
       setError(e?.message ?? "Couldn't read that photo.");
     }
   }
 
-  // State 3 — live camera scan (full-screen).
-  if (cameraOpen) {
-    return <CameraScanner onCapture={onCameraCapture} onCancel={() => setCameraOpen(false)} />;
-  }
+  const { boxContent, footer } = useCameraCapture({
+    active: cameraOpen,
+    boxWidth: boxSize.width,
+    boxHeight: boxSize.height,
+    onCapture: onCameraCapture,
+    onCancel: () => setCameraOpen(false),
+  });
+
+  const onBoxLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBoxSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+  }, []);
 
   if (locked) {
     // State 2 — hard paywall lockout
@@ -122,35 +208,110 @@ export default function Scan() {
             You've used all 10 free scans
           </Text>
           <Text tone="muted" style={{ textAlign: "center" }}>
-            Ditch the $40/year subscriptions. Unlock unlimited, offline label reading for life.
+            Unlock unlimited, offline label reading for every profile in your house.
           </Text>
-          <Text tone="muted" style={{ textDecorationLine: "line-through" }}>$39.99</Text>
-          <Button title="Unlock Unlimited Scans - $24.99" onPress={() => router.push("/paywall")} />
+          <Text tone="cyan" bold>$24.99/yr · $0.07/day</Text>
+          <Button title="Unlock Unlimited Scans - $24.99/yr" onPress={() => router.push("/paywall")} />
         </View>
       </Screen>
     );
   }
 
-  // State 1 — standby
+  // State 1 — standby / State 3 — live scan, same shell either way (2026-09-13:
+  // the whole tab used to disappear behind a full-screen camera; now only the
+  // box and button contents change).
   return (
     <Screen>
-      <View style={{ flex: 2, alignItems: "center", justifyContent: "center", gap: t.spacing.md }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text variant="heading" bold>Scan</Text>
         {!isPremium && (
-          <Card style={{ borderRadius: t.radius.pill, paddingVertical: t.spacing.sm }}>
-            <Text tone="cyan" bold>
-              Scans Remaining: {remaining} / 10
+          <View
+            style={{
+              borderRadius: t.radius.pill,
+              borderWidth: 1,
+              borderColor: t.colors.cyan,
+              paddingVertical: 6,
+              paddingHorizontal: t.spacing.sm,
+            }}
+          >
+            <Text tone="cyan" bold variant="caption">
+              {remaining} / 10 SCANS LEFT
             </Text>
-          </Card>
+          </View>
         )}
-        <Ionicons name="scan-outline" size={96} color={t.colors.textMuted} />
-        <Text tone="muted">Point at an ingredient list — no shutter needed.</Text>
-        {error && <Text tone="red" style={{ textAlign: "center" }}>{error}</Text>}
       </View>
 
-      <View style={{ flex: 1, gap: t.spacing.sm, justifyContent: "flex-end", paddingBottom: t.spacing.lg }}>
-        <Button title="Start Camera Scanner" onPress={() => setCameraOpen(true)} />
-        <Button title="Paste" kind="secondary" onPress={onPaste} />
-        <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} />
+      <View
+        onLayout={onBoxLayout}
+        style={{
+          flex: 1,
+          marginTop: t.spacing.lg,
+          borderRadius: t.radius.lg,
+          backgroundColor: t.colors.card,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: t.spacing.sm,
+          overflow: "hidden",
+        }}
+      >
+        {cameraOpen ? (
+          boxContent
+        ) : (
+          <View
+            style={{
+              width: `${GUIDE_WIDTH_FRACTION * 100}%`,
+              height: `${GUIDE_HEIGHT_FRACTION * 100}%`,
+              borderWidth: 2,
+              borderStyle: "dashed",
+              borderRadius: t.radius.md,
+              borderColor: t.colors.cyan,
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <Ionicons name="scan-outline" size={28} color={t.colors.cyan} />
+            <Text tone="cyan" bold variant="caption" style={{ textAlign: "center" }}>
+              POINT AT{"\n"}INGREDIENT LIST
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {!cameraOpen && (
+        <>
+          <Text tone="muted" variant="caption" style={{ textAlign: "center", marginTop: t.spacing.sm }}>
+            Hold steady over the ingredient list — tilt slightly if the label is glossy
+          </Text>
+          <Text tone="muted" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+            {scanContext.ready ? (
+              <>
+                Profile: <Text tone="cyan" bold>{scanContext.label}</Text>
+              </>
+            ) : (
+              <Text tone="warning" bold>{scanContext.label}</Text>
+            )}
+          </Text>
+        </>
+      )}
+      {error && (
+        <Text tone="red" style={{ textAlign: "center", marginTop: t.spacing.xs }}>
+          {error}
+        </Text>
+      )}
+
+      <View style={{ gap: t.spacing.sm, marginTop: t.spacing.lg, paddingBottom: t.spacing.lg }}>
+        {cameraOpen ? (
+          footer
+        ) : (
+          <>
+            <Button title="🎥  Scan Label" onPress={() => setCameraOpen(true)} />
+            <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+              <Button title="Paste Text" kind="secondary" onPress={onPaste} style={{ flex: 1 }} />
+              <Button title="Choose Photo" kind="secondary" onPress={onChoosePhoto} style={{ flex: 1 }} />
+            </View>
+          </>
+        )}
       </View>
     </Screen>
   );

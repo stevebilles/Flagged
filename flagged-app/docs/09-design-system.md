@@ -66,7 +66,7 @@ modes (contrast-checked).
 - **Meter pill** (Scan): `Scans Remaining: N / 10`.
 - **Result header** (cyan clean / red flagged) + **breakdown card** (charcoal).
 - **Pantry card** (thumbnail, brand, product) + **recheck checklist row** + **undo row**.
-- **Paywall card** ($24.99 with $39.99 struck through).
+- **Paywall card** ($24.99/yr, framed as "$0.07/day").
 
 ## Accessibility
 - Respect Dynamic Type / font scaling; layouts must reflow.

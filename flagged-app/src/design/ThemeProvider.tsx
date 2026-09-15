@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useMemo } from "react";
-import { useColorScheme } from "react-native";
 import { ColorScheme, ThemeColors, colorsForScheme, fontFamily, fontSize, radius, spacing } from "./theme";
 
 interface Theme {
@@ -14,9 +13,11 @@ interface Theme {
 const ThemeContext = createContext<Theme | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useColorScheme();
-  // Dark mode is the default "X-Ray" feel (docs/09) when the system is unset.
-  const scheme: ColorScheme = systemScheme === "light" ? "light" : "dark";
+  // Dark is the app's identity (docs/09 "X-Ray" feel) — force it regardless of
+  // the OS setting until there's a real in-app Appearance toggle (planned,
+  // docs/17 settings mockup). Previously this followed the system scheme, which
+  // silently showed the plain light fallback to anyone not in OS dark mode.
+  const scheme: ColorScheme = "dark";
 
   const value = useMemo<Theme>(
     () => ({

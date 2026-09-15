@@ -4,16 +4,26 @@ import {
   tokenize,
   looksLikeIngredientList,
   extractIngredientList,
+  cleanForDisplay,
 } from "../matching/normalize";
 import { matchParagraph } from "../matching/matcher";
 import { diffIngredients, evaluateRecheck } from "../domain/diffEngine";
 import {
-  deselectPack,
-  isPackActive,
   selectPack,
   effectiveRedFlagTerms,
+  effectiveRedFlagMetaForAll,
 } from "../domain/activation";
+import { displayName } from "../domain/types";
 import type { Category, Profile, QuickPack } from "../domain/types";
+
+/** Per-profile dashboard counters (docs/17) — zeroed for fixtures that don't care. */
+const zeroProfileStats = {
+  totalLabelsRead: 0,
+  totalRedFlagsCaught: 0,
+  totalCleanScans: 0,
+  totalSkimpflationCaught: 0,
+  totalReformulationsCaught: 0,
+};
 
 describe("levenshtein / similarity", () => {
   it("computes edit distance", () => {
@@ -194,31 +204,179 @@ describe("matcher", () => {
     const r = matchParagraph("color added (yellow 5, blue 1)", ["yellow 5", "blue 1", "red 40"]);
     expect(r.matches.map((m) => m.term).sort()).toEqual(["blue 1", "yellow 5"]);
   });
+
+  it("recovers a fuzzy OCR-misread letter inside a MULTI-word term (real device miss, 2026-09-13)", () => {
+    // "Sunfiower oil" — an l->i slip — never matched "sunflower oil" before
+    // this fix, since multi-word terms were excluded from fuzzy matching
+    // entirely (only single words got the fuzzy fallback).
+    const r = matchParagraph("Anti-caking agent (551), Sunfiower oil, Herb extract", ["sunflower oil"]);
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]).toMatchObject({ term: "sunflower oil", kind: "fuzzy" });
+    expect(r.isClean).toBe(false);
+  });
+
+  it("fuzzy-matches a short word inside a multi-word term when its neighbor already matched (real device miss, 2026-09-13)", () => {
+    // "Sunflower oll" — an i->l OCR slip, one of the most common OCR
+    // confusions — never matched "sunflower oil" before this fix, because
+    // "oil" (3 letters) was held to the same exact-match-only floor as a
+    // STANDALONE short term (the "malt"/"salt" regression). But here "oil"
+    // isn't standing alone: "sunflower" right next to it already matched
+    // with real confidence, and coincidentally matching both a phrase's
+    // words side by side for text that isn't actually about that phrase is
+    // vanishingly unlikely — the neighbor's own match is a safety net a
+    // standalone short word doesn't have.
+    const r = matchParagraph("Anti-caking agent (551), Sunflower oll, Herb extract", ["sunflower oil"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "sunflower oil", kind: "fuzzy" });
+  });
+
+  it("still won't fuzzy a 1-2 letter connector word, even next to a matched neighbor", () => {
+    // Below the length-3 floor there's no signal left to judge similarity
+    // on at all, neighbor or not.
+    const r = matchParagraph("Sunflower xx", ["sunflower of"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not fuzzy-match a multi-word term across unrelated words", () => {
+    const r = matchParagraph("Sunflower seeds and olive oil blend", ["sunflower oil"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("never fuzzes a multi-word term containing a digit (same rule as single-word dye codes)", () => {
+    const r = matchParagraph("citric acit 4o", ["citric acid 40"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not blend adjacent words from two DIFFERENT printed ingredients into a false multi-word match", () => {
+    // Steve's observation, 2026-09-13: the real separator printed between
+    // ingredients (a comma here; some labels use a "•" bullet instead) marks
+    // a true boundary — two words that are only adjacent because one
+    // ingredient happens to end right where another begins should never be
+    // read as a single two-word phrase, even if they'd otherwise score a
+    // fuzzy match. "Yeast" and a typo'd "Extrbct" are separate ingredients
+    // here (comma-separated), not "Yeast extract".
+    const r = matchParagraph("Yeast, Extrbct powder, Salt", ["yeast extract"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("still matches a genuine multi-word phrase that itself contains no internal separator", () => {
+    // Same word pair, no comma between them this time — a real occurrence
+    // of "Yeast extract" as one ingredient, with the same single-letter typo.
+    const r = matchParagraph("Onion powder, Yeast extrbct, Salt", ["yeast extract"]);
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]).toMatchObject({ term: "yeast extract", kind: "fuzzy" });
+  });
+
+  it("recognizes a bullet-dot ingredient separator the same way as a comma", () => {
+    const r = matchParagraph("Yeast • Extrbct powder • Salt", ["yeast extract"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("catches a single-letter OCR misread on a short standalone allergen word (real device miss, 2026-09-13)", () => {
+    // "Neast" for "Yeast" — a real Vision misread. The OLD flat 85%-
+    // similarity threshold required ~7+ letters to survive even one typo
+    // (a single edit on a 5-letter word only scores 80%), so this fell
+    // through the fuzzy net entirely: the red-flag term was present on the
+    // label but the scan reported clean. maxAllowedEdits fixes this for
+    // words of 5+ letters (still exact-only under 5 — see the "malt"/"salt"
+    // regression below for why 4-letter words don't get this tolerance).
+    const r = matchParagraph("Ingredients: Maize, Rice, Neast extract, Salt", ["yeast"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "yeast", kind: "fuzzy" });
+  });
+
+  it("does not fuzzy-match a 4-letter term against unrelated words at all", () => {
+    // 4-letter terms are exact-match-only (see the "malt"/"salt" regression
+    // below for why) — "malt" and "bulk" must stay unmatched against "milk".
+    const r = matchParagraph("Ingredients: barley malt, bulk fiber, water", ["milk"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not confuse two common, unrelated 4-letter words one edit apart (real device miss, 2026-09-13)", () => {
+    // Real false positive: "malt" (a Gluten Sources term) fuzzy-matched
+    // "salt" — present in nearly every ingredient list — because 1-edit
+    // tolerance at length 4 doesn't distinguish "the same word, misread"
+    // from "a completely different, extremely common word" (a single
+    // substitution changes a quarter of a 4-letter word). 4-letter terms
+    // are exact-match-only now specifically because of this; 5+ letter
+    // words (see "yeast"/"Neast" above) keep 1-edit tolerance since real
+    // collisions there are markedly rarer.
+    const r = matchParagraph("Ingredients: Water, Salt, Sugar, Citric Acid", ["malt"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not confuse two different real ingredients that happen to be 2 edits apart (real device miss, 2026-09-13)", () => {
+    // "sunflower" and "safflower" are both genuine, different oils, exactly
+    // 2 letters apart. A scan of a label that only said "Sunflower oil"
+    // wrongly also reported "safflower oil" as present once 9-letter words
+    // were allowed 2 edits — fabricating a second ingredient that was never
+    // on the label. 9-letter words are capped at 1 edit specifically
+    // because of this.
+    const r = matchParagraph("Ingredients: Maize, Rice, Sunflower oil, Herb extract", ["safflower oil"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("does not fuzzy-match a bilingual label's generic French 'farine' as the English term 'farina' (real device miss, 2026-09-14)", () => {
+    // "farina" (Wheat) is 1 edit from "farine" — French for "flour" in
+    // general, printed on every bilingual ingredient list regardless of
+    // which flour is actually used. A real scan false-flagged Wheat on a
+    // French section reading "Farine de soya" (soy flour) purely because
+    // "farine" and "farina" are both 6 letters, 1 edit apart. "farina" is
+    // exact-match-only now specifically because of this.
+    const r = matchParagraph("Ingrédients: Farine de soya, Farine de riz, Sel", ["farina"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("still matches 'farina' when the label actually says it", () => {
+    const r = matchParagraph("Ingredients: Farina, Sugar, Salt", ["farina"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "farina", kind: "exact" });
+  });
+
+  it("the common-words countersignal is a general mechanism, not a one-off fix for farina specifically", () => {
+    // "water" is a COMMON_LABEL_WORDS entry, unrelated to any real dictionary
+    // term — this proves the guard rejects a fuzzy candidate for ANY term
+    // one edit away from an ordinary word, not just the farina/farine pair
+    // that motivated it. A fictional 5-letter term stands in for "some
+    // future dictionary term" so this doesn't depend on today's dictionary
+    // contents happening to collide with "water".
+    const r = matchParagraph("Ingredients: Water, Sugar, Salt", ["watee"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
-describe("pack activation + shared categories", () => {
-  const packs: QuickPack[] = [
-    { id: "focus", name: "Focus & ADHD", type: "composite", categoryIds: ["dyes", "synth"] },
-    { id: "pres", name: "Preservatives", type: "composite", categoryIds: ["nitrates", "sulfites", "synth"] },
-  ];
+describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {
+  it("fixes a leading zero-for-O misread", () => {
+    expect(cleanForDisplay("Rice flour, Wheat bran, 0at bran, Rye flour")).toBe(
+      "Rice flour, Wheat bran, Oat bran, Rye flour"
+    );
+  });
+
+  it("fixes a lone apostrophe standing in for a dropped comma", () => {
+    expect(cleanForDisplay("Salt' Soybean oil")).toBe("Salt, Soybean oil");
+  });
+
+  it("never touches a dye code, E-number, or a weight", () => {
+    expect(cleanForDisplay("color added (Red 40, Yellow 5)")).toBe("color added (Red 40, Yellow 5)");
+    expect(cleanForDisplay("contains E120 and E621")).toBe("contains E120 and E621");
+    expect(cleanForDisplay("Sodium 40mg per serving")).toBe("Sodium 40mg per serving");
+  });
+
+  it("leaves a real possessive alone (letter right after the apostrophe, no space)", () => {
+    expect(cleanForDisplay("Baker's chocolate")).toBe("Baker's chocolate");
+  });
+});
+
+describe("pack activation (onboarding starting template only)", () => {
+  const pack: QuickPack = { id: "focus", name: "Focus & ADHD", type: "composite", categoryIds: ["dyes", "synth"] };
   const base: Profile = {
     profileId: "p1", name: "x", activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
   };
 
   it("selecting a pack activates all its categories", () => {
-    const p = selectPack(base, packs[0]);
+    const p = selectPack(base, pack);
     expect(new Set(p.activeCategoryIds)).toEqual(new Set(["dyes", "synth"]));
-    expect(isPackActive(p, packs[0])).toBe(true);
-  });
-
-  it("deselecting a pack keeps a shared category needed by another active pack", () => {
-    let p = selectPack(base, packs[0]); // dyes, synth
-    p = selectPack(p, packs[1]); // + nitrates, sulfites
-    p = deselectPack(p, packs[1], packs); // remove Preservatives
-    // synth is shared with Focus & ADHD (still active) → must remain
-    expect(p.activeCategoryIds).toContain("synth");
-    expect(p.activeCategoryIds).not.toContain("nitrates");
-    expect(p.activeCategoryIds).not.toContain("sulfites");
   });
 });
 
@@ -230,11 +388,59 @@ describe("effective red-flag set", () => {
   it("union of active categories minus excluded plus custom", () => {
     const profile: Profile = {
       profileId: "p", name: "x", activeCategoryIds: ["dyes"], excludedIngredientIds: ["i-yellow5"], customIngredients: ["carrageenan"], createdAt: 0,
+      ...zeroProfileStats,
     };
     const terms = effectiveRedFlagTerms(profile, categories, termById);
     expect(terms).toContain("red 40");
     expect(terms).not.toContain("yellow 5");
     expect(terms).toContain("carrageenan");
+  });
+});
+
+describe("effectiveRedFlagMetaForAll (docs/17 'All' mode)", () => {
+  const categories: Category[] = [
+    { id: "dyes", name: "Artificial Dyes", parentGroup: "Additives", classification: "advisory", ingredientIds: ["i-red40"] },
+    { id: "milk", name: "Milk", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-milk"] },
+    { id: "nuts", name: "Tree Nuts", parentGroup: "Allergens", classification: "regulated", ingredientIds: ["i-almond"] },
+  ];
+  const termById = new Map([
+    ["i-red40", "red 40"],
+    ["i-milk", "milk"],
+    ["i-almond", "almond"],
+  ]);
+  const sofia: Profile = {
+    profileId: "sofia", name: "Sofia", activeCategoryIds: ["dyes", "milk"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
+  };
+  const steve: Profile = {
+    profileId: "steve", name: "Steve", activeCategoryIds: ["milk", "nuts"], excludedIngredientIds: [], customIngredients: [], createdAt: 0,
+    ...zeroProfileStats,
+  };
+
+  it("unions every profile's terms", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(new Set(meta.keys())).toEqual(new Set(["red 40", "milk", "almond"]));
+  });
+
+  it("a term only one profile has names just that profile", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("red 40")?.profileNames).toEqual(["Sofia"]);
+    expect(meta.get("almond")?.profileNames).toEqual(["Steve"]);
+  });
+
+  it("a term shared by two profiles names both, without duplicates", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("milk")?.profileNames).toEqual(["Sofia", "Steve"]);
+  });
+
+  it("carries the classification through for badges", () => {
+    const meta = effectiveRedFlagMetaForAll([sofia, steve], categories, termById);
+    expect(meta.get("milk")?.classification).toBe("regulated");
+    expect(meta.get("red 40")?.classification).toBe("advisory");
+  });
+
+  it("returns an empty set for an empty profile list", () => {
+    expect(effectiveRedFlagMetaForAll([], categories, termById).size).toBe(0);
   });
 });
 
@@ -261,3 +467,14 @@ describe("diff engine (pantry recheck)", () => {
     expect(outcome.kind).toBe("changed_safe");
   });
 });
+
+describe("displayName", () => {
+  it("returns the real name when one is set", () => {
+    expect(displayName("Sofia")).toBe("Sofia");
+  });
+  it("falls back to New Profile for an empty or whitespace-only name", () => {
+    expect(displayName("")).toBe("New Profile");
+    expect(displayName("   ")).toBe("New Profile");
+  });
+});
+

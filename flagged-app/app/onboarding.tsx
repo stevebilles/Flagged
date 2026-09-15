@@ -51,7 +51,7 @@ const SCREENS = [
   {
     title: "Founding Member pricing",
     body:
-      "Ditch the $40/year subscriptions. After your 10 free scans, unlock unlimited scanning for life for a one-time fee of $24.99. No hidden fees. Pay once, own it forever.",
+      "After your 10 free scans, unlock unlimited scanning for $24.99/year — less than $0.07 a day, for every profile in your house. Cancel anytime.",
   },
 ];
 

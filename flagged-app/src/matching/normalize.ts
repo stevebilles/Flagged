@@ -12,6 +12,25 @@ export function regexClean(token: string): string {
 }
 
 /**
+ * Cosmetic-only cleanup for the raw ingredient text shown on the results
+ * screen (docs/07) — NOT used for matching (matching has its own
+ * digit-free-only regexClean fallback in matcher.ts, scoped differently
+ * because corrupting "red 40" into "red 4o" would be worse than a stray
+ * "0" on screen). Two narrow, low-risk fixes for what a real device capture
+ * showed (Steve, 2026-09-13): a leading "0" that should be a capital "O"
+ * ("0at bran" -> "Oat bran"), and a lone apostrophe standing in for a comma
+ * the OCR dropped ("Salt' Soybean" -> "Salt, Soybean" — a real possessive
+ * is immediately followed by a letter, e.g. "Baker's", never whitespace).
+ * Both patterns are common ML Kit confusions and deliberately scoped to
+ * avoid touching legitimate numbers (dye codes, E-numbers, weights).
+ */
+export function cleanForDisplay(text: string): string {
+  return text
+    .replace(/(^|[^A-Za-z0-9])0(?=[A-Za-z])/g, "$1O")
+    .replace(/['’]\s/g, ", ");
+}
+
+/**
  * Normalize a raw OCR paragraph (docs/06 Step 2):
  *  - lowercase
  *  - strip line-break hyphens (rejoin words split across lines)
@@ -49,17 +68,36 @@ export function tokenize(normalized: string): string[] {
  *      "." — a lowercase word followed by a Title-Case word starts a new item).
  * Falls back to the raw text when no header is found or the result is too short.
  */
-const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*:/i; // Contains: / Contient: / OCR garble
+const CONTAINS_RE = /\b[co][ao]nt[a-z]*\s*[:;]/i; // Contains: / Contient: / OCR garble (colon or a misread semicolon)
+// Scoped use only: extractIngredientList below searches for this within a
+// small window right after the chosen ingredient header, to find where the
+// list's own "Contains:" line ends. Kept deliberately unexported — a real
+// device false positive (2026-09-13) showed this pattern is too loose to
+// use as a whole-text "is there an allergen marker ANYWHERE" check: it
+// matches plenty of unrelated words that also happen to start with
+// cont/cant and end in a colon (Control:, Contact:, Content:, Continue:,
+// Container:), and tightening it with a similarity threshold doesn't cleanly
+// separate those from real garble ("Content" and "Contais" score similarly
+// close to "Contains"). See git history for the standalone
+// droppedAllergenLine safety gate this used to back, removed for the same
+// reason — the spatial completeness check in src/ocr/completeness.ts,
+// added the same day, is the sturdier replacement (docs/06).
 
 /**
  * Every position that looks like an ingredient header. OCR mangles the word
  * badly ("Ingredlents:", "Ihgrédients:", "lnaredients:", "Ionredients:"), so any
  * 7–14 letter word before a colon that is ≥60% similar to "ingredients" /
- * "ingrédients" counts.
+ * "ingrédients" counts. Also accepts a semicolon in the colon's place (real
+ * device miss, 2026-09-13: Vision read "Ingredients;" for "Ingredients:" —
+ * missing this ENTIRELY excluded the correctly-spelled English header from
+ * consideration, leaving only a same-looking French header — accented
+ * letters get dropped by OCR often enough that "Ingrédients" and
+ * "Ingredients" can render identically — as the sole candidate, so the
+ * wrong language's list got extracted).
  */
 function findHeaders(text: string): { at: number; after: number }[] {
   const heads: { at: number; after: number }[] = [];
-  const re = /(^|[^a-zà-ÿ])([a-zà-ÿ]{7,14})\s*:/gi;
+  const re = /(^|[^a-zà-ÿ])([a-zà-ÿ]{7,14})\s*[:;]/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const w = m[2].toLowerCase();
@@ -204,3 +242,4 @@ export function looksLikeIngredientList(raw: string): boolean {
   const commas = (raw.match(/,/g) ?? []).length;
   return raw.trim().length >= 60 && commas >= 5;
 }
+

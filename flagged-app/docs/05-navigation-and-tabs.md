@@ -55,7 +55,7 @@ Read from the Stats singleton (`03`):
 ### State 2 — Hard Paywall Lockout
 - When `freeScansUsed == 10`: the action menu is replaced by a **large lock icon** and a single
   primary button:
-  `[ Unlock Unlimited Scans - $24.99 ]` (show `$39.99` struck through).
+  `[ Unlock Unlimited Scans - $24.99/yr ]`.
 - The user can **no longer** open the camera, paste text, or choose a photo until they purchase.
   See `08`.
 - Paid users never see the meter or this state.

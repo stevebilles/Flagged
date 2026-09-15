@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TextInput, Image } from "react-native";
+import { ScrollView, TextInput, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../src/design/components";
@@ -17,6 +17,7 @@ export default function SaveToPantry() {
   const t = useTheme();
   const router = useRouter();
   const lastScan = useAppStore((s) => s.lastScan);
+  const activeProfileId = useAppStore((s) => s.activeProfileId);
   const [brand, setBrand] = useState("");
   const [product, setProduct] = useState("");
   const [photoUri, setPhotoUri] = useState<string>("");
@@ -40,6 +41,9 @@ export default function SaveToPantry() {
   function save() {
     const ingredients = lastScan ? tokenize(normalizeParagraph(lastScan.paragraph)) : [];
     addPantryItem({
+      // The profile this card belongs to (docs/17 Pantry mockup) — the profile
+      // that was active when the scan ran, even if it was checked via "All".
+      profileId: activeProfileId ?? lastScan?.profileIds?.[0] ?? "",
       brandName: brand.trim(),
       productName: product.trim(),
       imageFilePath: photoUri,
@@ -57,7 +61,10 @@ export default function SaveToPantry() {
 
   return (
     <Screen>
-      <View style={{ gap: t.spacing.md, flex: 1, justifyContent: "center" }}>
+      <ScrollView
+        contentContainerStyle={{ gap: t.spacing.md, flexGrow: 1, justifyContent: "center" }}
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="title" bold>Save to Pantry</Text>
         <Text tone="muted" variant="caption">
           Snap a photo of the front of the packaging, then name it.
@@ -91,7 +98,7 @@ export default function SaveToPantry() {
         </Card>
         <Button title="Save" onPress={save} disabled={!brand.trim() || !product.trim()} />
         <Button title="Cancel" kind="secondary" onPress={() => router.back()} />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

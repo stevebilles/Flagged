@@ -3,9 +3,18 @@
 The user **does not press a shutter**. They point the camera and the app does the rest.
 Everything here runs **on-device, offline**. No cloud OCR.
 
-**Implementation base:** `react-native-vision-camera` frame processors + an on-device text
-recognizer (ML Kit / VisionCamera OCR). The stitching, normalization, and matching stages are pure
-TypeScript so they behave identically on iOS and Android.
+**Implementation base:** `react-native-vision-camera` frame processors + `modules/vision-ocr`, a
+local native module wrapping Apple's on-device Vision framework directly (replaces Google ML Kit,
+2026-09-13 — ML Kit's iOS accuracy on small/dense/glossy print was not good enough for a
+safety-critical ingredient match; see `docs/02`). The stitching, normalization, and matching stages
+are pure TypeScript so they behave identically across platforms; the OCR engine itself is
+per-platform (Android, not yet built, would need its own).
+
+**Note:** the actual current capture flow (`src/ocr/CameraScanner.tsx`) has evolved past the
+"3-second live scan" design below — it now waits for a live-read-quality signal (not a fixed timer)
+before taking a real burst of still photos, and reconciles multiple independent reads of the same
+view word-by-word to catch letter-level misreads. See the doc comment at the top of
+`CameraScanner.tsx` for the current, authoritative design.
 
 ---
 

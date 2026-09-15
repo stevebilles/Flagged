@@ -5,9 +5,16 @@ import { longestCommonSubstringLength } from "../matching/levenshtein";
  * Stitches the trailing text of the accumulated string with the leading text of
  * the next frame using the longest common substring as the overlap seam.
  *
- * This is the pure-TS core; the live camera frame processor (native, VisionCamera)
- * feeds recognized-and-spatially-sorted text into this on each frame. See the
- * camera screen for where the native plugin plugs in.
+ * `stitch()` itself is still live — src/ocr/burst.ts reuses it to merge
+ * full-resolution burst photos. `sortBlocks`/`frameText`/`pickBestFrameText`/
+ * `assembleParagraph` below, however, are no longer wired into
+ * CameraScanner.tsx (superseded 2026-09-13 by the burst-photo capture +
+ * completeness-check approach in burst.ts/completeness.ts, which fixed a
+ * real bug: stitching many small live-preview frames in arrival order, with
+ * no cross-frame spatial alignment, could scramble text when the hand
+ * drifted between frames). Kept here — still exported, still covered by
+ * stitch.test.ts — as validated pure-logic utilities, not dead weight to
+ * delete outright, in case a live-frame fallback mode is ever revisited.
  */
 export function stitch(accumulated: string, nextFrame: string): string {
   const a = accumulated.trim();

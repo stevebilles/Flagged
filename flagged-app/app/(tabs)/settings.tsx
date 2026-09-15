@@ -1,20 +1,33 @@
-import React, { useState } from "react";
-import { View, TextInput, Linking } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, ScrollView, TextInput, Linking, Platform } from "react-native";
+import { useRouter } from "expo-router";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { getMetaValue, setMetaValue } from "../../src/db/appMeta";
 import { getStats, saveStats } from "../../src/db/repositories";
 import { useAppStore } from "../../src/state/appStore";
-import { restorePurchases } from "../../src/purchases/purchases";
+import { restorePurchases, cachedRenewalDate, setDevPremiumOverride } from "../../src/purchases/purchases";
+import { scansRemaining } from "../../src/domain/scanService";
+import { FREE_SCAN_LIMIT } from "../../src/domain/types";
+
+const MANAGE_SUBSCRIPTION_URL = Platform.select({
+  ios: "https://apps.apple.com/account/subscriptions",
+  android: "https://play.google.com/store/account/subscriptions",
+  default: undefined,
+});
 
 /** SETTINGS — app administration & compliance (docs/05 Tab 4). */
 export default function Settings() {
   const t = useTheme();
+  const router = useRouter();
   const isPremium = useAppStore((s) => s.isPremium);
   const setPremium = useAppStore((s) => s.setPremium);
   const [name, setName] = useState(getMetaValue("firstName") ?? "");
   const [restoring, setRestoring] = useState(false);
   const [devNote, setDevNote] = useState<string | null>(null);
+
+  const scansUsed = FREE_SCAN_LIMIT - scansRemaining();
+  const renewalDate = useMemo(() => cachedRenewalDate(), [isPremium]);
 
   function saveName(v: string) {
     setName(v);
@@ -33,7 +46,7 @@ export default function Settings() {
 
   return (
     <Screen>
-      <View style={{ gap: t.spacing.lg }}>
+      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
         <View style={{ gap: t.spacing.sm }}>
           <Text tone="muted" variant="caption">FIRST NAME</Text>
           <Card>
@@ -48,11 +61,51 @@ export default function Settings() {
         </View>
 
         <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">PURCHASES</Text>
-          <Card style={{ gap: t.spacing.sm }}>
-            <Text>Status: {isPremium ? "Premium (Lifetime)" : "Trial"}</Text>
-            <Button title="Restore Purchases" kind="secondary" loading={restoring} onPress={onRestore} />
-          </Card>
+          <Text tone="muted" variant="caption">SUBSCRIPTION</Text>
+          {isPremium ? (
+            <Card style={{ gap: t.spacing.sm }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text bold>Flagged Pro</Text>
+                <Text tone="cyan" bold>Active</Text>
+              </View>
+              <Text tone="muted">
+                {renewalDate
+                  ? `Renews ${renewalDate.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}`
+                  : "$24.99/yr, auto-renewing"}
+              </Text>
+              <Button title="Restore Purchases" kind="secondary" loading={restoring} onPress={onRestore} />
+              {MANAGE_SUBSCRIPTION_URL && (
+                <Button
+                  title="Manage Subscription"
+                  kind="secondary"
+                  onPress={() => Linking.openURL(MANAGE_SUBSCRIPTION_URL)}
+                />
+              )}
+            </Card>
+          ) : (
+            <Card style={{ gap: t.spacing.sm }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View>
+                  <Text bold>Free Trial</Text>
+                  <Text tone="muted" variant="caption">{scansUsed} of {FREE_SCAN_LIMIT} scans used</Text>
+                </View>
+                <Text tone="cyan" bold>Trial</Text>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: t.colors.canvas, overflow: "hidden" }}>
+                <View
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, (scansUsed / FREE_SCAN_LIMIT) * 100)}%`,
+                    backgroundColor: t.colors.cyan,
+                  }}
+                />
+              </View>
+              <Text variant="display" bold tone="cyan">$24.99/yr</Text>
+              <Text tone="muted">Unlimited, offline label reading — every profile in your house.</Text>
+              <Button title="Unlock Flagged — $24.99/yr" onPress={() => router.push("/paywall")} />
+              <Button title="Restore Purchases" kind="secondary" loading={restoring} onPress={onRestore} />
+            </Card>
+          )}
         </View>
 
         <View style={{ gap: t.spacing.sm }}>
@@ -82,15 +135,20 @@ export default function Settings() {
                 title={isPremium ? "Turn OFF Premium" : "Turn ON Premium"}
                 kind="secondary"
                 onPress={() => {
-                  setPremium(!isPremium);
-                  setDevNote(isPremium ? "Premium off." : "Premium on — unlimited scans.");
+                  const next = !isPremium;
+                  // Persist to the offline cache too, not just the in-memory
+                  // store — otherwise the next app-foreground entitlement
+                  // check silently reverts this back to free.
+                  setDevPremiumOverride(next);
+                  setPremium(next);
+                  setDevNote(next ? "Premium on — unlimited scans." : "Premium off.");
                 }}
               />
               {devNote && <Text tone="cyan" variant="caption">{devNote}</Text>}
             </Card>
           </View>
         )}
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

@@ -1,61 +1,174 @@
-import React, { useMemo, useState } from "react";
-import { View, ScrollView, TextInput, Pressable, Switch } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { View, ScrollView, TextInput, Pressable, Switch, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Screen, Text, Card, Button, Pill, Badge } from "../src/design/components";
+import { Ionicons } from "@expo/vector-icons";
+import { Screen, Text, Card, Pill, Badge, ClassificationGuide } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import {
   getCategories,
   getIngredientTermMap,
   getProfile,
-  getQuickPacks,
+  getProfiles,
   createProfile,
   updateProfile,
+  deleteProfile,
 } from "../src/db/repositories";
 import {
   addCustomIngredient,
-  isPackActive,
   removeCustomIngredient,
   toggleCategory,
   toggleIngredientExcluded,
-  togglePack,
 } from "../src/domain/activation";
+import { profileColor } from "../src/design/avatar";
+import { displayName } from "../src/domain/types";
 import type { Category, Profile, ParentGroup } from "../src/domain/types";
 
 const GROUP_ORDER: ParentGroup[] = ["Allergens", "Sugars", "Additives", "Dietary"];
 
 /**
- * Profile editor (docs/05 Home → Edit). Quick Pack pills, categories grouped by
- * parent with classification badges + on/off switches, expandable individual
- * ingredient toggles, and custom ingredients. Activation per docs/data-schema.md.
+ * Profile editor (docs/05 Home → Edit, docs/17 profile_edit mockups).
+ * Categories grouped by parent with classification badges + on/off switches,
+ * expandable individual ingredient toggles, a combined ingredient
+ * search/custom-add box, and profile deletion. Activation per docs/data-schema.md.
+ *
+ * Quick Packs (bulk-select bundles of categories) were removed from this
+ * screen — several packs share a category with each other, and turning one
+ * off/on had knock-on effects on the others that kept confusing users no
+ * matter how it was explained. Toggling categories directly has no such
+ * coupling: each switch does exactly what it shows.
  */
 export default function ProfileEdit() {
   const t = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; new?: string }>();
+  const activeProfileId = useAppStore((s) => s.activeProfileId);
   const setActiveProfile = useAppStore((s) => s.setActiveProfile);
 
-  const packs = useMemo(() => getQuickPacks(), []);
   const categories = useMemo(() => getCategories(), []);
   const termById = useMemo(() => getIngredientTermMap(), []);
 
   const [profile, setProfile] = useState<Profile>(() => {
-    if (params.new) return createProfile("New Profile");
-    return getProfile(params.id ?? "") ?? createProfile("New Profile");
+    // A brand-new profile starts with an empty name so the "Profile name..."
+    // placeholder shows through — a pre-filled "New Profile" looked like an
+    // already-chosen name with no hint that tapping it does anything.
+    if (params.new) return createProfile("");
+    return getProfile(params.id ?? "") ?? createProfile("");
   });
+  // Position among all profiles (same creation order Home uses) — the avatar
+  // dot's color comes from this, not the id, so it can never collide with
+  // another profile's color the way a hash could.
+  const profileIndex = useMemo(() => {
+    const idx = getProfiles().findIndex((p) => p.profileId === profile.profileId);
+    return idx === -1 ? 0 : idx;
+  }, [profile.profileId]);
+  const nameInputRef = useRef<TextInput>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [custom, setCustom] = useState("");
+  const [query, setQuery] = useState("");
+  const [customNote, setCustomNote] = useState<string | null>(null);
 
   const activeSet = new Set(profile.activeCategoryIds);
   const excludedSet = new Set(profile.excludedIngredientIds);
+
+  // Every default ingredient term, lowercased, mapped to the category that
+  // owns it — used both to answer "what category is X in?" (search) and to
+  // stop a custom ingredient from duplicating one already in the dictionary.
+  const termToCategory = useMemo(() => {
+    const map = new Map<string, Category>();
+    for (const cat of categories) {
+      for (const ingId of cat.ingredientIds) {
+        const term = termById.get(ingId);
+        if (term) map.set(term.toLowerCase(), cat);
+      }
+    }
+    return map;
+  }, [categories, termById]);
+
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const results: { ingredientId: string; term: string; category: Category }[] = [];
+    for (const cat of categories) {
+      for (const ingId of cat.ingredientIds) {
+        const term = termById.get(ingId);
+        if (term && term.toLowerCase().includes(q)) {
+          results.push({ ingredientId: ingId, term, category: cat });
+        }
+      }
+    }
+    return results;
+  }, [query, categories, termById]);
 
   function persist(next: Profile) {
     setProfile(next);
     updateProfile(next);
   }
 
-  function save() {
-    updateProfile(profile);
+  // Search result tap: make sure this exact ingredient is switched on — turn
+  // on its category if needed, and un-exclude the ingredient if it had been
+  // individually excluded — then jump to it in the list below.
+  function activateIngredient(categoryId: string, ingredientId: string) {
+    let next = profile;
+    if (!activeSet.has(categoryId)) next = toggleCategory(next, categoryId);
+    if (excludedSet.has(ingredientId)) next = toggleIngredientExcluded(next, ingredientId);
+    persist(next);
+    setExpanded(categoryId);
+    setQuery("");
+  }
+
+  function addCustom() {
+    const term = query.trim();
+    if (!term) return;
+    const lower = term.toLowerCase();
+    if (profile.customIngredients.includes(lower)) {
+      setCustomNote(`"${term}" is already in your custom list.`);
+      return;
+    }
+    const existing = termToCategory.get(lower);
+    if (existing) {
+      setCustomNote(`"${term}" is already tracked under ${existing.name} — turn that filter on above instead of adding it as custom.`);
+      return;
+    }
+    persist(addCustomIngredient(profile, term));
+    setQuery("");
+    setCustomNote(null);
+  }
+
+  function confirmDelete() {
+    const name = displayName(profile.name);
+    Alert.alert(
+      `Delete ${name}?`,
+      `This removes ${name}'s profile and filters. Pantry items already saved for ${name} are kept, but won't show under this profile anymore.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteProfile(profile.profileId);
+            if (activeProfileId === profile.profileId) {
+              setActiveProfile(getProfiles()[0]?.profileId ?? "");
+            }
+            router.back();
+          },
+        },
+      ]
+    );
+  }
+
+  // Every toggle on this screen already persists immediately via persist()
+  // above — there's nothing left to save here. This just closes the screen,
+  // and (only meaningful for a brand-new profile; a no-op otherwise, since
+  // the only other way to reach this screen is editing the already-active
+  // profile) makes sure the profile being edited is the active one.
+  //
+  // The stored name is allowed to stay empty (never falls back to writing
+  // literal "New Profile" text) — that text would otherwise become the
+  // field's real value next time this profile is edited, forcing the user
+  // to delete it before typing their own name instead of just typing over
+  // a placeholder. Anywhere the name needs to be *displayed*, displayName()
+  // supplies the "New Profile" fallback without ever touching storage.
+  function finish() {
     setActiveProfile(profile.profileId);
     router.back();
   }
@@ -65,58 +178,138 @@ export default function ProfileEdit() {
     cats: categories.filter((c) => c.parentGroup === g),
   })).filter((x) => x.cats.length > 0);
 
+  const categoryCount = profile.activeCategoryIds.length;
+
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }}>
-        <Text variant="title" bold>Edit Profile</Text>
-        <Card>
-          <TextInput
-            value={profile.name}
-            onChangeText={(v) => persist({ ...profile, name: v })}
-            placeholder="Profile name"
-            placeholderTextColor={t.colors.textMuted}
-            style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.body }}
-          />
-        </Card>
-
-        {/* QUICK PACKS */}
-        <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">QUICK PACKS</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-            {packs.map((p) => (
-              <Pill
-                key={p.id}
-                label={p.name}
-                selected={isPackActive(profile, p)}
-                onPress={() => persist(togglePack(profile, p, packs))}
-              />
-            ))}
+      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
+        {/* HEADER — back button, name, and Save all on one row; subtitle below */}
+        <View style={{ gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: t.colors.card,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="chevron-back" size={22} color={t.colors.textPrimary} />
+            </Pressable>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: t.spacing.sm }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: profileColor(profileIndex) }} />
+              {/* Card background (lighter than the screen behind it), same
+                  pattern as the ingredient search box below — reads as a real
+                  input field rather than plain text, with or without a name typed in. */}
+              <View style={{ backgroundColor: t.colors.card, borderRadius: t.radius.md, paddingHorizontal: t.spacing.md, paddingVertical: 6 }}>
+                <TextInput
+                  ref={nameInputRef}
+                  autoFocus={!!params.new}
+                  value={profile.name}
+                  onChangeText={(v) => persist({ ...profile, name: v })}
+                  placeholder="Profile name..."
+                  placeholderTextColor={t.colors.textMuted}
+                  textAlign="center"
+                  style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.title }}
+                />
+              </View>
+            </View>
+            <Pressable
+              onPress={finish}
+              style={({ pressed }) => ({
+                backgroundColor: t.colors.cyan,
+                borderRadius: t.radius.md,
+                paddingVertical: 8,
+                paddingHorizontal: t.spacing.md,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Text style={{ color: "#0B1220", fontFamily: t.fontFamily.bold }}>Done</Text>
+            </Pressable>
           </View>
+          <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
+            {categoryCount} {categoryCount === 1 ? "category" : "categories"} active
+          </Text>
         </View>
 
-        {/* CUSTOM */}
+        {/* CUSTOM INGREDIENTS (search the dictionary or add your own) */}
         <View style={{ gap: t.spacing.sm }}>
-          <Text tone="muted" variant="caption">CUSTOM — your own ingredients</Text>
-          <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-            <Card style={{ flex: 1 }}>
+          <Text tone="muted" variant="caption">CUSTOM INGREDIENTS</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+            <Card style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+              <Ionicons name="search" size={18} color={t.colors.textMuted} />
               <TextInput
-                value={custom}
-                onChangeText={setCustom}
-                placeholder="e.g. carrageenan"
+                value={query}
+                onChangeText={(v) => {
+                  setQuery(v);
+                  setCustomNote(null);
+                }}
+                placeholder="Search or add an ingredient..."
                 placeholderTextColor={t.colors.textMuted}
-                style={{ color: t.colors.textPrimary, fontFamily: t.fontFamily.regular }}
+                style={{ flex: 1, color: t.colors.textPrimary, fontFamily: t.fontFamily.regular, fontSize: t.fontSize.body }}
               />
             </Card>
-            <Button
-              title="Add"
-              onPress={() => {
-                if (custom.trim()) {
-                  persist(addCustomIngredient(profile, custom));
-                  setCustom("");
-                }
+            <Pressable
+              onPress={addCustom}
+              disabled={!query.trim()}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: t.radius.md,
+                backgroundColor: t.colors.cyan,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: query.trim() ? 1 : 0.5,
               }}
-            />
+            >
+              <Ionicons name="add" size={22} color="#0B1220" />
+            </Pressable>
           </View>
+          <Text tone="muted" variant="caption">
+            Type an ingredient and tap + to add it. We'll let you know if it's already covered by a default category.
+          </Text>
+
+          {query.trim().length > 0 &&
+            (searchResults.length > 0 ? (
+              <View style={{ gap: t.spacing.xs }}>
+                {/* Keyed by category+ingredient, not just ingredient: a few
+                    ingredient rows are shared by two categories (docs/data-schema.md
+                    "Shared ingredient terms", e.g. wheat in both Wheat and Gluten
+                    Sources) and both are valid, separately-actionable results. */}
+                {searchResults.slice(0, 15).map((r) => (
+                  <Pressable
+                    key={`${r.category.id}-${r.ingredientId}`}
+                    onPress={() => activateIngredient(r.category.id, r.ingredientId)}
+                    style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}
+                  >
+                    <Text style={{ flexShrink: 1 }}>{r.term}</Text>
+                    <Text tone={activeSet.has(r.category.id) && !excludedSet.has(r.ingredientId) ? "cyan" : "muted"} variant="caption">
+                      {activeSet.has(r.category.id) && !excludedSet.has(r.ingredientId)
+                        ? `${r.category.name} · on`
+                        : `${r.category.name} · tap to turn on`}
+                    </Text>
+                  </Pressable>
+                ))}
+                {searchResults.length > 15 && (
+                  <Text tone="muted" variant="caption">
+                    +{searchResults.length - 15} more — keep typing to narrow it down.
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <Text tone="muted">No match in our list for "{query.trim()}" — tap + above to add it as custom.</Text>
+            ))}
+
+          {customNote && (
+            <Text tone="warning" variant="caption">
+              {customNote}
+            </Text>
+          )}
+
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
             {profile.customIngredients.map((c) => (
               <Pill key={c} label={`${c}  ✕`} selected onPress={() => persist(removeCustomIngredient(profile, c))} />
@@ -124,54 +317,113 @@ export default function ProfileEdit() {
           </View>
         </View>
 
-        {/* CATEGORIES grouped by parent */}
+        <ClassificationGuide />
+
+        {/* CATEGORIES grouped by parent — one row each, grouped into one card per section */}
         {grouped.map(({ group, cats }) => (
           <View key={group} style={{ gap: t.spacing.sm }}>
             <Text tone="muted" variant="caption">{group.toUpperCase()}</Text>
-            {cats.map((cat: Category) => (
-              <Card key={cat.id} style={{ gap: t.spacing.sm }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text bold>{cat.name}</Text>
-                    <Pressable onPress={() => setExpanded(expanded === cat.id ? null : cat.id)}>
-                      <Text tone="muted" variant="caption">
-                        {cat.ingredientIds.length} names · tap for details
-                      </Text>
-                    </Pressable>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              {cats.map((cat: Category, idx) => (
+                <View
+                  key={cat.id}
+                  style={{
+                    paddingHorizontal: t.spacing.md,
+                    borderTopWidth: idx > 0 ? 1 : 0,
+                    borderTopColor: t.colors.canvas,
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setExpanded(expanded === cat.id ? null : cat.id)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm, paddingVertical: t.spacing.sm }}
+                  >
+                    <Ionicons
+                      name={expanded === cat.id ? "chevron-down" : "chevron-forward"}
+                      size={16}
+                      color={t.colors.textMuted}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text bold>{cat.name}</Text>
+                      <Text tone="muted" variant="caption">{cat.ingredientIds.length} ingredients</Text>
+                    </View>
                     <Badge classification={cat.classification} />
-                  </View>
-                  <Switch
-                    value={activeSet.has(cat.id)}
-                    onValueChange={() => persist(toggleCategory(profile, cat.id))}
-                    trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
-                  />
-                </View>
+                    <Switch
+                      value={activeSet.has(cat.id)}
+                      onValueChange={() => persist(toggleCategory(profile, cat.id))}
+                      trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
+                    />
+                  </Pressable>
 
-                {expanded === cat.id && (
-                  <View style={{ gap: 4, borderTopWidth: 1, borderTopColor: t.colors.canvas, paddingTop: t.spacing.sm }}>
-                    {cat.ingredientIds.map((ingId) => {
-                      const excluded = excludedSet.has(ingId);
-                      return (
-                        <View key={ingId} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                          <Text tone={excluded ? "muted" : "primary"} style={excluded ? { textDecorationLine: "line-through" } : undefined}>
-                            {termById.get(ingId) ?? ingId}
+                  {expanded === cat.id && (() => {
+                    const categoryOn = activeSet.has(cat.id);
+                    return (
+                      <View style={{ paddingBottom: t.spacing.xs, borderTopWidth: 1, borderTopColor: t.colors.canvas }}>
+                        {!categoryOn && (
+                          <Text tone="muted" variant="caption" style={{ paddingTop: t.spacing.sm }}>
+                            {cat.name} is off, so every ingredient below is off too — turn the category on above to set exclusions.
                           </Text>
-                          <Switch
-                            value={!excluded}
-                            onValueChange={() => persist(toggleIngredientExcluded(profile, ingId))}
-                            trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </Card>
-            ))}
+                        )}
+                        {cat.ingredientIds.map((ingId, ingIdx) => {
+                          const excluded = excludedSet.has(ingId);
+                          // Effective state = category on AND not individually excluded — matches
+                          // what actually gets checked while scanning (docs/data-schema.md), so a
+                          // category switched off can't leave its ingredient rows looking lit.
+                          const effectivelyOn = categoryOn && !excluded;
+                          return (
+                            <View
+                              key={ingId}
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                paddingVertical: t.spacing.sm,
+                                borderTopWidth: ingIdx > 0 ? 1 : 0,
+                                borderTopColor: t.colors.canvas,
+                              }}
+                            >
+                              <Text
+                                tone={effectivelyOn ? "primary" : "muted"}
+                                style={categoryOn && excluded ? { textDecorationLine: "line-through" } : undefined}
+                              >
+                                {termById.get(ingId) ?? ingId}
+                              </Text>
+                              <Switch
+                                value={effectivelyOn}
+                                disabled={!categoryOn}
+                                onValueChange={() => persist(toggleIngredientExcluded(profile, ingId))}
+                                trackColor={{ true: t.colors.cyan, false: t.colors.textMuted }}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
+                </View>
+              ))}
+            </Card>
           </View>
         ))}
 
-        <Button title="Done" onPress={save} />
+        <Pressable
+          onPress={confirmDelete}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: t.spacing.sm,
+            paddingVertical: 14,
+            borderRadius: t.radius.md,
+            borderWidth: 1,
+            borderColor: t.colors.red,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Ionicons name="trash-outline" size={18} color={t.colors.red} />
+          <Text style={{ color: t.colors.red, fontFamily: t.fontFamily.bold, fontSize: t.fontSize.body }}>
+            Delete Profile
+          </Text>
+        </Pressable>
       </ScrollView>
     </Screen>
   );

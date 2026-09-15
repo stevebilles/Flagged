@@ -1,17 +1,23 @@
 # 14 — Camera & OCR Integration
 
-> **Status: IMPLEMENTED.** The live camera OCR is now wired end-to-end (Option A). This doc
-> describes the implementation and what remains **device-only** to verify. The pipeline downstream
-> of a captured paragraph (normalize → match → results → stats) was already built and tested
-> (docs/06, `07`, `13`).
+> **Status: IMPLEMENTED, since superseded in several places.** The live camera OCR is wired
+> end-to-end. This doc's "chosen stack" section below is kept current; the rest describes an early
+> implementation snapshot (a 3-second countdown, live-frame stitching) that later work replaced —
+> see the doc comment at the top of `src/ocr/CameraScanner.tsx` for the current, authoritative
+> capture design (a live-read-quality trigger, real burst photos, multi-shot reconciliation). The
+> pipeline downstream of a captured paragraph (normalize → match → results → stats) was already
+> built and tested (docs/06, `07`, `13`).
 
 ## The chosen stack
 
 - **`react-native-vision-camera` `4.5.1`** — camera + frame processors.
-- **`react-native-vision-camera-text-recognition` `^3.x`** — ML Kit on-device OCR frame-processor
-  plugin (`useTextRecognition({ language: "latin" }).scanText(frame)` + `PhotoRecognizer` for
-  stills). Fully offline on iOS and Android.
-- **`react-native-worklets-core` `1.3.3`** — required by the plugin's frame processor; its babel
+- **`modules/vision-ocr`** (local native module, iOS) — Apple's own on-device Vision framework
+  (`VNRecognizeTextRequest`) called directly, for both the live frame-processor readiness signal
+  (`visionScanText(frame)`, Vision `.fast` mode) and still-photo analysis (`recognizeText(uri)`,
+  Vision `.accurate` mode). Replaces `react-native-vision-camera-text-recognition` (Google ML Kit,
+  2026-09-13) — see `docs/02`'s "one real tradeoff" for why. Fully offline; iOS only for now
+  (Android, not yet built, would need its own engine).
+- **`react-native-worklets-core` `1.3.3`** — required for the frame processor; its babel
   plugin is added in `babel.config.js` (before reanimated's, which stays last).
 - **`expo-image-picker`** (Choose Photo) and **`expo-clipboard`** (Paste).
 

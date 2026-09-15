@@ -46,8 +46,8 @@ chosen to avoid.
 • Your Safe List (Pantry). Save approved products, and get reminded to re-check items in case a
   brand quietly changes the recipe.
 
-Try it free: 10 full scans with every feature unlocked. Then unlock unlimited scanning for life for
-a one-time $24.99 — no subscriptions.
+Try it free: 10 full scans with every feature unlocked. Then unlock unlimited scanning for
+$24.99/year — less than $0.07 a day.
 
 Flagged helps you read labels faster; it is not medical advice and does not replace reading the
 packaging yourself.
@@ -72,7 +72,7 @@ looks final). Do NOT fabricate.
 3. A **Clean** result — "No red flags detected."
 4. Profile editor — Quick Packs + category toggles with classification badges.
 5. Pantry / Safe List.
-6. Pricing card — $24.99 lifetime, "no subscriptions."
+6. Pricing card — $24.99/year.
 
 **IAP review screenshot (App Store Connect → the in-app purchase):** a real capture of the
 **paywall screen** (`app/paywall.tsx`). Same size rules as above.
@@ -90,22 +90,23 @@ looks final). Do NOT fabricate.
 
 ## App Privacy (iOS) / Data safety (Android)
 
-Flagged is architecturally **zero-backend, on-device** (docs/01/02). This makes the privacy
-answers simple and strong.
+Flagged is architecturally **zero-backend, on-device** (docs/01/02) for everything except
+purchases. The app has no accounts, no analytics SDK, and no crash reporting anywhere in `src/` —
+RevenueCat (for the $24.99/yr subscription, docs/08) is the only data collected.
 
-- **Data collected:** **None.** The app does not collect or transmit personal data.
+- **Data collected: Purchases (Purchase History).** Collected via RevenueCat/StoreKit to validate
+  the subscription. Not linked to the user's identity (no accounts/sign-in; RevenueCat identifies
+  the device with an anonymous, app-generated ID). Not used for tracking. Purpose: **App
+  Functionality** only.
 - **Camera:** used **only** on-device to read label text; **no images or text are uploaded or
   stored off-device** (thumbnails saved to the Pantry stay local and are excluded from backup —
   docs/03). Declare camera **usage**, but it is not "data collection."
 - **Tracking:** none. No ATT prompt needed (no cross-app tracking, no ad SDKs).
-- **Purchases:** processed by Apple/Google + RevenueCat for entitlement. If RevenueCat's SDK is
-  considered a data recipient, disclose the minimal purchase/identifier data it processes per their
-  guidance — it is used for purchase functionality, not tracking. Confirm current RevenueCat
-  privacy guidance at submission time.
 - **Account:** none (no sign-in).
 
-> **Answer with care:** the "no data collected" claim must remain true. If any future analytics or
-> crash reporting is added, update these answers and the Privacy Policy accordingly.
+> **Answer with care:** confirm RevenueCat's current official Apple App Privacy guidance at
+> submission time (their recommended answers can shift). If any future analytics or crash
+> reporting is added, update these answers and the Privacy Policy accordingly.
 
 ## Support & marketing URLs
 
@@ -122,6 +123,6 @@ Wire the same URLs into the Settings tab links (docs/05 Tab 4).
 - [ ] Real screenshots at required sizes (app running, fonts installed)
 - [ ] IAP review screenshot = the paywall
 - [ ] Privacy Policy + Terms hosted at public HTTPS URLs; linked in Settings
-- [ ] App Privacy / Data safety completed ("no data collected", camera on-device)
-- [ ] IAP `flagged_lifetime` attached to the version; iOS Agreements Active (docs/08/12)
+- [ ] App Privacy / Data safety completed (Purchases only, camera on-device)
+- [ ] IAP `flagged_annual` attached to the version; iOS Agreements Active (docs/08/12)
 - [ ] Description avoids medical/safety guarantees
