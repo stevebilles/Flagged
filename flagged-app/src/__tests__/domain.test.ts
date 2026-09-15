@@ -315,6 +315,34 @@ describe("matcher", () => {
     const r = matchParagraph("Ingredients: Maize, Rice, Sunflower oil, Herb extract", ["safflower oil"]);
     expect(r.isClean).toBe(true);
   });
+
+  it("does not fuzzy-match a bilingual label's generic French 'farine' as the English term 'farina' (real device miss, 2026-09-14)", () => {
+    // "farina" (Wheat) is 1 edit from "farine" — French for "flour" in
+    // general, printed on every bilingual ingredient list regardless of
+    // which flour is actually used. A real scan false-flagged Wheat on a
+    // French section reading "Farine de soya" (soy flour) purely because
+    // "farine" and "farina" are both 6 letters, 1 edit apart. "farina" is
+    // exact-match-only now specifically because of this.
+    const r = matchParagraph("Ingrédients: Farine de soya, Farine de riz, Sel", ["farina"]);
+    expect(r.isClean).toBe(true);
+  });
+
+  it("still matches 'farina' when the label actually says it", () => {
+    const r = matchParagraph("Ingredients: Farina, Sugar, Salt", ["farina"]);
+    expect(r.isClean).toBe(false);
+    expect(r.matches[0]).toMatchObject({ term: "farina", kind: "exact" });
+  });
+
+  it("the common-words countersignal is a general mechanism, not a one-off fix for farina specifically", () => {
+    // "water" is a COMMON_LABEL_WORDS entry, unrelated to any real dictionary
+    // term — this proves the guard rejects a fuzzy candidate for ANY term
+    // one edit away from an ordinary word, not just the farina/farine pair
+    // that motivated it. A fictional 5-letter term stands in for "some
+    // future dictionary term" so this doesn't depend on today's dictionary
+    // contents happening to collide with "water".
+    const r = matchParagraph("Ingredients: Water, Sugar, Salt", ["watee"]);
+    expect(r.isClean).toBe(true);
+  });
 });
 
 describe("cleanForDisplay (results-screen cosmetic OCR cleanup)", () => {

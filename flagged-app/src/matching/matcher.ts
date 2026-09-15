@@ -47,6 +47,60 @@ function maxAllowedEdits(length: number): number {
   return 3;
 }
 
+/**
+ * Ordinary, common ingredient-label words — English and French — that are
+ * NOT themselves being checked for (docs, 2026-09-14). Used as a
+ * countersignal during fuzzy matching: a candidate word that exactly equals
+ * one of these, but isn't the term currently being checked, is confidently
+ * a real, different, unrelated word — not "the term, misread" — so it's
+ * rejected as a fuzzy candidate before the edit-distance check even runs.
+ *
+ * This exists because the matcher's ONLY vocabulary used to be the profile's
+ * dangerous terms — so an ordinary word with no dangerous meaning at all
+ * (French "farine," meaning any kind of flour) got force-fit against
+ * whichever dangerous term happened to be spelled similarly ("farina," a
+ * specific wheat product), for lack of anything else to compare it to. Real
+ * device miss (2026-09-14): this false-flagged Wheat on a label whose
+ * French section just said "farine" for wheat, soy, and barley flour alike.
+ * Giving the matcher a broader "these are just ordinary words" vocabulary
+ * fixes the whole class of this mistake at once, not just this one pair —
+ * see `dictionaryCollisions.test.ts` for the complementary check (two
+ * DIFFERENT dangerous terms colliding with each other, which this list
+ * can't help with since neither side is "just an ordinary word").
+ *
+ * Doesn't need to be exhaustive: an exact real match to your actual list is
+ * always caught before fuzzy matching ever runs (see `findPresence` above),
+ * so a term missing from this list only means one fewer countersignal for
+ * ambiguous fuzzy cases, not a missed real match.
+ */
+const COMMON_LABEL_WORDS = new Set([
+  // English
+  "salt", "water", "sugar", "oil", "flour", "milk", "cream", "butter", "cheese",
+  "egg", "eggs", "corn", "rice", "wheat", "oats", "yeast", "spice", "spices",
+  "natural", "flavor", "flavour", "color", "colour", "starch", "vinegar",
+  "extract", "powder", "syrup", "gum", "acid", "vitamin", "protein", "sodium",
+  "potassium", "calcium", "iron", "contains", "ingredients",
+  // French
+  "farine", "sucre", "sucres", "lait", "sel", "sels", "oeuf", "oeufs", "huile",
+  "soja", "soya", "ble", "avoine", "orge", "seigle", "levure", "contient",
+  "ingredients", "poudre", "extrait", "arome", "naturel", "amidon",
+  "maltodextrine", "colorant", "conservateur", "acide", "citrique", "vinaigre",
+  "beurre", "fromage", "legume", "legumes", "assaisonnement", "riz", "mais",
+  "lecithine", "lactoserum", "moutarde", "noix", "arachide", "poisson",
+  "crustace", "sesame", "epice", "epices", "sirop", "miel", "melasse",
+  "phosphate", "fer", "vitamine", "proteine", "eau", "sans", "avec", "creme",
+]);
+
+/**
+ * Single-word terms that must never fuzzy-match at all, even against a word
+ * not covered by COMMON_LABEL_WORDS — an escape hatch for a same-vocabulary
+ * collision between two genuinely dangerous-sounding terms (neither side an
+ * "ordinary word" COMMON_LABEL_WORDS could catch). Empty for now; see
+ * `dictionaryCollisions.test.ts` for how those get surfaced before shipping
+ * instead of by a user hitting one on a real scan.
+ */
+const NEVER_FUZZY = new Set<string>([]);
+
 export interface Match {
   token: string; // the offending text from the label
   term: string; // the red-flag term it matched
@@ -71,6 +125,14 @@ export interface ScanResult {
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Diacritics are preserved through normalizeParagraph (real French OCR
+ * output keeps them — "Arôme," "Lécithine" — even though it sometimes
+ * doesn't), but COMMON_LABEL_WORDS is written unaccented for maintainability.
+ * Stripped at comparison time so a lookup matches either form. */
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 /**
@@ -148,11 +210,15 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
     const termWords = term.split(" ");
     if (termWords.length === 1) {
       // Fuzzy — single-word terms, against individual label words.
-      if (term.length < 5) continue;
+      if (term.length < 5 || NEVER_FUZZY.has(term)) continue;
       let best: Hit | null = null;
       for (const w of words) {
         if (Math.abs(w.length - term.length) > 2) continue;
         if (levenshtein(w, term) > maxAllowedEdits(term.length)) continue;
+        // w is already known not to exactly equal term (findPresence above
+        // would've caught that) — so if it exactly equals some OTHER
+        // ordinary word, it's confidently that word, not term misread.
+        if (COMMON_LABEL_WORDS.has(stripAccents(w))) continue;
         const score = similarity(w, term);
         if (!best || score > best.score) {
           const at = normalized.indexOf(w);
@@ -205,7 +271,8 @@ export function matchParagraph(rawParagraph: string, redFlagTerms: string[]): Sc
           // signal even with a neighbor's help.
           termWord.length < 3 ||
           Math.abs(labelWord.length - termWord.length) > 2 ||
-          levenshtein(labelWord, termWord) > maxAllowedEdits(termWord.length)
+          levenshtein(labelWord, termWord) > maxAllowedEdits(termWord.length) ||
+          COMMON_LABEL_WORDS.has(stripAccents(labelWord))
         ) {
           ok = false;
           break;
