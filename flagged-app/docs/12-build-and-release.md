@@ -7,8 +7,8 @@ How to produce store-ready builds and submit Flagged to the App Store and Google
 
 | What | Value |
 |---|---|
-| iOS bundle identifier | `com.billesappcoinc.flaggedingredientscanner` |
-| Android package | `com.billesappcoinc.flaggedingredientscanner` |
+| iOS bundle identifier | `com.billesappcoinc.flagged` |
+| Android package | `com.billesappcoinc.flagged` |
 | IAP product ID | `flagged_annual` (auto-renewing subscription, $24.99/yr) |
 | RevenueCat entitlement | `premium` |
 | RevenueCat offering | `default` |
@@ -77,7 +77,7 @@ Builds run in the cloud; the CLI prints a URL to download the artifact / view lo
 ### iOS → App Store / TestFlight
 
 Prereqs (done once in App Store Connect):
-- App record created with bundle ID `com.billesappcoinc.flaggedingredientscanner`.
+- App record created with bundle ID `com.billesappcoinc.flagged`.
 - **Agreements, Tax, and Banking** = Active (required for paid IAP — docs/08).
 - IAP `flagged_annual` created (auto-renewing subscription, 1-year, $24.99) and submitted with the app.
 - Store listing metadata + screenshots (see `15-store-listing.md`).
@@ -92,7 +92,7 @@ Then in App Store Connect: attach the build, complete **App Privacy** answers (s
 ### Android → Google Play
 
 Prereqs:
-- App created in Play Console with package `com.billesappcoinc.flaggedingredientscanner`.
+- App created in Play Console with package `com.billesappcoinc.flagged`.
 - Subscription product `flagged_annual` created + activated ($24.99/yr).
 - A **Google service account JSON** with Play Developer API access (for `eas submit`).
 - Data safety form completed (on-device; no collection).
