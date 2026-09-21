@@ -27,14 +27,22 @@ export function selectPack(profile: Profile, pack: QuickPack): Profile {
 /** Toggle a single category on/off (row switch). */
 export function toggleCategory(profile: Profile, categoryId: string): Profile {
   const set = new Set(profile.activeCategoryIds);
-  set.has(categoryId) ? set.delete(categoryId) : set.add(categoryId);
+  if (set.has(categoryId)) {
+    set.delete(categoryId);
+  } else {
+    set.add(categoryId);
+  }
   return { ...profile, activeCategoryIds: [...set] };
 }
 
 /** Toggle an individual ingredient off/on ("tap for details"). */
 export function toggleIngredientExcluded(profile: Profile, ingredientId: string): Profile {
   const set = new Set(profile.excludedIngredientIds);
-  set.has(ingredientId) ? set.delete(ingredientId) : set.add(ingredientId);
+  if (set.has(ingredientId)) {
+    set.delete(ingredientId);
+  } else {
+    set.add(ingredientId);
+  }
   return { ...profile, excludedIngredientIds: [...set] };
 }
 

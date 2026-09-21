@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { View, ScrollView, TextInput, Pressable, Linking, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -68,7 +68,9 @@ export default function Settings() {
   const [devNote, setDevNote] = useState<string | null>(null);
 
   const scansUsed = FREE_SCAN_LIMIT - scansRemaining();
-  const renewalDate = useMemo(() => cachedRenewalDate(), [isPremium]);
+  // Cheap sync SQLite read — call directly each render so it never goes stale
+  // after a renewal that leaves `isPremium` unchanged (true -> true).
+  const renewalDate = cachedRenewalDate();
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
   function saveName(v: string) {
