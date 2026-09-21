@@ -5,14 +5,6 @@
  *
  * `src/db/repositories` is mocked so these stay pure (it pulls in expo-sqlite).
  */
-jest.mock("../db/repositories", () => ({
-  getCategories: jest.fn(() => []),
-  getIngredientTermMap: jest.fn(() => new Map<string, string>()),
-  getStats: jest.fn(),
-  saveStats: jest.fn(),
-  updateProfile: jest.fn(),
-}));
-
 import * as repo from "../db/repositories";
 import {
   canScan,
@@ -26,6 +18,14 @@ import {
 import type { Stats, Profile, Category } from "../domain/types";
 import type { ScanResult, Match } from "../matching/matcher";
 import type { RecheckOutcome, AttributedMatch, MatchAttribution } from "../domain/recheckEngine";
+
+jest.mock("../db/repositories", () => ({
+  getCategories: jest.fn(() => []),
+  getIngredientTermMap: jest.fn(() => new Map<string, string>()),
+  getStats: jest.fn(),
+  saveStats: jest.fn(),
+  updateProfile: jest.fn(),
+}));
 
 const zeroStats = (): Stats => ({
   statsId: "s1",
