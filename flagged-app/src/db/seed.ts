@@ -1,7 +1,6 @@
 import { randomUUID } from "expo-crypto";
 import { sqlite, ensureTables, runMigrations } from "./client";
 import type { SeedFile } from "../domain/types";
-import { FREE_SCAN_LIMIT } from "../domain/types";
 
 // Bundled dictionary (docs/data-schema.md). Parsed into SQLite on first launch.
 import seedJson from "../../assets/data/ingredients.json";
@@ -108,5 +107,3 @@ function ensureDefaultProfile(): void {
     );
   }
 }
-
-export { FREE_SCAN_LIMIT };

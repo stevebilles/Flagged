@@ -2,8 +2,8 @@ import { matchParagraph, Match, ScanResult } from "../matching/matcher";
 import { looksLikeIngredientList } from "../matching/normalize";
 import { effectiveRedFlagMeta, effectiveRedFlagMetaForAll, RedFlagMeta, AllProfilesMeta } from "./activation";
 import type { RecheckOutcome } from "./recheckEngine";
-import { getCategories, getIngredientTermMap, getStats, saveStats, updateProfile } from "../db/repositories";
-import { displayName, FREE_SCAN_LIMIT, type Profile } from "./types";
+import { getCategories, getIngredientTermMap, updateProfile } from "../db/repositories";
+import { displayName, type Profile } from "./types";
 
 /**
  * Orchestrates a scan (docs/06/07/08).
@@ -16,7 +16,7 @@ import { displayName, FREE_SCAN_LIMIT, type Profile } from "./types";
  */
 
 export type ScanEvaluation =
-  | { status: "aborted"; reason: "illegible" } // does NOT consume a free scan
+  | { status: "aborted"; reason: "illegible" } // does NOT commit stats
   | { status: "result"; result: ScanResult };
 
 /** Attach the catching filter's name/classification (and, in "All" mode, whose
@@ -70,25 +70,11 @@ function runEvaluation(
 }
 
 /**
- * Consume one credit from the shared, account-wide trial pool (docs/08). This
- * stays a singleton on purpose — the free-scan limit does NOT multiply with
- * the number of profiles, even for an "All profiles" scan (one scan = one
- * credit, regardless of how many profiles it checked).
- */
-function bumpTrialCounter(isPremium: boolean): void {
-  if (isPremium) return;
-  const stats = getStats();
-  stats.freeScansUsed = Math.min(FREE_SCAN_LIMIT, stats.freeScansUsed + 1);
-  saveStats(stats);
-}
-
-/**
  * Commit stats for a successful single-profile scan (docs/03/08, docs/17).
- * The Scans/Clean/Flags counters shown on that profile's Home dashboard now
- * live on the profile itself — only the shared trial counter is account-wide.
+ * The Scans/Clean/Flags counters shown on that profile's Home dashboard live
+ * on the profile itself.
  */
-export function commitScanStats(result: ScanResult, profile: Profile, isPremium: boolean): void {
-  bumpTrialCounter(isPremium);
+export function commitScanStats(result: ScanResult, profile: Profile): void {
   const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
   if (result.isClean) {
     updated.totalCleanScans += 1;
@@ -99,15 +85,14 @@ export function commitScanStats(result: ScanResult, profile: Profile, isPremium:
 }
 
 /**
- * Commit stats for an "All profiles" scan (docs/17): the trial counter moves
- * once, and EVERY real profile gets its own Scans/Clean/Flags counters
- * updated based on whether that specific profile's filters were among the
- * matches — not whether the combined result was clean overall. A label that
- * flags Sofia's dye filter but nothing of Steve's is a "clean" scan on
- * Steve's dashboard and a "flagged" one on Sofia's.
+ * Commit stats for an "All profiles" scan (docs/17): EVERY real profile gets
+ * its own Scans/Clean/Flags counters updated based on whether that specific
+ * profile's filters were among the matches — not whether the combined
+ * result was clean overall. A label that flags Sofia's dye filter but
+ * nothing of Steve's is a "clean" scan on Steve's dashboard and a "flagged"
+ * one on Sofia's.
  */
-export function commitScanStatsForAll(result: ScanResult, profiles: Profile[], isPremium: boolean): void {
-  bumpTrialCounter(isPremium);
+export function commitScanStatsForAll(result: ScanResult, profiles: Profile[]): void {
   for (const profile of profiles) {
     // profileNames was built from displayName() (never empty) — compare
     // against the same, or an unnamed profile would never match its own terms.
@@ -126,13 +111,12 @@ export function commitScanStatsForAll(result: ScanResult, profiles: Profile[], i
  * Commit stats for a completed pantry recheck (docs/03/07) — recheck stays
  * tied to the item's OWN profile (`item.profileId`), never whichever profile
  * is globally active; caller passes that profile in. A recheck is always a
- * label read, and consumes a trial credit when not premium.
- * `totalReformulationsCaught` moves once per recheck with at least one
- * reformulation-attributed match — a filter-change-only match doesn't count
- * (docs/07 §7.1; skimpflation detection was retired the same day).
+ * label read. `totalReformulationsCaught` moves once per recheck with at
+ * least one reformulation-attributed match — a filter-change-only match
+ * doesn't count (docs/07 §7.1; skimpflation detection was retired the same
+ * day).
  */
-export function commitRecheckStats(outcome: RecheckOutcome, profile: Profile, isPremium: boolean): void {
-  bumpTrialCounter(isPremium);
+export function commitRecheckStats(outcome: RecheckOutcome, profile: Profile): void {
   const updated: Profile = { ...profile, totalLabelsRead: profile.totalLabelsRead + 1 };
   if (outcome.kind === "changed_flagged") {
     updated.totalRedFlagsCaught += outcome.matches.length;
@@ -141,14 +125,4 @@ export function commitRecheckStats(outcome: RecheckOutcome, profile: Profile, is
     }
   }
   updateProfile(updated);
-}
-
-/** Trial/paywall gate (docs/08). */
-export function canScan(isPremium: boolean): boolean {
-  if (isPremium) return true;
-  return getStats().freeScansUsed < FREE_SCAN_LIMIT;
-}
-
-export function scansRemaining(): number {
-  return Math.max(0, FREE_SCAN_LIMIT - getStats().freeScansUsed);
 }

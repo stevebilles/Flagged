@@ -81,14 +81,20 @@ export const fontFamily = {
  * shows is never smaller (or a mismatched size) relative to what iOS's own
  * UI and other apps use at the same semantic weight.
  *
- * caption -> Footnote (13), body -> Body (17, not 16 — Callout, a size down,
- * was being used for primary text), title -> Title 3 (20), heading ->
- * Title 1 (28, matches its actual use as a top-level page title — "Scan",
- * "Settings" — not Title 2/22, which is a level below that), display ->
- * Large Title (34).
+ * caption -> Footnote (13; platform convention for section headers and true
+ * fine print only — not a general "secondary text" default, since Flagged's
+ * users skew toward needing to actually read this stuff, not squint at it),
+ * subheadline -> Subheadline (15; for text that's secondary in hierarchy but
+ * still real content the user needs to read — e.g. explanatory copy, a
+ * stated count — added 2026-09-21 to fill the gap between caption and body),
+ * body -> Body (17, not 16 — Callout, a size down, was being used for
+ * primary text), title -> Title 3 (20), heading -> Title 1 (28, matches its
+ * actual use as a top-level page title — "Scan", "Settings" — not Title
+ * 2/22, which is a level below that), display -> Large Title (34).
  */
 export const fontSize = {
   caption: 13,
+  subheadline: 15,
   body: 17,
   title: 20,
   heading: 28,

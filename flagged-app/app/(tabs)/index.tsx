@@ -169,11 +169,15 @@ export default function Home() {
             detected. Reformulation Caught folded into this one row rather than
             left alone in its own (a lone flex:1 Pillar would stretch to fill
             the whole row width). */}
-        <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
-          <Pillar label="Scans" value={dashboardStats.totalLabelsRead} tone="cyan" />
-          <Pillar label="Saved" value={savedCount} tone="primary" />
-          <Pillar label="Flags" value={dashboardStats.totalRedFlagsCaught} tone="red" />
-          <Pillar label="Reformulated" value={dashboardStats.totalReformulationsCaught} tone="warning" />
+        <View style={{ gap: t.spacing.sm }}>
+          <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+            <Pillar label="Total Scans" value={dashboardStats.totalLabelsRead} tone="cyan" />
+            <Pillar label="Pantry Items Saved" value={savedCount} tone="primary" />
+          </View>
+          <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+            <Pillar label="Red Flags Found" value={dashboardStats.totalRedFlagsCaught} tone="red" />
+            <Pillar label="Reformulations Found" value={dashboardStats.totalReformulationsCaught} tone="warning" />
+          </View>
         </View>
 
         <Button title="📷  Scan a label" onPress={() => router.push("/(tabs)/scan")} />

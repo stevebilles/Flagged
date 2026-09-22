@@ -28,7 +28,7 @@ than what a given weight of content calls for.
 | Headline | 17 | **Semibold** | *(unused — reach for this, not `body`+bold, for genuinely headline-weight emphasis)* |
 | Body | 17 | Regular | `body` — default/primary reading text |
 | Callout | 16 | Regular | *(unused)* |
-| Subheadline | 15 | Regular | *(unused — a real step between `body` and `caption`, not currently in the token set)* |
+| Subheadline | 15 | Regular | `subheadline` — secondary-hierarchy text the user still needs to actually read (explanatory copy, a stated count), not true fine print |
 | Footnote | 13 | Regular | `caption` |
 | Caption 1 | 12 | Regular | *(unused)* |
 | Caption 2 | 11 | Regular | *(unused — avoid; Apple positions this as the smallest, least important label on the whole screen, not a general "small text" default)* |

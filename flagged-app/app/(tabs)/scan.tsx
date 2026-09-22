@@ -8,7 +8,7 @@ import { Screen, Text, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
 import { getProfile, getProfiles } from "../../src/db/repositories";
-import { canScan, evaluateScan, evaluateScanForAll, scansRemaining } from "../../src/domain/scanService";
+import { evaluateScan, evaluateScanForAll } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
@@ -40,12 +40,8 @@ export default function Scan() {
   const scanAllProfiles = useAppStore((s) => s.scanAllProfiles);
   const setLastScan = useAppStore((s) => s.setLastScan);
 
-  // Re-read on every focus, not just first mount — a scan completed elsewhere
-  // (or the dev "reset free scans" button) must update this immediately.
-  const [remaining, setRemaining] = useState(() => scansRemaining());
   useFocusEffect(
     useCallback(() => {
-      setRemaining(scansRemaining());
       // Reset on the way BACK to this tab, not on the way out (see
       // onCameraCapture) — so a finished scan's last screen doesn't flash
       // to idle mid-transition, but revisiting Scan later still starts
@@ -53,7 +49,7 @@ export default function Scan() {
       setCameraOpen(false);
     }, [])
   );
-  const locked = !canScan(isPremium);
+  const locked = !isPremium;
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
@@ -199,19 +195,21 @@ export default function Scan() {
   }, []);
 
   if (locked) {
-    // State 2 — hard paywall lockout
+    // State 2 — hard paywall lockout (docs/08: 7-day free trial, not a scan
+    // count — start the trial to unlock scanning; the rest of the app, incl.
+    // Settings and profile setup, stays fully usable while locked).
     return (
       <Screen>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: t.spacing.lg }}>
           <Ionicons name="lock-closed" size={72} color={t.colors.textMuted} />
           <Text variant="title" bold style={{ textAlign: "center" }}>
-            You've used all 10 free scans
+            Start your free trial to scan
           </Text>
           <Text tone="muted" style={{ textAlign: "center" }}>
-            Unlock unlimited, offline label reading for every profile in your house.
+            Unlimited, offline label reading for every profile in your house — 7 days free, then
+            $24.99/yr.
           </Text>
-          <Text tone="cyan" bold>$24.99/yr · $0.07/day</Text>
-          <Button title="Unlock Unlimited Scans - $24.99/yr" onPress={() => router.push("/paywall")} />
+          <Button title="Start Your 7-Day Free Trial" onPress={() => router.push("/paywall")} />
         </View>
       </Screen>
     );
@@ -222,24 +220,7 @@ export default function Scan() {
   // box and button contents change).
   return (
     <Screen>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text variant="heading" bold>Scan</Text>
-        {!isPremium && (
-          <View
-            style={{
-              borderRadius: t.radius.pill,
-              borderWidth: 1,
-              borderColor: t.colors.cyan,
-              paddingVertical: 6,
-              paddingHorizontal: t.spacing.sm,
-            }}
-          >
-            <Text tone="cyan" bold variant="caption">
-              {remaining} / 10 SCANS LEFT
-            </Text>
-          </View>
-        )}
-      </View>
+      <Text variant="heading" bold>Scan</Text>
 
       <View
         onLayout={onBoxLayout}

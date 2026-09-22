@@ -48,9 +48,7 @@ export interface Profile {
   createdAt: number;
   /**
    * Per-profile dashboard counters (docs/17 Home mockup — each profile's own
-   * Scans/Flags/etc., "All" sums across every profile). Separate from the
-   * shared trial counter (Stats.freeScansUsed below), which stays account-wide
-   * regardless of how many profiles exist.
+   * Scans/Flags/etc., "All" sums across every profile).
    */
   totalLabelsRead: number;
   totalRedFlagsCaught: number;
@@ -121,9 +119,12 @@ export interface ProfileChangeLogEntry {
   ingredientTerm: string | null;
 }
 
-/** Account-wide trial singleton (docs/03 §3.3). Only the shared free-scan
- * counter is still read — the rest were per-account totals that predate
- * per-profile stats and are no longer displayed anywhere. */
+/** Account-wide legacy singleton (docs/03 §3.3) — predates per-profile stats.
+ * `freeScansUsed` was the 10-free-scan trial gate, retired 2026-09-21 in
+ * favor of a RevenueCat/App Store 7-day free trial (real entitlement status,
+ * not a local counter); the column stays in the DB (no migration needed)
+ * but nothing reads or writes it anymore. Nothing else here is displayed
+ * anywhere either. */
 export interface Stats {
   statsId: string;
   freeScansUsed: number;
@@ -133,6 +134,5 @@ export interface Stats {
   totalReformulationsCaught: number;
 }
 
-export const FREE_SCAN_LIMIT = 10;
 export const RECHECK_DAYS = 30;
 export const SOFT_DELETE_HOURS = 24;

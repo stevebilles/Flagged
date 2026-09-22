@@ -24,7 +24,7 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-type Variant = "body" | "caption" | "title" | "heading" | "display";
+type Variant = "body" | "caption" | "subheadline" | "title" | "heading" | "display";
 type Tone = "primary" | "muted" | "cyan" | "red" | "warning" | "success";
 
 export function Text({

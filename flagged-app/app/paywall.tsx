@@ -42,6 +42,7 @@ export default function Paywall() {
         <Card style={{ alignItems: "center", gap: t.spacing.sm }}>
           <Text variant="display" bold tone="cyan">$24.99 / yr</Text>
           <Text tone="cyan" bold>Just $0.07 / day</Text>
+          <Text tone="muted" variant="subheadline">Just $2.08 / mo · less than a pack of gum</Text>
           <Text tone="muted" style={{ textAlign: "center" }}>
             Unlimited, offline label reading — for every profile in your house.
           </Text>

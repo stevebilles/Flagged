@@ -16,7 +16,7 @@ import {
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import { getProfile, getProfiles } from "../src/db/repositories";
-import { commitScanStats, commitScanStatsForAll, canScan } from "../src/domain/scanService";
+import { commitScanStats, commitScanStatsForAll } from "../src/domain/scanService";
 import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
 import { cleanForDisplay } from "../src/matching/normalize";
 import { profileColor } from "../src/design/avatar";
@@ -40,7 +40,6 @@ function displayTerm(m: Match): string {
 export default function Results() {
   const t = useTheme();
   const router = useRouter();
-  const isPremium = useAppStore((s) => s.isPremium);
   const lastScan = useAppStore((s) => s.lastScan);
   // Decided at scan time (a specific profile's name, or "all N profiles") —
   // not re-derived from the current active profile, which may have changed
@@ -62,9 +61,9 @@ export default function Results() {
     const result = { tokens: [], matches: lastScan.matches, isClean: lastScan.isClean };
     const profiles = (lastScan.profileIds ?? []).map(getProfile).filter((p): p is NonNullable<typeof p> => !!p);
     if (profiles.length > 1) {
-      commitScanStatsForAll(result, profiles, isPremium);
+      commitScanStatsForAll(result, profiles);
     } else if (profiles.length === 1) {
-      commitScanStats(result, profiles[0], isPremium);
+      commitScanStats(result, profiles[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -121,7 +120,6 @@ export default function Results() {
   }
 
   const clean = lastScan.isClean;
-  const justHitLimit = !isPremium && !canScan(false);
 
   async function dismiss(to: "home" | "scan") {
     if (!clean) await onFlaggedResultDismissed(lastScan!.matches.length);
@@ -249,11 +247,10 @@ export default function Results() {
               Flagged items can't be saved to your Pantry — only clean scans can.
             </Text>
           )}
-          {justHitLimit ? (
-            <Button title="Unlock Unlimited Scans" onPress={() => router.push("/paywall")} />
-          ) : (
-            <Button title="Scan Another Item" kind="secondary" onPress={() => dismiss("scan")} />
-          )}
+          {/* Reaching this screen at all already required an active
+              entitlement (docs/08: Scan tab hard-locks otherwise), so there's
+              no in-result upsell branch anymore — always offer to scan again. */}
+          <Button title="Scan Another Item" kind="secondary" onPress={() => dismiss("scan")} />
           <Button title="Return to Home" kind="secondary" onPress={() => dismiss("home")} />
         </View>
       </ScrollView>

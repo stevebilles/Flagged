@@ -53,13 +53,12 @@ function attributionMessage(m: AttributedMatch, profileId: string): string {
 export default function RecheckResult() {
   const t = useTheme();
   const router = useRouter();
-  const isPremium = useAppStore((s) => s.isPremium);
   const handoff = useAppStore((s) => s.lastRecheck);
   const item = useMemo(() => (handoff ? getPantryItem(handoff.itemId) : null), [handoff]);
 
   useEffect(() => {
     const profile = item ? getProfile(item.profileId) : null;
-    if (handoff && profile) commitRecheckStats(handoff.outcome, profile, isPremium);
+    if (handoff && profile) commitRecheckStats(handoff.outcome, profile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
