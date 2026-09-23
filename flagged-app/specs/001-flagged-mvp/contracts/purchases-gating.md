@@ -1,42 +1,56 @@
-# Contract — Purchases & Trial Gating (`src/purchases/purchases.ts`, `src/domain/scanService.ts`)
+# Contract — Purchases & Scan Gating (`src/purchases/purchases.ts`, `app/(tabs)/scan.tsx`)
 
-Product reference: `docs/08-monetization.md`. One non-consumable product, one entitlement
-(`premium`). Offline-first: a paid user is never locked out.
+Product reference: `docs/08-monetization.md`. One auto-renewing **annual subscription**
+(`flagged_annual`, $24.99/yr) with a **7-day free trial**, one entitlement (`premium`), offering
+`default`. Offline-first: a paid user is never locked out (bounded grace window).
+
+> **Rewritten 2026-09-23 to match the code.** The original contract described a one-time
+> non-consumable purchase and a 10-scan usage gate (`canScan`, `scansRemaining`,
+> `FREE_SCAN_LIMIT`); both were retired 2026-09-21.
 
 ## Entitlement (purchases.ts)
-- `isPremiumCached(): boolean` — synchronous read of `app_meta.cachedPremium`. Never throws,
-  never touches the network. This is the value the gate uses.
-- `refreshEntitlement(): Promise<boolean>` — best-effort `getCustomerInfo`; on success
-  writes the cache; on failure returns the cached value. Never blocks a render.
-- `purchaseLifetime(): Promise<boolean>` — buy the current Offering's package (fallback: the
-  product by id). On success writes cache = true and records `premiumSince` if unset.
-- `restorePurchases(): Promise<boolean>` — RevenueCat restore; updates cache + status.
-- SDK-not-configured ("skeleton") mode: purchase/restore are unavailable but
-  `isPremiumCached` still works.
+- `isPremiumCached(): boolean` — synchronous read of the `app_meta` cache (`cachedPremium`,
+  `cachedPremiumExpiresAt`). Never throws, never touches the network. True only while inside the
+  subscription's known expiry **plus a 3-day offline grace window**; if no expiry is on record
+  (e.g. skeleton/dev mode) it trusts the flag. This is the value the gate uses.
+- `cachedRenewalDate(): Date | null` — the cached renewal/expiry date, for display.
+- `refreshEntitlement(): Promise<boolean>` — best-effort `getCustomerInfo`; on success writes the
+  cache; on failure returns the cached value. Called at bootstrap and on app foreground; never
+  blocks a render.
+- `purchaseAnnual(): Promise<boolean>` — buy the current offering's package. On success writes
+  the cache.
+- `restorePurchases(): Promise<boolean>` — RevenueCat restore; updates the cache.
+- `diagnosePurchases()` and `setDevPremiumOverride(active)` — dev-only helpers (the Settings dev
+  toggle "Turn ON/OFF Premium").
+- No-key ("skeleton") mode: without `EXPO_PUBLIC_RC_IOS_KEY` / `EXPO_PUBLIC_RC_ANDROID_KEY`,
+  `configurePurchases()` is a no-op; `isPremiumCached` still works from the cache.
 
-## Gate (scanService.ts)
-```
-canScan(isPremium)      = isPremium || getStats().freeScansUsed < 10
-scansRemaining()        = max(0, 10 − freeScansUsed)
-```
-- `evaluateScan(raw, profile)` → `aborted:"illegible"` (no state change) or `result`.
-- `commitScanStats(result, isPremium)` — called **only** when a result screen is reached:
-  `totalLabelsRead += 1`; if `!isPremium` `freeScansUsed = min(10, +1)`; clean/flagged
-  counters per the matching result.
+## Gate
+- Gating is purely **`isPremium`** (app store value, seeded from the cache):
+  `locked = !isPremium` in `app/(tabs)/scan.tsx`. There is no scan counter. (The `freeScansUsed`
+  DB column remains but nothing reads or writes it.)
+- `evaluateScan(raw, profile)` → `aborted: "illegible"` (no state change) or `result`.
+- `commitScanStats(result, profile)` / `commitScanStatsForAll(...)` — called **only** when a
+  result screen is reached; update the per-profile counters (`totalLabelsRead`,
+  `totalRedFlagsCaught`, `totalCleanScans`).
 
 ## UI rules
-- `showMeter = !isPremium`; the Scan tab shows `Scans Remaining: N / 10`.
-- `locked = !isPremium && freeScansUsed >= 10` → Scan tab State 2: lock icon + single
-  `Unlock Unlimited Scans - $24.99` button with `$39.99` struck through. Camera / Paste /
-  Choose Photo are all disabled.
-- Results secondary button becomes `Unlock Unlimited Scans` when the 10th scan was just used.
-- After premium: meter, lock, and unlock buttons are hidden everywhere.
-- Settings shows `Restore Purchases` + a Trial/Premium status indicator.
+- Not premium → Scan tab State 2: a lock screen with `Start Your 7-Day Free Trial` (→ `paywall`).
+  Camera / Paste / Choose Photo are unavailable. **Every other tab stays usable.**
+- No scan meter anywhere; no in-result upsell (`Scan Another Item` is always offered).
+- Premium (trial or paid) → the lock is never shown.
+- Settings: an active subscriber sees `Flagged Pro · Active · Renews <date>` and Manage
+  Subscription; there is a `Restore Purchase` row. Non-premium users see **no** upsell card
+  (removed 2026-09-21).
+- Paywall (`app/paywall.tsx`): `$24.99 / yr` with the `$2.08 / mo` and daily breakdowns; buy →
+  `purchaseAnnual`.
 
 **Acceptance checks** (→ tests + device)
-- 10 successful scans decrement to 0; 11th attempt → locked (unit on gate; screen test).
-- Illegible abort never decrements (unit).
-- Premium never decrements; meter/lock hidden (unit + screen).
-- Offline (airplane mode) premium user relaunch → not locked, no meter (device manual).
+- Not premium → Scan tab locked, other tabs usable (screen).
+- Premium → lock hidden (unit/screen).
+- Illegible abort never commits stats (unit).
+- Offline (airplane mode) premium user relaunch → not locked while inside expiry + grace;
+  past expiry + grace with no network → treated as not premium (device manual).
+- Starting the trial → `premium` entitlement active immediately (device sandbox).
 - Restore with no prior purchase → clean "no purchases found" message (device sandbox).
-- Purchase cancelled mid-flow → stays in trial/locked, no partial entitlement (device).
+- Purchase cancelled mid-flow → stays locked, no partial entitlement (device).

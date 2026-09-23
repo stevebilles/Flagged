@@ -92,13 +92,13 @@ modes (contrast-checked).
 
 ## Key UI components (build once, reuse)
 - **Profile chip** (Home) with `[ Edit ]` affordance + `[ Add Profile + ]`.
-- **Quick Pack pill** (selectable; selected = cyan-filled) — profile editor & onboarding S3.
+- **Quick Pack pill** (selectable; selected = cyan-filled) — onboarding S3 only. (Quick Packs were
+  removed from the profile editor; filters there are toggled per category.)
 - **Category row**: name, "N names · tap for details", classification badge, on/off switch;
   expandable to individual-ingredient toggles.
-- **Meter pill** (Scan): `Scans Remaining: N / 10`.
 - **Result header** (cyan clean / red flagged) + **breakdown card** (charcoal).
 - **Pantry card** (thumbnail, brand, product) + **recheck checklist row** + **undo row**.
-- **Paywall card** ($24.99/yr, framed as "$0.07/day").
+- **Paywall card** ($24.99/yr, framed as "$0.07/day" and "$2.08/mo" — see `08`).
 
 ## Accessibility
 - Respect Dynamic Type / font scaling; layouts must reflow.

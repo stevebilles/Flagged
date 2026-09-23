@@ -1,42 +1,49 @@
 # 06 — The OCR Engine: Capture & Translation
 
-The user **does not press a shutter**. They point the camera and the app does the rest.
+The user aims a guide box at the ingredient list and **taps a shutter button** to capture.
 Everything here runs **on-device, offline**. No cloud OCR.
 
-**Implementation base:** `react-native-vision-camera` frame processors + `modules/vision-ocr`, a
-local native module wrapping Apple's on-device Vision framework directly (replaces Google ML Kit,
-2026-09-13 — ML Kit's iOS accuracy on small/dense/glossy print was not good enough for a
-safety-critical ingredient match; see `docs/02`). The stitching, normalization, and matching stages
-are pure TypeScript so they behave identically across platforms; the OCR engine itself is
-per-platform (Android, not yet built, would need its own).
+**Implementation base:** `react-native-vision-camera` (live preview + still photo) and
+`modules/vision-ocr`, a local native module wrapping Apple's on-device Vision framework directly
+(replaced Google ML Kit, 2026-09-13 — ML Kit's iOS accuracy on small/dense/glossy print was not
+good enough for a safety-critical ingredient match; see `docs/02`). The stitching, normalization,
+and matching stages are pure TypeScript so they behave identically across platforms; the OCR
+engine itself is per-platform (Android, not yet built, would need its own).
 
-**Note:** the actual current capture flow (`src/ocr/CameraScanner.tsx`) has evolved past the
-"3-second live scan" design below — it now waits for a live-read-quality signal (not a fixed timer)
-before taking a real burst of still photos, and reconciles multiple independent reads of the same
-view word-by-word to catch letter-level misreads. See the doc comment at the top of
-`CameraScanner.tsx` for the current, authoritative design.
+**Note:** this doc was updated 2026-09-23 to match the code. The capture flow has changed twice
+since it was first written: the original hands-free **3-second live scan** (frame processing, live
+bounding boxes, frame-to-frame stitching) is gone — the JS code no longer runs a frame processor
+at all. Capture is now a **manual-shutter, fixed-frame** still photo (2026-09-13). See the doc
+comment at the top of `src/ocr/CameraScanner.tsx` for the authoritative design.
 
 ---
 
-## Step 1 — The 3-second live scan (frame processing)
+## Step 1 — Capture (manual shutter, guide box)
 
-- **Dynamic highlighting:** draw bounding boxes (**Cyan `#22D3EE` stroke, transparent fill**) over
-  recognized text paragraphs, live.
-- **Deduplication & spatial sorting:** for each frame, extract recognized text blocks; prevent
-  processing the *same* block twice as the camera moves (dedupe on block identity — geometry +
-  text signature, the RN analogue of Vision's `RecognizedItem.id`). Sort blocks by **X/Y
-  coordinates** to rebuild reading order into a coherent paragraph.
-- **String merging (frame-to-frame):** implement **Longest Common Substring** (or **Levenshtein**)
-  to stitch the **trailing** text of frame *N* to the **leading** text of frame *N+1*, so panning
-  across a long list produces one continuous string without duplication.
+- **Guide box:** the live preview shows a **dashed cyan (`#22D3EE`) guide box**; the user aims it
+  at the ingredient list. OCR is automatically restricted to what's inside the box
+  (`guideBoxToPhotoCorners`, `src/ocr/guideBox.ts`) — there is no manual crop step.
+- **Shutter:** tapping `[ 📸 Capture ]` takes a still photo, which `modules/vision-ocr` reads
+  (`recognizeText`; perspective correction via `correctPerspective`).
+- **Scan More:** an optional second capture (e.g. a list that wraps around a curved can/jar or is
+  too wide for one frame). The two reads are joined by `stitch` (`src/ocr/stitch.ts`, overlap /
+  longest-common-substring search) so nothing is duplicated or dropped across the seam.
+- **Reading order:** recognized blocks are assembled into one paragraph in reading order
+  (`photoResultToParagraph`, `src/ocr/recognition.ts`).
+- **No raw OCR text is shown to the user.** OCR can't be typo-free on glossy print, and the matcher
+  tolerates letter noise; the Results screen shows only each matched red-flag term's correct
+  spelling.
 
 ## Step 2 — Quality control & normalization
 
-At exactly **0 seconds**, stitching stops.
+Once the capture (or pasted text) has been assembled into one paragraph:
 
-- **Validation:** check for start indicators (e.g., contains `"ingredients:"`). If the capture is
-  illegible / no ingredient list detected → **abort and show an error**. **This does NOT consume a
-  free scan** (do not increment `freeScansUsed`; see `08`).
+- **Validation:** check that it looks like an ingredient list (`looksLikeIngredientList`, e.g.
+  contains `"ingredients:"`, or a long comma-dense capture when the header OCR'd away). If the
+  capture is illegible / no ingredient list detected → **abort and show an error**;
+  `evaluateScan` returns `aborted: "illegible"` and **nothing is committed to stats**.
+- **List extraction:** `extractIngredientList` keeps just the ingredient list (and allergen line)
+  from the raw text — e.g. only the English list on a bilingual label.
 - **Normalization:**
   - lowercase all text,
   - strip line-break hyphens (rejoin words split across lines),
@@ -61,17 +68,20 @@ paragraph and the breakdown card in `07`.
 
 ## Alternate inputs (same pipeline)
 
-- **`[ Paste ]`:** text goes straight into **Step 2** (normalization) → **Step 3** (matching).
-  Skip camera/stitching. Still subject to validation and scan-count rules.
+- **`[ Paste Text ]`:** text goes straight into **Step 2** (normalization) → **Step 3** (matching).
+  Skip camera/stitching. Still subject to the same validation rules.
 - **`[ Choose Photo ]`:** run on-device OCR on the still image → **Step 2** → **Step 3**.
 
-## Scan-count rule (reiterated — important)
+## Stats rule (reiterated — important)
 
-Increment `freeScansUsed` (and `totalLabelsRead`) **only** when a scan **successfully extracts text
-and routes to a Results Screen**. Aborted, illegible, or cancelled captures cost nothing. See `08`.
+A scan's per-profile counters (`totalLabelsRead`, `totalRedFlagsCaught`, `totalCleanScans`) are
+committed **only** when a scan **successfully extracts text and routes to a Results Screen**
+(`commitScanStats`, called from `app/results.tsx`). Aborted, illegible, or cancelled captures
+commit nothing. There is no free-scan counter any more — the trial is a store entitlement (`08`).
 
 ## Performance / UX notes
 
-- Keep the frame-processor worklet lightweight; throttle OCR to a sustainable FPS.
-- Provide clear affordance during the 3-second window (countdown + live boxes).
+- Keep the live preview responsive; after the shutter tap show a clear processing state
+  (`waiting → processing → shotDone` in `CameraScanner.tsx`).
+- Give the user a clear aiming affordance (the dashed guide box) — OCR only reads inside it.
 - Everything is local; there must be **no** network round-trip anywhere in this pipeline.

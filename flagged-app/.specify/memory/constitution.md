@@ -1,5 +1,16 @@
 <!--
-Sync Impact Report
+Sync Impact Report (2026-09-23)
+- Version change: 1.0.0 → 2.0.0 (MAJOR — Principle III redefined)
+- Modified principles: III "Full-Featured Trial, Hard Usage Gate" → "Full-Featured Trial, Hard
+  Scan Gate": 10-scan usage gate + one-time non-consumable purchase replaced by a 7-day store
+  free trial + $24.99/yr auto-renewing subscription (the app changed this on 2026-09-21).
+- Modified sections: Technology & Architecture Constraints (camera/OCR and purchases bullets).
+- Templates reviewed: plan/spec/tasks templates — no changes required.
+- Follow-up: the original planning artifacts in specs/001-flagged-mvp/ (spec, plan, tasks,
+  research, data-model) still describe the old model; they now carry a "historical record"
+  banner, and the contracts/ files were updated to match the code.
+
+Previous report (2026-09-07, 1.0.0)
 - Version change: (template) → 1.0.0
 - Ratification: initial adoption of the Flagged project constitution
 - Principles defined:
@@ -52,22 +63,26 @@ sensitivities. A **missed red flag** (a dangerous ingredient not caught) or a **
 
 Rationale: the cost of a wrong answer is a health incident, not an inconvenience.
 
-### III. Full-Featured Trial, Hard Usage Gate
+### III. Full-Featured Trial, Hard Scan Gate
 
 Conversion is driven by proving the technology, never by frustrating the user with locked
 features.
 
-- During the free trial (10 successful scans) every feature is unlocked: multiple family
-  profiles, custom ingredients, and the full pantry.
-- A scan counts against the trial ONLY when it successfully extracts text and reaches a
-  results screen. Illegible/aborted scans do not count.
-- Monetization is a single one-time purchase (non-consumable). No subscriptions, no
-  consumables, no recurring billing.
-- On the gate (11th scan attempt), the scanning engine is fully locked until purchase; the
-  rest of the app the user already set up remains viewable.
+- The trial is a **7-day free trial** of the annual subscription, provided by the store and
+  reflected by RevenueCat's entitlement status — not a local counter. During it every feature is
+  unlocked: multiple family profiles, custom ingredients, and the full pantry.
+- Monetization is a single **auto-renewing annual subscription ($24.99/year)** with the 7-day
+  trial (`flagged_annual`, entitlement `premium`). No consumables and no other products.
+- The only gate is **scanning**. When the user is not premium (no active trial or
+  subscription), the Scan tab is fully locked — camera, Paste, and Choose Photo. Everything else
+  (Home, Pantry, Settings, profile setup) remains usable.
+- The gate is decided from the cached entitlement only (`isPremium`), never a scan count, and a
+  paying user MUST NOT be locked out for lack of connectivity (bounded offline grace window;
+  see `docs/08`).
 
-Rationale: the audience has subscription fatigue; the pitch is "pay once, own it forever,"
-and the trial must deliver the real product.
+Rationale: the trial must deliver the real product, and the gate must never depend on the
+network for a paying user. (Amended 2026-09-21/23: this principle originally specified a
+10-scan usage gate and a one-time non-consumable purchase; see `docs/08`.)
 
 ### IV. Accessibility-First, Objective Reporting
 
@@ -98,17 +113,17 @@ keeping the surface small keeps a solo, non-developer-led project maintainable.
 - **Platform:** React Native + Expo (Expo SDK, current stable) with TypeScript in strict
   mode. iOS 17.0+ is the MVP target; Android (minSdk 26+) is a near-term goal from the same
   codebase and MUST NOT be designed out.
-- **Native modules required:** camera + on-device OCR (`react-native-vision-camera` with an
-  on-device text-recognition frame processor) and purchases (`react-native-purchases` /
-  RevenueCat). Because of these, builds use an Expo **development client** and **EAS Build** —
-  Expo Go is not sufficient.
+- **Native modules required:** camera + on-device OCR (`react-native-vision-camera` for capture
+  and the local `modules/vision-ocr` native module wrapping Apple's Vision framework — iOS only
+  for now) and purchases (`react-native-purchases` / RevenueCat). Because of these, builds use an
+  Expo **development client** and **EAS Build** — Expo Go is not sufficient.
 - **Local database:** `expo-sqlite` with Drizzle ORM and typed migrations. The bundled
   `assets/data/ingredients.json` seed is parsed into SQLite once on first launch.
-- **Purchases:** RevenueCat configured for a non-consumable one-time purchase with local
-  entitlement caching.
+- **Purchases:** RevenueCat configured for an auto-renewing annual subscription with a 7-day
+  free trial and local entitlement caching (bounded offline grace window).
 - **No cloud OCR, no server, no network-dependent core feature** — this restates Principle I
   as a hard technical boundary.
-- The `docs/` set (`00`–`16`, `data-schema.md`) is the detailed product source of truth.
+- The `docs/` set (`00`–`17`, `data-schema.md`) is the detailed product source of truth.
   Where a spec and `docs/` disagree, resolve the conflict explicitly before building.
 
 ## Development Workflow & Quality Gates
@@ -135,4 +150,4 @@ keeping the surface small keeps a solo, non-developer-led project maintainable.
 - Complexity that appears to violate Principle V MUST be justified in the plan's Complexity
   Tracking section or removed.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-07 | **Last Amended**: 2026-09-08
+**Version**: 2.0.0 | **Ratified**: 2026-09-07 | **Last Amended**: 2026-09-23

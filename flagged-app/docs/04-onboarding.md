@@ -1,5 +1,11 @@
 # 04 — The 7-Screen Onboarding Flow
 
+> **Status (2026-09-23): pending redesign.** Onboarding has not been reworked since the switch to
+> a 7-day free trial. Screens 6–7 below (and the "Start My 10 Free Scans" button) describe the
+> **retired 10-free-scan model** — `app/onboarding.tsx` still ships that copy — and the soft
+> paywall described in `08` is **not built yet**. Treat screens 6–7 as outdated, not as the
+> target; the redesign will replace this doc. Screens 1–5 match the current code.
+
 **Logic:** Problem → The Tech/Moat → Interactive Setup → Name (Personalization) → Navigation
 Overview → The Fully Unlocked Trial → Annual Upsell Intro.
 

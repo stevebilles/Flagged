@@ -28,53 +28,53 @@ A horizontal row of **Profile Chips**.
   trial and after purchase).
 
 ### Protection Summary (the pillars of value)
-Read from the Stats singleton (`03`):
-- **Labels Read** (`totalLabelsRead`) — volume of text processed / time saved.
-- **Red Flags Caught** (`totalRedFlagsCaught`) — danger avoided.
-- **Clean Scans** (`totalCleanScans`) — peace of mind delivered.
-- **Skimpflation Caught** (`totalSkimpflationCaught`) — pantry rechecks where the surviving
-  ingredients changed order (`07`).
-- **Reformulations Caught** (`totalReformulationsCaught`) — pantry rechecks where an ingredient
-  was added or removed (`07`).
+Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile** counters on
+`Profile` (`03` §3.1). When Home is viewing "All" profiles, each tile sums every profile's counters.
+- **Total Scans** (`totalLabelsRead`) — labels read, including rechecks.
+- **Pantry Items Saved** — number of saved Pantry items (for the viewed profile, or all).
+- **Red Flags Found** (`totalRedFlagsCaught`) — danger avoided.
+- **Reformulations Found** (`totalReformulationsCaught`) — rechecks where a category/term that was
+  already being screened for turned up (`07` §7.1).
 
-> The first three are the "core" pillars from the brief; the two recheck totals only become
-> meaningful once the user has a pantry and rechecks running. Design may present them as a
-> secondary row or reveal them once non-zero — but all five are tracked from day one.
+> `totalCleanScans` is still tracked per profile but has no tile. **Skimpflation Caught was retired
+> on 2026-09-14** (`07` §7.1): the recheck redesign no longer stores ingredient order, so it can't
+> be detected.
 
 ---
 
 ## Tab 2 — SCAN (The Core Action Tab)
 
 ### State 1 — Standby (default)
-- **Top 2/3:** dark placeholder screen.
-- **The Meter (trial users only):** a prominent pill at the top reading
-  `Scans Remaining: [ 10 − freeScansUsed ] / 10`.
-- **Bottom 1/3 (action menu):** `[ Start Camera Scanner ]` (primary), `[ Paste ]`,
+- **Top 2/3:** the viewfinder box (a dark placeholder until the camera is opened).
+- **Bottom 1/3 (action menu):** `[ 🎥 Scan Label ]` (primary), `[ Paste Text ]`,
   `[ Choose Photo ]`.
+- There is **no scan meter** (the 10-scan counter was retired 2026-09-21).
 
 ### State 2 — Hard Paywall Lockout
-- When `freeScansUsed == 10`: the action menu is replaced by a **large lock icon** and a single
-  primary button:
-  `[ Unlock Unlimited Scans - $24.99/yr ]`.
-- The user can **no longer** open the camera, paste text, or choose a photo until they purchase.
-  See `08`.
-- Paid users never see the meter or this state.
+- Shown whenever the user is **not premium** (no active trial or subscription): the whole Scan
+  tab — camera, Paste and Choose Photo — is replaced by a lock screen with a single primary
+  button, `[ Start Your 7-Day Free Trial ]`, which opens the paywall (`08`).
+- Every other tab (Home, Pantry, Settings, profile setup) stays fully usable while locked.
+- Premium users (trial or paid) never see this state.
 
 ### State 3 — Active Mode (Live Scan)
-- Live camera feed with **Cyan (#22D3EE) bounding boxes** over recognized text and a **3-second
-  visual countdown**. No shutter button — point and hold. See `06` for the full engine.
+- The live camera renders **inline inside the Scan tab's viewfinder box** (never full-screen),
+  with a **dashed cyan (#22D3EE) guide box** — OCR is restricted to what's inside it. The user
+  aims and **taps a shutter button** (manual capture; nothing triggers automatically). An
+  optional **Add more** repeats the capture for a second photo (e.g. a curved label) and joins
+  the two reads. See `06` and the doc comment at the top of `src/ocr/CameraScanner.tsx`.
 
 ---
 
 ## Tab 3 — PANTRY (My Approved List & Audit Hub)
 - **Icon:** a clean, modern pantry jar / open box.
 
-### Section 1 — Skimpflation & Reformulation Checks (the to-do list)
+### Section 1 — Reformulation Checks (the to-do list)
 - **Trigger:** any saved item whose `lastVerifiedDate` is **older than 30 days** moves out of the
   main grid to the **top** of the screen as a checklist item.
 - **Header & subtitle:**
-  > "Skimpflation & Reformulation Checks: Brands sneakily change recipes all the time. Re-scan
-  > these items to ensure they are still approved."
+  > "Reformulation Checks" — "Brands sneakily change recipes all the time. Re-scan these items to
+  > ensure they are still approved."
 - **Intercept modal** (prevents scanning the old box already at home): tapping a task shows a strict
   modal:
   > "Only scan a NEWLY PURCHASED box to check for changes. Do you have a new box ready?"

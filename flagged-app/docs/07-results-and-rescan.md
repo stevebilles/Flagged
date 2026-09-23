@@ -25,12 +25,14 @@ After the engine (`06`) produces matches, route to a Results Screen. Two outcome
   `totalLabelsRead`).
 
 ### Secondary actions (both outcomes)
-- `[ Scan Another Item ]` — **if the free user just used their 10th scan, this button becomes
-  `[ Unlock Unlimited Scans ]`** (routes to paywall; see `08`).
+- `[ Scan Another Item ]` — returns to the Scan tab. (Reaching Results already required an active
+  trial or subscription — the Scan tab hard-locks otherwise, see `08` — so there is no in-result
+  upsell branch.)
 - `[ Return to Home ]`.
 
-> Reminder: a scan counts toward `freeScansUsed` **only** because it reached this Results Screen
-> (successful extraction). See `06`/`08`.
+> Reminder: a scan's per-profile stats (`totalLabelsRead`, `totalRedFlagsCaught`,
+> `totalCleanScans`) are committed **only** because it reached this Results Screen (successful
+> extraction). Illegible captures commit nothing. See `06`.
 
 ---
 

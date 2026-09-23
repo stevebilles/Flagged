@@ -34,19 +34,23 @@ native deps and run in the sandbox. Extend them as the source of truth.
     Focus & ADHD and Preservatives).
   - Individual-ingredient exclusion removes only that term from the effective set.
   - Effective set = active-category ingredients − excluded + custom.
-- **Diff engine (`src/domain/diffEngine.ts`)**
-  - Identical lists → no change.
-  - Additions/removals detected (reformulation).
-  - Order shift among survivors detected (skimpflation), ignoring pure add/remove.
-  - Changed + new red flag → `changed_flagged`; changed + none → `changed_safe`.
+- **Recheck engine (`src/domain/recheckEngine.ts`)** — renamed from `diffEngine.ts` on
+  2026-09-14; it no longer diffs ingredient text (`07` §7.1).
+  - Still clean under the current profile → `identical`.
+  - Any match on a rescan → `changed_flagged`.
+  - A match on a category/term already in the saved profile snapshot → attributed
+    `reformulation`; a match on one that is new to the snapshot → `profile_change`.
 - **Stitching (`src/ocr/stitch.ts`)**
   - Overlapping frames merge on the seam without duplication.
   - Spatial sort rebuilds reading order; deduped block ids aren't re-added.
-- **Stats/trial math (`src/domain/scanService.ts`)**
-  - `freeScansUsed` increments only on a successful result; illegible aborts don't.
-  - Caps at 10; premium never increments; clean/flagged counters update correctly.
-  - Recheck stats: `totalReformulationsCaught` +1 on add/remove, `totalSkimpflationCaught`
-    +1 on survivor order-shift, both +1 when a recheck has both, neither on "identical".
+- **Stats math (`src/domain/scanService.ts`)**
+  - Per-profile counters commit only on a successful result (`commitScanStats` /
+    `commitScanStatsForAll`); illegible aborts commit nothing.
+  - "All profiles" mode: each profile's counters move based on whether *its own* filters matched.
+  - Recheck stats (`commitRecheckStats`): `totalLabelsRead` +1 always; on `changed_flagged`,
+    `totalRedFlagsCaught` += matches, and `totalReformulationsCaught` +1 only if at least one match
+    is reformulation-attributed. Skimpflation was retired 2026-09-14.
+  - There is no trial counter or `canScan` gate any more; gating is `isPremium` (`08`).
 
 ## Integration tests
 
@@ -55,7 +59,7 @@ screen, assert behavior.
 
 - Onboarding S3 pack selection persists to the default profile.
 - Profile editor toggles write through to the DB and reflect on reload.
-- Scan standby vs. hard-paywall lockout renders based on `freeScansUsed`/premium.
+- Scan standby vs. hard-paywall lockout renders based on `isPremium`.
 - Results highlights the correct tokens and writes stats once.
 - Pantry surfaces items older than 30 days into the recheck section; 24h undo restores.
 
@@ -72,9 +76,11 @@ Critical flows to cover:
 1. Fresh install → onboarding → Home.
 2. Scan (paste path) → flagged result → breakdown shown.
 3. Scan clean → Save to Pantry → appears in grid.
-4. Exhaust 10 free scans → hard paywall lockout appears.
-5. Pantry recheck → each of the 3 outcomes (identical / changed-safe / changed-flagged).
-6. Restore Purchases path (sandbox) → premium unlocks, meter disappears.
+4. Not premium → Scan tab shows the hard-lock screen ("Start Your 7-Day Free Trial"); every other
+   tab still works.
+5. Pantry recheck → both outcomes (identical / changed_flagged, including a reformulation-
+   attributed and a profile-change-attributed match).
+6. Restore Purchases path (sandbox) → premium unlocks, the lock screen disappears.
 
 ## Manual / device-only checks
 

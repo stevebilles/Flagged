@@ -2,6 +2,14 @@
 description: "Task list for Flagged V1 MVP implementation"
 ---
 
+> **Historical planning record (banner added 2026-09-23).** This file captures the original
+> Spec Kit planning for the MVP and is **not kept in sync with the app**. Its checkboxes are not
+> a reliable record of what is built, and it still describes the retired 10-free-scan trial, a
+> one-time non-consumable purchase, ML Kit / a 3-second live scan, and skimpflation detection.
+> Current behavior is defined by the code, `CLAUDE.md` and `docs/` (see `docs/08`, `06`, `07`); the
+> constitution (v2.0.0) and `contracts/` were updated. Don't build from this file without
+> checking those.
+
 # Tasks: Flagged V1 MVP
 
 **Input**: Design documents from `specs/001-flagged-mvp/`

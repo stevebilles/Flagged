@@ -30,8 +30,8 @@ ever.**
 
 | Original (brief) | React Native + Expo equivalent | On-device / Offline |
 |---|---|---|
-| VisionKit `DataScannerViewController` (live OCR) | `react-native-vision-camera` **frame processors** + a local native module wrapping Apple's own Vision framework (`modules/vision-ocr`) | ✅ |
-| Vision item tracking (`RecognizedItem.id`) | Frame-processor dedup keyed on recognized-block geometry/text (worklet) | ✅ |
+| VisionKit `DataScannerViewController` (live OCR) | `react-native-vision-camera` (manual-shutter still-photo capture) + a local native module wrapping Apple's own Vision framework (`modules/vision-ocr`) — see `14` | ✅ |
+| Vision item tracking (`RecognizedItem.id`) | No longer needed: capture is a still photo, not a live stream of frames (the earlier frame-processor dedup was removed, 2026-09-13) | ✅ |
 | Longest Common Substring / Levenshtein stitching | Pure TypeScript (identical algorithm) | ✅ |
 | SwiftData persistence | **`expo-sqlite`** + **Drizzle ORM** (typed migrations) | ✅ |
 | Foundation `JSONDecoder` seed load | Bundled `assets/data/ingredients.json` parsed on first launch | ✅ |
@@ -45,15 +45,16 @@ ever.**
 - **Build/config:** Expo with **config plugins** + **development builds** (EAS). VisionCamera and
   RevenueCat require native modules, so **Expo Go is not sufficient** — use a **custom dev client**
   (`expo-dev-client`) and **EAS Build**.
-- **Navigation:** `expo-router` (file-based) or React Navigation. Bottom tab navigator for the 4-tab
-  hub, native stack for onboarding + results + modals.
+- **Navigation:** `expo-router` (file-based). Bottom tab navigator for the 4-tab hub, native stack
+  for onboarding + results + modals.
 - **Local database:** `expo-sqlite` with **Drizzle ORM**. All persistence is local. See `03`.
-- **Camera + OCR:** `react-native-vision-camera` (camera + frame processors) with `modules/vision-ocr`,
-  a local native module wrapping Apple's on-device Vision framework directly (iOS). No network calls.
+- **Camera + OCR:** `react-native-vision-camera` (live preview + still-photo capture; no JS frame
+  processor) with `modules/vision-ocr`, a local native module wrapping Apple's on-device Vision
+  framework directly (iOS). No network calls. See `14`.
 - **Purchases:** `react-native-purchases` (RevenueCat), configured for an **auto-renewing annual
   subscription**, with **offline entitlement caching** (grace window, not indefinite — see `08`).
-- **State:** Lightweight — Zustand or React Context for the active profile + trial state; the DB is
-  the source of truth. Keep global state minimal.
+- **State:** Lightweight — **Zustand** (`src/state/appStore.ts`) for the active profile + premium
+  state; the DB is the source of truth. Keep global state minimal.
 - **Fonts:** `expo-font` loading Atkinson Hyperlegible.
 - **Reviews:** `expo-store-review`.
 - **Images:** `expo-image-manipulator` (compress pantry thumbnails), `expo-file-system` (store

@@ -33,17 +33,18 @@ allergies / celiac).
 
 ## Business model
 
-A **metered trial** of **10 free scans** leading to an **auto-renewing annual subscription at
-$24.99/year**. Designed to prove the technology works before asking for the sale.
-See `08-monetization.md`.
+A **7-day free trial** leading to an **auto-renewing annual subscription at $24.99/year**. The
+Scan tab is locked until the user starts the trial or subscribes; every other tab stays usable.
+(This replaced the original 10-free-scan metered trial on 2026-09-21.) See `08-monetization.md`.
 
 ## Non-negotiable product principles
 
 1. **Zero backend.** All processing and storage happen on-device. No cloud APIs for OCR or data.
 2. **Offline-first.** The app must fully function with no network, including for a paid user who
    opens it in a store with no signal.
-3. **No feature-gating during the trial.** Free users get every feature for 10 successful scans;
-   conversion is driven by a hard usage gate, not locked features.
+3. **No feature-gating inside the app.** Every feature (multiple profiles, custom ingredients,
+   the full Pantry) is available to everyone; the only gate is scanning itself, which requires an
+   active trial or subscription (`isPremium`).
 4. **Accessibility-first typography.** Atkinson Hyperlegible everywhere (see `09-design-system.md`).
 
 ## Platform roadmap
@@ -62,7 +63,7 @@ See `08-monetization.md`.
 | `05-navigation-and-tabs.md` | The 4-tab hub and every screen state |
 | `06-ocr-engine.md` | Capture, frame stitching, normalization, hybrid matching |
 | `07-results-and-rescan.md` | Clean/Flagged results + the Pantry recheck diff engine |
-| `08-monetization.md` | 10-scan trial, hard paywall, offline entitlement |
+| `08-monetization.md` | 7-day free trial, Scan-tab hard lock, offline entitlement |
 | `09-design-system.md` | Colors (dark/light), typography, components |
 | `10-aso-review.md` | In-app review request triggers |
 | `data-schema.md` | The bundled `ingredients.json` shape + activation rules |

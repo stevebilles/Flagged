@@ -1,5 +1,12 @@
 # Implementation Plan: Flagged V1 MVP
 
+> **Historical planning record (banner added 2026-09-23).** This file captures the original
+> Spec Kit planning for the MVP and is **not kept in sync with the app**. It still describes the
+> retired 10-free-scan trial, a one-time non-consumable purchase, ML Kit / a 3-second live scan,
+> and skimpflation detection. Current behavior is defined by the code, `CLAUDE.md` and `docs/`
+> (see `docs/08`, `06`, `07`); the constitution (v2.0.0) and `contracts/` were updated. Don't build
+> from this file without checking those.
+
 **Branch**: `001-flagged-mvp` | **Date**: 2026-09-08 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `specs/001-flagged-mvp/spec.md`

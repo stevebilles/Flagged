@@ -1,5 +1,9 @@
 # Quickstart & Validation — Flagged V1 MVP
 
+> **Historical planning record (banner added 2026-09-23).** Not kept in sync with the app: it
+> still mentions a non-consumable product and skimpflation stats. For running the app see
+> `CLAUDE.md` and `docs/11-setup-and-run.md`; the purchase setup is `docs/08`.
+
 How to run the app and prove the MVP works. Detailed setup lives in
 `docs/11-setup-and-run.md` and `docs/16-first-build-on-windows.md`; this file is the
 acceptance guide the spec's Success Criteria are checked against.

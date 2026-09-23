@@ -174,10 +174,10 @@ You're now running Flagged on your iPhone with live reload. 🎉
 
 These couldn't be verified before a device build — check them now:
 
-- [ ] **Live camera scan** on a real label: point at an ingredient list, watch the cyan boxes +
-      3-second countdown, confirm the result screen highlights correctly (docs/14).
-- [ ] **Curved surfaces**: scan a can/jar — pan slowly across the curve during the 3 seconds and
-      confirm the stitched paragraph is complete.
+- [ ] **Camera scan** on a real label: aim the dashed guide box at an ingredient list, tap
+      **Capture**, and confirm the result screen highlights correctly (docs/14).
+- [ ] **Curved surfaces**: scan a can/jar — capture one part of the list, tap **Scan More** for the
+      rest, and confirm the stitched result is complete.
 - [ ] **Choose Photo** and **Paste** paths.
 - [ ] **Fonts**: text renders in Atkinson Hyperlegible.
 - [ ] **Offline**: airplane mode — scanning, matching, and the pantry still work.

@@ -121,22 +121,30 @@ profileChangeLog {
 }
 ```
 
-### 3.3 Stats (Free Trial) — Singleton
+### 3.3 Stats — legacy singleton (retired)
 
-Exactly **one** row per device install. Only the shared trial counter lives here — everything else
-moved to per-profile counters on `Profile` (3.1) when Home stopped sharing one global counter
-across profiles.
+One row per device install, kept only for backward compatibility. Every dashboard counter lives
+per-profile on `Profile` (3.1); the trial is now a real store entitlement (RevenueCat, see `08`),
+not a local counter. **Nothing reads or writes this table's counters** (`saveStats` has no
+callers, and the review schedule in `10` no longer uses it).
 
 ```ts
 stats {
-  statsId: text PK,      // UUID (single row)
-  freeScansUsed: int     // starts 0, caps at 10, triggers hard paywall — account-wide regardless of profile count
+  statsId: text PK,               // UUID (single row, created on first launch)
+  freeScansUsed: int,             // retired 2026-09-21 (was the 10-scan gate); unused
+  totalLabelsRead: int,           // legacy, not updated — per-profile counters replaced these
+  totalRedFlagsCaught: int,       // legacy, not updated
+  totalCleanScans: int,           // legacy, not updated
+  totalReformulationsCaught: int  // legacy, not updated
 }
 ```
 
-> **What counts as a scan (critical):** `freeScansUsed` increments **only** when a scan successfully
-> extracts text and routes to a Results Screen. An aborted/illegible scan does **not** consume a
-> free scan (see `06` validation and `08`).
+> **What counts as a scan (critical):** a scan's per-profile counters (`totalLabelsRead`, etc.)
+> are committed **only** when a scan successfully extracts text and routes to a Results Screen.
+> An aborted/illegible scan commits nothing (see `06` validation).
+>
+> The old `total_skimpflation_caught` column may still exist in installed databases (and in the
+> `CREATE TABLE` in `src/db/client.ts`); it is retired and unused.
 
 ## Seed loading (first launch)
 

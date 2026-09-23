@@ -19,6 +19,42 @@ detail lives in git history and commit messages; this is the narrative summary.
 - Stale docs still to refresh: `docs/17` screen paths, 10-scan mentions in `docs/01`/`06`/`13`
   and the Spec Kit constitution/contracts (tracked in `CLAUDE.md`).
 
+**Stale-docs refresh (docs/, README, Spec Kit)**
+- Audited every doc against the code and fixed the retired-model leftovers: the 10-free-scan
+  trial → 7-day trial + hard Scan-tab lock (`01`, `03`, `05`, `06`, `07`, `10`, `13`), the
+  3-second live scan / frame processor / ML Kit → manual-shutter guide-box capture with Apple
+  Vision (`02`, `05`, `06`, `14` rewritten, `16`), `diffEngine.ts`/skimpflation → `recheckEngine.ts`
+  (`13`), Home tiles/Pantry headings (`05`), Quick Packs removed from the profile editor and the
+  scan-meter component (`09`), screen file paths and missing screens (`17`).
+- `docs/04-onboarding.md` got a "pending redesign" banner only (onboarding is deliberately
+  deferred); README's skeleton-era claims (camera "stub", `flagged_lifetime`, 13 tests, fonts TODO)
+  corrected.
+- Spec Kit: constitution amended to **v2.0.0** (Principle III now the 7-day trial + annual
+  subscription, not a 10-scan gate + one-time purchase); contracts `purchases-gating`,
+  `recheck-diff`, `ocr-pipeline` rewritten and `screens` updated to match the code;
+  spec/plan/tasks/research/data-model/quickstart marked as a historical planning record.
+- Found while auditing: the "Habit" review trigger's 50-scan path read the legacy `stats`
+  singleton, which nothing updates, so it never fired — superseded by the review-schedule rewrite
+  below. Also corrected `CLAUDE.md`: the JS code runs no camera frame processor.
+- Not read in full (only searched for retired terms): `docs/11`, `12`, `15`, `data-schema.md`,
+  `legal/`.
+
+**Review requests redesigned for the 7-day trial**
+- Replaced the old "Aha" (5th flagged ingredient) and "Habit" (30 days premium / 50 scans)
+  triggers with three requests, each at most once, each right after a completed scan once the user
+  has left Results: (1) inside the 7-day trial, (2) after the trial ends, (3) 30+ days after the
+  trial was activated. At most one per scan, in that order.
+- New pure, unit-tested `src/review/reviewSchedule.ts` (14 tests, written test-first);
+  `onScanCompleted()` replaces `onFlaggedResultDismissed`/`onAppForeground` and is called from
+  `app/results.tsx` for clean and flagged scans; the foreground trigger was removed from
+  `app/_layout.tsx`. `purchases.ts` now caches the store's original purchase date
+  (`cachedPremiumSince`) as the trial-start anchor.
+- Typecheck, lint, and all 120 tests (9 suites) pass. **Not yet verified on a device** — the native
+  prompt and RevenueCat dates can only be checked in a TestFlight/sandbox build. Because scanning
+  requires premium, requests 2–3 only reach people who kept their subscription; iOS caps the system
+  prompt at about three per year, so this schedule uses that whole allowance in the first month.
+  Docs updated (`docs/10`, `03`, `14`, README).
+
 **Seed cleanup**
 - `src/db/seed.ts`: the first-launch `stats` insert no longer names the retired
   `total_skimpflation_caught` column (it falls back to its `DEFAULT 0`). This was never a crash

@@ -23,8 +23,10 @@ doc (or this file) needs fixing. See "Keeping this file current" at the bottom.
 - **Expo SDK 51**, React Native 0.74.5, React 18.2, TypeScript 5.3, Node 20 (`.nvmrc`).
 - **Expo Router ~3.5** (file-based, `typedRoutes` on). Not Expo Go — native modules require a
   **custom dev client / EAS build** (`expo-dev-client`, `eas.json`).
-- **Camera:** `react-native-vision-camera` 4.5.1 with frame processors
-  (+ `react-native-worklets-core`). Not `expo-camera`.
+- **Camera:** `react-native-vision-camera` 4.5.1 — **manual-shutter still capture** (`takePhoto`)
+  inside a dashed guide box. The JS code runs **no frame processor**: frame processors are still
+  enabled in `app.config.ts` and `react-native-worklets-core` is still installed/configured, but
+  nothing calls them. Not `expo-camera`.
 - **OCR:** on-device only, via the local native module **`modules/vision-ocr`** (Swift/ObjC,
   Apple's Vision `VNRecognizeTextRequest`). **iOS only — Android is not built** and would need its
   own engine. No cloud/LLM OCR and no backend, ever.
@@ -57,8 +59,9 @@ component tests; native modules must not be imported by anything under test.
   `save-to-pantry.tsx` · `profile-edit.tsx` (create with `?new=1`, edit with `?id=`) ·
   `recheck-capture.tsx` → `recheck-result.tsx` · `paywall.tsx`. `app/index.tsx` redirects to
   onboarding or the tabs. There is no separate pantry-detail screen (Pantry uses a `Modal`).
-- **Scan input:** live camera scan, **Paste Text**, or **Choose Photo** — all feed the same
-  pipeline (`src/ocr/`, `src/matching/`, `src/domain/scanService.ts`).
+- **Scan input:** camera capture (guide box + `Capture` button, optional `Scan More`), **Paste
+  Text**, or **Choose Photo** — all feed the same pipeline (`src/ocr/`, `src/matching/`,
+  `src/domain/scanService.ts`). Details: `docs/14`.
 
 ## Code map (`src/`)
 
@@ -74,6 +77,12 @@ retired; the `freeScansUsed` DB column remains but nothing reads or writes it). 
 `isPremium`: the **Scan tab hard-locks** when not premium; every other tab stays usable.
 Details: `docs/08-monetization.md`.
 
+**Review requests** (`docs/10`): three, each at most once, each right after a completed scan once
+the user has left Results — (1) inside the 7-day trial, (2) after the trial ends, (3) 30+ days after
+the trial was activated (store original-purchase date). Schedule logic is the pure, tested
+`src/review/reviewSchedule.ts`; `onScanCompleted()` in `src/review/reviewTriggers.ts` is called from
+`app/results.tsx`. There is no app-foreground review trigger.
+
 ## Documentation
 
 `docs/` holds the specs; read the ones relevant to your task before writing code:
@@ -86,19 +95,19 @@ Details: `docs/08-monetization.md`.
   `ingredients.json` shape) · `00-master-brief.pdf`.
 - `docs/screenshots/` — Figma mockup screenshots; `docs/17-mockup-screens.md` indexes them
   (numbered `_2`, `_3` variants are scroll continuations of one screen).
-- **Spec Kit:** `.specify/memory/constitution.md` and `specs/001-flagged-mvp/` (contracts for
-  activation, matching, OCR pipeline, purchases gating, recheck diff); `speckit-*` skills are in
-  `.claude/skills/`.
+- **Spec Kit:** `.specify/memory/constitution.md` (v2.0.0, amended 2026-09-23) and
+  `specs/001-flagged-mvp/`. The `contracts/` (activation, matching, OCR pipeline, purchases
+  gating, recheck, screens) were brought in line with the code; the spec/plan/tasks/research/
+  data-model/quickstart files are a **historical planning record** (banner on each) — don't build
+  from them. `speckit-*` skills are in `.claude/skills/`.
 
-**Docs known to lag the code** (fix them, or tell the user, when you touch these areas — remove
-items from this list once they're corrected):
+**Docs status (updated 2026-09-23):** `docs/` (except `04`), the README, the constitution and the
+`contracts/` were brought in line with the code. Still out of step — fix these, or tell the user,
+when you touch these areas, and remove items once corrected:
 
-- `docs/17-mockup-screens.md` — its file paths for profile, recheck and pantry-detail screens
-  don't exist; use the Screens list above.
-- `docs/01`, `docs/06`, `docs/13`, and the Spec Kit constitution/contracts still describe the
-  retired 10-free-scan model in places; `docs/08` is current.
-- `docs/06` and `docs/14` describe an early 3-second live-scan design; the authoritative current
-  capture flow is the doc comment at the top of `src/ocr/CameraScanner.tsx`.
+- `docs/04-onboarding.md` screens 6–7 — deliberately deferred (see below).
+- `docs/11`, `12`, `15`, `data-schema.md`, `legal/` — only searched for the retired terms
+  (10-scan model, skimpflation, 3-second scan, one-time purchase); not read in full.
 
 **Onboarding is deliberately deferred:** work so far has focused on the app's functionality, not
 onboarding. `app/onboarding.tsx` is still the original flow — its copy references the retired

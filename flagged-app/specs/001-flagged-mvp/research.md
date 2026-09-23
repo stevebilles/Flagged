@@ -1,5 +1,12 @@
 # Phase 0 Research — Flagged V1 MVP
 
+> **Historical planning record (banner added 2026-09-23).** This file captures the original
+> Spec Kit planning for the MVP and is **not kept in sync with the app**. Several decisions below
+> were reversed: ML Kit was replaced by Apple Vision (`modules/vision-ocr`), the one-time
+> non-consumable purchase became an annual subscription with a 7-day trial, and skimpflation
+> detection was retired. Current behavior is defined by the code, `CLAUDE.md` and `docs/`; the
+> constitution (v2.0.0) and `contracts/` were updated.
+
 All decisions below are constrained by the constitution (offline-first, zero backend,
 safety-critical accuracy) and by `docs/02-architecture.md`. Nothing here introduces a
 network dependency on a core path.

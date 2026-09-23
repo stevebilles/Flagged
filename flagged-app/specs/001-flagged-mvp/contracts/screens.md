@@ -4,6 +4,10 @@
 `profile-edit`, `save-to-pantry`, `recheck-result` presented as cards/sheets. Fixed 4-tab
 bottom bar, no floating action button. Exact copy: the `docs/` set.
 
+> **Updated 2026-09-23** for scan gating, the Home tiles, the Scan states, the recheck outcomes,
+> the profile editor, Settings and the paywall. Sections not mentioned here were not re-verified
+> line by line — where this file and the code disagree, the code wins.
+
 ## `index.tsx`
 - Redirect: `hasOnboarded` → `(tabs)`, else `onboarding`.
 
@@ -11,6 +15,7 @@ bottom bar, no floating action button. Exact copy: the `docs/` set.
 1. Label Fatigue · 2. No Barcodes/Scores · 3. Personalize (Quick Pack pills, writes default
 profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 5. 4-Tab Hub ·
 6. 10-Scan Trial · 7. Founding Member pricing → `Start My 10 Free Scans` → `(tabs)`.
+*(Screens 6–7 are the retired 10-scan copy; onboarding is pending redesign — see `docs/04`.)*
 - Consumes no scan. Sets `hasOnboarded`. Name (if given) → `app_meta.firstName` + default
   profile name.
 
@@ -18,15 +23,16 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 - Header: "Good Morning, {firstName}" with graceful fallback.
 - Profile chips row: select (sets active profile), `Edit` (opens `profile-edit`),
   `Add Profile +`.
-- Protection Summary: 5 stat tiles — Labels Read, Red Flags Caught, Clean Scans,
-  Skimpflation Caught, Reformulations Caught (last two may be a secondary row / reveal when
-  non-zero). Values from the `stats` singleton, refresh on focus.
+- Protection Summary: 4 tiles in a 2×2 grid — Total Scans, Pantry Items Saved, Red Flags Found,
+  Reformulations Found. Values come from the viewed profile's per-profile counters (summed across
+  profiles in "All" mode), not the legacy `stats` singleton. (Skimpflation Caught was retired.)
 
 ## `(tabs)/scan.tsx` — Scan (`docs/05`, `docs/06`, `docs/08`)
-- State 1 Standby: meter pill (trial only), `Start Camera Scanner` / `Paste` / `Choose Photo`.
-- State 2 Locked (`freeScansUsed >= 10`, not premium): lock icon + `Unlock Unlimited Scans -
-  $24.99` ($39.99 struck through); all inputs disabled.
-- State 3 Active: live camera + cyan boxes + 3s countdown.
+- State 1 Standby: `Scan Label` / `Paste Text` / `Choose Photo` (no scan meter).
+- State 2 Locked (not premium): lock screen + `Start Your 7-Day Free Trial` (→ `paywall`); all
+  scan inputs unavailable, every other tab still usable.
+- State 3 Active: inline live camera + dashed cyan guide box + `Capture` (manual shutter), then
+  `Done` / `Scan More` — see `contracts/ocr-pipeline.md`.
 - On result → set `appStore.lastScan`, navigate to `results`.
 
 ## `results.tsx` (`docs/07`)
@@ -34,45 +40,46 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
   `save-to-pantry`.
 - Flagged: red header "Red flags detected", offending tokens highlighted red, charcoal
   breakdown card (ingredient · category · profile filter).
-- Secondary: `Scan Another Item` (→ `Unlock Unlimited Scans` if the 10th scan was just used)
-  and `Return to Home`.
+- Secondary: `Scan Another Item` and `Return to Home`. Flagged results can't be saved to the
+  Pantry — only clean scans show `Save to Pantry`.
 - Commits stats once, on mount, via `commitScanStats`.
 
 ## `save-to-pantry.tsx` (`docs/07`)
-- Camera viewfinder "Snap a photo of the front of the packaging" → compress thumbnail →
-  modal for Brand + Product → write `pantryItem` with `originalIngredients` = scanned list,
-  `dateAdded`/`lastVerifiedDate` = now.
+- Take a photo of the front of the packaging (`Take photo` / `Retake photo`), enter `Brand Name`
+  and `Product Name` (`Save` stays disabled until both are filled), then write the `pantryItem`
+  with a `profileSnapshot` of the profile's active filters at save time (no ingredient text is
+  stored — `docs/07` §7.1) and `dateAdded`/`lastVerifiedDate` = now.
 
 ## `(tabs)/pantry.tsx` (`docs/05`, `docs/07`)
 - Section 1 Recheck list: items with `now − lastVerifiedDate > 30d` (clamp negatives).
-  Header/subtitle verbatim. Tapping a task → intercept modal ("Only scan a NEWLY PURCHASED
+  Header `Reformulation Checks` + subtitle verbatim (`docs/05`). Tapping a task → intercept modal ("Only scan a NEWLY PURCHASED
   box…") → `Yes, open camera` (→ recheck scan) / `Remind me later`.
 - Section 2 Grid: up-to-date items (thumbnail, brand, product).
 - Section 3 Recent Changes: items with `deletedAt` within 24h, each with `Undo`; purge after.
 - Empty state (grid AND log empty): calming graphic + verbatim copy.
 
-## `recheck-result.tsx` (`docs/07` §7.1) — NEW
-- Outcome 1 identical: green toast, reset timer, back to grid.
-- Outcome 2 changed_safe: orange "Recipe Change Detected", breakdown of skimpflation/
-  reformulation, "No Active Red Flags Detected" badge, `Keep` / `Delete`.
-- Outcome 3 changed_flagged: Alert Red screen, names added ingredient(s) + which filter,
-  `Delete` (primary) / `Keep` (muted).
-- Applies the Keep/Delete repository effects and the recheck stat increments.
+## `recheck-result.tsx` (`docs/07` §7.1)
+- **Two** outcomes (`contracts/recheck-diff.md`): `identical` → green confirmation, reset the
+  30-day timer, `Back to Pantry`; `changed_flagged` → Alert Red screen, each match attributed
+  (reformulation vs. a dated/generic filter change), `Delete Item` (destructive) / `Keep Item`
+  (secondary). The old "changed_safe" outcome no longer exists.
+- Applies the Keep/Delete repository effects and the recheck stat increments (once, on mount).
 
 ## `profile-edit.tsx` (`docs/05`, `docs/09`)
-- Bottom sheet: 11 Quick Pack pills; expandable category rows (name, "N names · tap for
+- Editor (no Quick Pack pills — removed; filters are toggled per category): expandable category rows (name, "N names · tap for
   details", classification badge, on/off switch); per-ingredient toggles; custom-ingredient
   text field + `Add`. Writes through activation functions to the DB; reflects on reload.
 
 ## `(tabs)/settings.tsx` (`docs/05`, `docs/08`)
 - First Name field (→ `app_meta.firstName`).
-- `Restore Purchases` + Trial/Premium status.
-- `Report an Issue / Contact Us`.
+- Active subscribers see `Flagged Pro · Active · Renews <date>` + `Manage Subscription`;
+  non-premium users see no upsell card. `Restore Purchase`, `Rate Flagged`, `Contact Support`.
+  (A dev toggle to force Premium on/off also exists.)
 - `Privacy Policy` / `Terms of Service` links.
 
 ## `paywall.tsx` (`docs/08`)
-- $24.99 card, $39.99 struck through, the pitch copy, buy button → `purchaseLifetime` → on
-  success dismiss and unlock.
+- `$24.99 / yr` card with the `$2.08 / mo` and daily breakdowns, the pitch copy, buy button →
+  `purchaseAnnual` → on success dismiss and unlock.
 
 ## Cross-cutting
 - All text in Atkinson Hyperlegible; respects Dynamic Type; WCAG AA both themes; state never

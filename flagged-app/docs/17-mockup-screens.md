@@ -26,13 +26,22 @@ is taller than one viewport. Read all numbered variants together as a single scr
 |--------|------|-------------|
 | Results — Clean | `app/results.tsx` | `results_clean.png` |
 | Results — Flagged | `app/results.tsx` | `results_flagged.png` → `results_flagged_2.png` |
-| Pantry Detail | `app/pantry/[id].tsx` | `pantry_detail.png` |
-| Recheck Detail | `app/recheck/[id].tsx` | `recheck_detail.png` |
+| Pantry Detail | *(no separate screen — mockup only; Pantry lists items in `app/(tabs)/pantry.tsx`)* | `pantry_detail.png` |
+| Recheck Detail | *(no separate screen — mockup only; the Pantry recheck intercept `Modal` leads to `app/recheck-capture.tsx`)* | `recheck_detail.png` |
 | Recheck Result — Unchanged | `app/recheck-result.tsx` | `recheck_result_clean.png` |
-| Recheck Result — Changed | `app/recheck-result.tsx` | `recheck_result_changed.png` → `recheck_result_changed_2.png` |
+| Recheck Result — Changed | `app/recheck-result.tsx` *(see note below)* | `recheck_result_changed.png` → `recheck_result_changed_2.png` |
 | Recheck Result — New Red Flag | `app/recheck-result.tsx` | `recheck_result_red_flag.png` → `recheck_result_red_flag_2.png` |
-| Profile Edit | `app/profile/edit.tsx` | `profile_edit.png` → `profile_edit_2.png` → `profile_edit_3.png` → `profile_edit_4.png` |
-| Profile New | `app/profile/new.tsx` | `profile_new.png` → `profile_new_2.png` → `profile_new_3.png` |
+| Profile Edit | `app/profile-edit.tsx` (`?id=<profileId>`) | `profile_edit.png` → `profile_edit_2.png` → `profile_edit_3.png` → `profile_edit_4.png` |
+| Profile New | `app/profile-edit.tsx` (`?new=1`) | `profile_new.png` → `profile_new_2.png` → `profile_new_3.png` |
+| Save to Pantry | `app/save-to-pantry.tsx` | *(no mockup)* |
+| Paywall | `app/paywall.tsx` | *(no screenshot in `docs/screenshots/`)* |
+| Onboarding (7 screens) | `app/onboarding.tsx` | *(no screenshot in `docs/screenshots/`; flow pending redesign, see `04`)* |
+
+> **Notes (2026-09-23):** (1) The code's `recheck-result.tsx` implements **two** outcomes —
+> `identical` and `changed_flagged` (`07` §7.1); the "Changed" mockup (a "changed but still
+> approved" state) no longer maps to a separate outcome. (2) Some mockups predate later UI
+> changes: Quick Pack pills were removed from the profile editor, and Settings' upsell card was
+> removed on 2026-09-21. Where a mockup and the code disagree, the code wins.
 
 ---
 
@@ -63,6 +72,6 @@ screenshots/
   results_flagged_2.png               ← Scan result: flags found, scrolled (breakdown list)
   scan.png                            ← Camera viewfinder with sweep line animation
   scan_camera_permissions_overlay.png ← Camera permission request overlay
-  settings.png                        ← Settings top: plan status, upsell card
+  settings.png                        ← Settings top: plan status (the upsell card in this mockup was removed 2026-09-21)
   settings_2.png                      ← Settings scrolled: appearance, notifications, links
 ```

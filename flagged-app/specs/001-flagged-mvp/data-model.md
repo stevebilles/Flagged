@@ -1,5 +1,12 @@
 # Phase 1 Data Model — Flagged V1 MVP
 
+> **Historical planning record (banner added 2026-09-23).** This file captures the original
+> Spec Kit planning for the MVP and is **not kept in sync with the app**. Notably, the `stats`
+> singleton described here is now a retired legacy table (counters live per-profile on `Profile`),
+> `freeScansUsed` and `totalSkimpflationCaught` are retired, and pantry items store a
+> `profileSnapshot` instead of ingredient text. The current model is `docs/03-data-models.md` and
+> `src/db/schema.ts` / `src/domain/types.ts`.
+
 All storage is local SQLite (`expo-sqlite` + Drizzle), defined in `src/db/schema.ts`, mapped
 to the domain types in `src/domain/types.ts`. JSON columns hold `string[]` serialized as
 text. Authoritative product reference: `docs/03-data-models.md` and `docs/data-schema.md`.
