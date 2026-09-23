@@ -8,7 +8,6 @@ import { useAppFonts } from "../src/design/useAppFonts";
 import { bootstrap } from "../src/bootstrap/init";
 import { useAppStore } from "../src/state/appStore";
 import { refreshEntitlement } from "../src/purchases/purchases";
-import { onAppForeground } from "../src/review/reviewTriggers";
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -22,8 +21,8 @@ export default function RootLayout() {
   }, []);
 
   // On return to the foreground: re-check the purchase entitlement (best-effort,
-  // never blocks — a paid user offline keeps the cached value) and evaluate the
-  // "Habit" review trigger (docs/08, docs/10).
+  // never blocks — a paid user offline keeps the cached value). (Review requests
+  // are no longer evaluated here — they fire after a completed scan, docs/10.)
   useEffect(() => {
     const sub = AppState.addEventListener("change", async (next: AppStateStatus) => {
       const cameToForeground =
@@ -34,7 +33,6 @@ export default function RootLayout() {
       try {
         const premium = await refreshEntitlement();
         useAppStore.getState().setPremium(premium);
-        await onAppForeground(premium);
       } catch (e) {
         console.warn("foreground refresh failed", e);
       }

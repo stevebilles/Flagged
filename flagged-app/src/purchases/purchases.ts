@@ -18,6 +18,7 @@ export const CURRENT_OFFERING = "default"; // RevenueCat → Offerings (recommen
 
 const CACHED_PREMIUM_KEY = "cachedPremium";
 const CACHED_EXPIRES_AT_KEY = "cachedPremiumExpiresAt"; // ms epoch, or "" if unknown/none
+const CACHED_SINCE_KEY = "cachedPremiumSince"; // ms epoch of the store's original purchase (trial start)
 // How long a subscriber can stay offline before we require a fresh network check
 // (a normal offline stretch — road trip, a store basement — shouldn't lock them out).
 const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
@@ -39,9 +40,18 @@ export function configurePurchases(): void {
   configured = true;
 }
 
-function cachePremium(active: boolean, expiresAt: Date | null): void {
+function cachePremium(active: boolean, expiresAt: Date | null, sinceMs: number | null = null): void {
   setMetaValue(CACHED_PREMIUM_KEY, active ? "1" : "0");
   setMetaValue(CACHED_EXPIRES_AT_KEY, expiresAt ? String(expiresAt.getTime()) : "");
+  // The store's original purchase date (= when the free trial was activated).
+  // Only ever set, never cleared — it's the anchor for the review schedule.
+  if (active && sinceMs) setMetaValue(CACHED_SINCE_KEY, String(sinceMs));
+}
+
+/** When the user first activated the trial/subscription, per the store — null if never seen. */
+export function cachedPremiumSinceMs(): number | null {
+  const ms = Number(getMetaValue(CACHED_SINCE_KEY));
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
 }
 
 /**
@@ -79,13 +89,17 @@ function expiryOf(info: CustomerInfo): Date | null {
   return iso ? new Date(iso) : null;
 }
 
+function sinceOf(info: CustomerInfo): number | null {
+  return activeEntitlement(info)?.originalPurchaseDateMillis ?? null;
+}
+
 /** Refresh from the network when available; always update the offline cache. */
 export async function refreshEntitlement(): Promise<boolean> {
   if (!configured) return isPremiumCached();
   try {
     const info = await Purchases.getCustomerInfo();
     const active = hasPremium(info);
-    cachePremium(active, expiryOf(info));
+    cachePremium(active, expiryOf(info), sinceOf(info));
     return active;
   } catch {
     // Offline / transient failure: fall back to the cache (which itself expires
@@ -106,7 +120,7 @@ export async function purchaseAnnual(): Promise<boolean> {
   if (pkg) {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
     const active = hasPremium(customerInfo);
-    cachePremium(active, expiryOf(customerInfo));
+    cachePremium(active, expiryOf(customerInfo), sinceOf(customerInfo));
     return active;
   }
 
@@ -119,7 +133,7 @@ export async function purchaseAnnual(): Promise<boolean> {
   }
   const { customerInfo } = await Purchases.purchaseStoreProduct(products[0]);
   const active = hasPremium(customerInfo);
-  cachePremium(active, expiryOf(customerInfo));
+  cachePremium(active, expiryOf(customerInfo), sinceOf(customerInfo));
   return active;
 }
 
@@ -186,7 +200,7 @@ export async function restorePurchases(): Promise<boolean> {
   if (!configured) return isPremiumCached();
   const info = await Purchases.restorePurchases();
   const active = hasPremium(info);
-  cachePremium(active, expiryOf(info));
+  cachePremium(active, expiryOf(info), sinceOf(info));
   return active;
 }
 

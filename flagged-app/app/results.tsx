@@ -17,7 +17,7 @@ import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import { getProfile, getProfiles } from "../src/db/repositories";
 import { commitScanStats, commitScanStatsForAll } from "../src/domain/scanService";
-import { onFlaggedResultDismissed } from "../src/review/reviewTriggers";
+import { onScanCompleted } from "../src/review/reviewTriggers";
 import { cleanForDisplay } from "../src/matching/normalize";
 import { profileColor } from "../src/design/avatar";
 import type { Match } from "../src/matching/matcher";
@@ -122,7 +122,9 @@ export default function Results() {
   const clean = lastScan.isClean;
 
   async function dismiss(to: "home" | "scan") {
-    if (!clean) await onFlaggedResultDismissed(lastScan!.matches.length);
+    // A completed scan, clean or flagged — now that the user is leaving Results,
+    // a scheduled review request may be due (docs/10).
+    await onScanCompleted();
     useAppStore.getState().setLastScan(null);
     router.replace(to === "home" ? "/(tabs)" : "/(tabs)/scan");
   }
