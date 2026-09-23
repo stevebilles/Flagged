@@ -37,7 +37,7 @@
     "production": {
       "ios": {
         "ascAppId": "6812040251",
-        "ascApiKeyPath": "C:\\Users\\steve\\OneDrive\\Desktop\\AI App Publishing\\API Keys\\Flagged_AuthKey_M69U92KZ2K.p8",
+        "ascApiKeyPath": "C:\\Users\\steve\\Apps\\API Keys\\Flagged_AuthKey_M69U92KZ2K.p8",
         "ascApiKeyId": "M69U92KZ2K",
         "ascApiKeyIssuerId": "e16a0905-8fb8-4e5f-b789-75702b9e7243"
       }

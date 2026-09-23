@@ -91,7 +91,7 @@ function ensureStatsSingleton(): void {
   const row = s.getFirstSync<{ c: number }>("SELECT COUNT(*) as c FROM stats");
   if (!row || row.c === 0) {
     s.runSync(
-      "INSERT INTO stats (stats_id, free_scans_used, total_labels_read, total_red_flags_caught, total_clean_scans, total_skimpflation_caught, total_reformulations_caught) VALUES (?, 0, 0, 0, 0, 0, 0)",
+      "INSERT INTO stats (stats_id, free_scans_used, total_labels_read, total_red_flags_caught, total_clean_scans, total_reformulations_caught) VALUES (?, 0, 0, 0, 0, 0)",
       [randomUUID()]
     );
   }

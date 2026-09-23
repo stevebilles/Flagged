@@ -4,6 +4,39 @@ Session-by-session log of substantive work on Flagged, kept so a new session (hu
 can quickly see what happened and why without digging through commit-by-commit history. Full
 detail lives in git history and commit messages; this is the narrative summary.
 
+## 2026-09-23
+
+**CLAUDE.md rewritten to match the code**
+- The old `CLAUDE.md` described a stack the app never used (`expo-camera`, Claude vision OCR,
+  FlashList, `expo-linear-gradient`, `@expo-google-fonts`). Rewrote it from the actual code:
+  Expo SDK 51, `react-native-vision-camera`, on-device Apple Vision OCR (`modules/vision-ocr`,
+  iOS only), `expo-sqlite` + Drizzle, Zustand, RevenueCat, real screen list, current 7-day-trial
+  model, repo layout (git root is one level above `flagged-app/`), and a "Keeping this file
+  current" rule: any change that departs from `CLAUDE.md` must update it in the same change.
+- Code was deliberately not changed to match the old file — the code is the source of truth.
+- Onboarding (`app/onboarding.tsx`) is intentionally still the original flow (stale "10 free
+  scans" copy, no soft paywall) until onboarding work starts.
+- Stale docs still to refresh: `docs/17` screen paths, 10-scan mentions in `docs/01`/`06`/`13`
+  and the Spec Kit constitution/contracts (tracked in `CLAUDE.md`).
+
+**Seed cleanup**
+- `src/db/seed.ts`: the first-launch `stats` insert no longer names the retired
+  `total_skimpflation_caught` column (it falls back to its `DEFAULT 0`). This was never a crash
+  — `client.ts` still creates the column — just a leftover; `client.ts`'s `CREATE TABLE` is
+  intentionally unchanged so existing and fresh installs keep the same table shape. Typecheck
+  and all 106 Jest tests pass; not yet verified on a fresh device install.
+
+**`eas.json` submit block — reviewed, closed (no change)**
+- Contains the App Store Connect key path, key ID and issuer ID only. The private `.p8` is
+  gitignored and never committed, so nothing sensitive is exposed; the IDs can't authenticate
+  alone. Accepted as-is. Recorded under "Settled decisions" in `CLAUDE.md` so it isn't re-raised.
+
+**Moved everything Flagged-related out of OneDrive**
+- API keys, design bundle, Red Flag Ingredients source docs, mascot folder, workspace file and
+  master brief moved from `OneDrive\Desktop\...` to `C:\Users\steve\Apps\` (local, non-synced).
+- `eas.json` `ascApiKeyPath` updated to `C:\Users\steve\Apps\API Keys\Flagged_AuthKey_M69U92KZ2K.p8`
+  (the old OneDrive path no longer existed). Not yet re-tested with a real `eas submit`.
+
 ## 2026-09-21
 
 **Tooling & CI**
@@ -60,8 +93,7 @@ detail lives in git history and commit messages; this is the narrative summary.
 
 **Known follow-ups, not yet done**
 - Onboarding soft-paywall screen — not built yet (Figma redesign in progress).
-- `src/db/seed.ts`'s `ensureStatsSingleton()` inserts a `total_skimpflation_caught` column that
-  doesn't exist in the current schema — latent bug, likely dormant (only runs on a genuinely
-  fresh install), found but not fixed tonight (out of scope).
+- ~~`src/db/seed.ts`'s `ensureStatsSingleton()` inserts a retired `total_skimpflation_caught`
+  column~~ — resolved 2026-09-23 (see above).
 - The OneDrive copy of the repo still exists on disk — safe to delete once tonight's work is
   pushed (see "Dev workflow" above).
