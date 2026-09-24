@@ -119,6 +119,13 @@ when you touch these areas, and remove items once corrected:
 - `docs/11`, `12`, `15`, `data-schema.md`, `legal/` — only searched for the retired terms
   (10-scan model, skimpflation, 3-second scan, one-time purchase); not read in full.
 
+**No app icon or splash screen is configured yet (icon in progress):** `app.config.ts` has no
+`icon`/`splash` and `assets/` has no images. An App Store build needs a 1024×1024 PNG icon (no
+transparency, no rounded corners); until then Apple's purchase sheet shows a placeholder icon and
+the dev overlay shows "Possible unhandled promise rejection: No native splash screen registered for
+given view controller" — that's Expo's startup splash code, not a bug in our code. Wire `icon` +
+`splash` in `app.config.ts` once the artwork exists (needs a new EAS build).
+
 **Onboarding is deliberately deferred:** work so far has focused on the app's functionality, not
 onboarding. `app/onboarding.tsx` is still the original flow — its copy references the retired
 "10 free scans" model and it has no soft-paywall step yet (Figma redesign in progress). This is

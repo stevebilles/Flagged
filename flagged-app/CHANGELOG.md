@@ -6,6 +6,27 @@ detail lives in git history and commit messages; this is the narrative summary.
 
 ## 2026-09-23
 
+**Where things stand at the end of this session (2026-09-24) — open items**
+- **Verified working on a device (sandbox):** paywall → Apple purchase sheet with the 1-week free
+  trial → RevenueCat → Scan tab unlocks; trial converts to a paid period; the ineligible-user
+  paywall ("Subscribe for $24.99/year", no trial promise) displays correctly.
+- **Not yet verified on a device:** the *eligible*-user paywall after the spacing rework (needs a
+  fresh sandbox tester who hasn't used the trial); the Pantry red dot (needs an item >30 days old —
+  a dev-only "age an item" button would help); a subscription lapsing back to the paywall.
+- **Before App Store submission:** app icon (1024×1024, in progress) + splash config; Terms of
+  Service and Privacy Policy pages hosted at a URL the owner controls (`flagged.app` currently
+  serves a different product; drafts are in `legal/`); subscription Display Name/Description are
+  set in App Store Connect; production EAS build, upload, attach the subscription to the version,
+  final review screenshot/notes (owner says done); set `EXPO_PUBLIC_RC_IOS_KEY` as an EAS
+  environment variable (`.env` only feeds dev builds); decide whether to add Restore Purchase to the
+  paywall if App Review asks.
+- **Known/deferred:** onboarding is still the original flow (stale 10-scan copy) — deliberately
+  deferred; RevenueCat/Play Android side is not built; eligibility lookup could use a timeout on
+  slow connections; app launch waits on RevenueCat with no time limit (suggested cap: a few seconds,
+  fall back to the cache).
+- **Later, after release:** move the repo folder into `C:\Users\steve\Apps\` (see CLAUDE.md /
+  memory note for the steps).
+
 **CLAUDE.md rewritten to match the code**
 - The old `CLAUDE.md` described a stack the app never used (`expo-camera`, Claude vision OCR,
   FlashList, `expo-linear-gradient`, `@expo-google-fonts`). Rewrote it from the actual code:
