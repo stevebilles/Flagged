@@ -72,7 +72,7 @@ features.
   reflected by RevenueCat's entitlement status — not a local counter. During it every feature is
   unlocked: multiple family profiles, custom ingredients, and the full pantry.
 - Monetization is a single **auto-renewing annual subscription ($24.99/year)** with the 7-day
-  trial (`flagged_annual`, entitlement `premium`). No consumables and no other products.
+  trial (`Flagged_Pro_Annual`, entitlement `premium`). No consumables and no other products.
 - The only gate is **scanning**. When the user is not premium (no active trial or
   subscription), the Scan tab is fully locked — camera, Paste, and Choose Photo. Everything else
   (Home, Pantry, Settings, profile setup) remains usable.

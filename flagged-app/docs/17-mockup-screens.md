@@ -34,7 +34,8 @@ is taller than one viewport. Read all numbered variants together as a single scr
 | Profile Edit | `app/profile-edit.tsx` (`?id=<profileId>`) | `profile_edit.png` → `profile_edit_2.png` → `profile_edit_3.png` → `profile_edit_4.png` |
 | Profile New | `app/profile-edit.tsx` (`?new=1`) | `profile_new.png` → `profile_new_2.png` → `profile_new_3.png` |
 | Save to Pantry | `app/save-to-pantry.tsx` | *(no mockup)* |
-| Paywall | `app/paywall.tsx` | *(no screenshot in `docs/screenshots/`)* |
+| Paywall | `src/purchases/PaywallView.tsx` (shown inline in `app/(tabs)/scan.tsx`; also `app/paywall.tsx`) | `paywall.png` *(layout and copy only — its colors/font are not the brand's; the code uses the design system, `09`)* |
+| Subscription details | `app/subscription-details.tsx` (opened from the paywall's "Subscription details" link) | *(no mockup)* |
 | Onboarding (7 screens) | `app/onboarding.tsx` | *(no screenshot in `docs/screenshots/`; flow pending redesign, see `04`)* |
 
 > **Notes (2026-09-23):** (1) The code's `recheck-result.tsx` implements **two** outcomes —

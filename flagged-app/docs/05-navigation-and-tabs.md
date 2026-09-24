@@ -27,6 +27,14 @@ A horizontal row of **Profile Chips**.
 - **Adding:** a functional `[ Add Profile + ]` button creates a new profile (all users, during
   trial and after purchase).
 
+### Trial-ending banner (top of Home)
+Shown only while a free trial is in its **last 3 days** and hasn't been cancelled (RevenueCat's
+`willRenew` is still true): "Your free trial ends Tue 5:42 PM — Cancel by Mon 5:42 PM if you don't
+want to be charged $24.99", with a **Manage subscription** link. Apple only stops the charge if you
+cancel at least 24 hours before the trial ends, so it shows that deadline instead of a countdown;
+in the final 24 hours it says the cancel window has passed. It's the app's own in-app reminder (no
+push notifications). See `08`.
+
 ### Protection Summary (the pillars of value)
 Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile** counters on
 `Profile` (`03` §3.1). When Home is viewing "All" profiles, each tile sums every profile's counters.
@@ -52,8 +60,11 @@ Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile*
 
 ### State 2 — Hard Paywall Lockout
 - Shown whenever the user is **not premium** (no active trial or subscription): the whole Scan
-  tab — camera, Paste and Choose Photo — is replaced by a lock screen with a single primary
-  button, `[ Start Your 7-Day Free Trial ]`, which opens the paywall (`08`).
+  tab — camera, Paste and Choose Photo — is replaced by the **paywall**, rendered inline
+  (`src/purchases/PaywallView.tsx`, see `08` and the `paywall.png` mockup in `17`): "FLAGGED PRO"
+  header, the `$24.99 / year` price card with a "7-day free trial" pill, four feature rows, and a
+  `[ Start your 7-day free trial ]` button with the required subscription disclosure beneath.
+  After a successful purchase the tab unlocks in place.
 - Every other tab (Home, Pantry, Settings, profile setup) stays fully usable while locked.
 - Premium users (trial or paid) never see this state.
 
@@ -70,6 +81,8 @@ Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile*
 - **Icon:** a clean, modern pantry jar / open box.
 
 ### Section 1 — Reformulation Checks (the to-do list)
+- The **Pantry tab icon shows a red dot** whenever any saved item is due (more than 30 days since
+  it was last verified) — the in-app stand-in for a notification (`src/domain/pantryDue.ts`).
 - **Trigger:** any saved item whose `lastVerifiedDate` is **older than 30 days** moves out of the
   main grid to the **top** of the screen as a checklist item.
 - **Header & subtitle:**

@@ -114,7 +114,7 @@ and [`docs/06-ocr-engine.md`](docs/06-ocr-engine.md).
 
 ## Integration notes
 - **RevenueCat**: set `EXPO_PUBLIC_RC_IOS_KEY` / `EXPO_PUBLIC_RC_ANDROID_KEY` (public SDK keys —
-  see `.env.example`) and configure the `flagged_annual` auto-renewing subscription with a 7-day
+  see `.env.example`) and configure the `Flagged_Pro_Annual` auto-renewing subscription with a 7-day
   free trial, the `premium` entitlement and the `default` offering. Offline caching is already
   wired (`src/purchases/purchases.ts`).
 - **Pantry recheck**: implemented — intercept modal → `recheck-capture` → `evaluateRecheck()`

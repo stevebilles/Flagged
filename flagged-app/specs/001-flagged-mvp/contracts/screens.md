@@ -29,8 +29,9 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 
 ## `(tabs)/scan.tsx` — Scan (`docs/05`, `docs/06`, `docs/08`)
 - State 1 Standby: `Scan Label` / `Paste Text` / `Choose Photo` (no scan meter).
-- State 2 Locked (not premium): lock screen + `Start Your 7-Day Free Trial` (→ `paywall`); all
-  scan inputs unavailable, every other tab still usable.
+- State 2 Locked (not premium): the paywall (`PaywallView`) rendered inline with a
+  `Start your 7-day free trial` button; all scan inputs unavailable, every other tab still usable;
+  it unlocks in place after purchase.
 - State 3 Active: inline live camera + dashed cyan guide box + `Capture` (manual shutter), then
   `Done` / `Scan More` — see `contracts/ocr-pipeline.md`.
 - On result → set `appStore.lastScan`, navigate to `results`.
@@ -77,9 +78,14 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
   (A dev toggle to force Premium on/off also exists.)
 - `Privacy Policy` / `Terms of Service` links.
 
-## `paywall.tsx` (`docs/08`)
-- `$24.99 / yr` card with the `$2.08 / mo` and daily breakdowns, the pitch copy, buy button →
-  `purchaseAnnual` → on success dismiss and unlock.
+## `PaywallView` (`src/purchases/PaywallView.tsx`; `app/paywall.tsx` wraps it) (`docs/08`)
+- "FLAGGED PRO" header, `$24.99 / year` card with a "7-day free trial" pill and the `$2.08/mo` /
+  `$0.07/day` breakdowns, four feature rows, buy button → `purchaseAnnual` → on success
+  `setPremium(true)` (the Scan tab unlocks in place; the standalone route also goes back).
+- One-line subscription summary under the button plus a `Subscription details` link to
+  `subscription-details.tsx` (Terms/Privacy links are in Settings, not here). `onDismiss` adds a
+  `Not now`
+  button (standalone route only).
 
 ## Cross-cutting
 - All text in Atkinson Hyperlegible; respects Dynamic Type; WCAG AA both themes; state never

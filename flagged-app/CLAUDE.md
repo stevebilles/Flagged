@@ -34,7 +34,7 @@ doc (or this file) needs fixing. See "Keeping this file current" at the bottom.
   `assets/data/ingredients.json` on first launch.
 - **State:** **Zustand** (`src/state/appStore.ts`).
 - **Purchases:** **RevenueCat** via `react-native-purchases` (`src/purchases/purchases.ts`);
-  entitlement `premium`, offering `default`, product `flagged_annual`, with an offline entitlement
+  entitlement `premium`, offering `default`, product `Flagged_Pro_Annual`, with an offline entitlement
   cache (3-day grace past expiry).
 - **Other Expo modules in use:** `expo-image-picker` (Choose Photo), `expo-clipboard` (Paste),
   `expo-image` / `expo-image-manipulator`, `expo-store-review`, `expo-font`, `expo-file-system`,
@@ -57,7 +57,9 @@ component tests; native modules must not be imported by anything under test.
   Settings `settings.tsx`. No floating action button.
 - **Stack:** `onboarding.tsx` (7 screens) · `results.tsx` (clean + flagged states) ·
   `save-to-pantry.tsx` · `profile-edit.tsx` (create with `?new=1`, edit with `?id=`) ·
-  `recheck-capture.tsx` → `recheck-result.tsx` · `paywall.tsx`. `app/index.tsx` redirects to
+  `recheck-capture.tsx` → `recheck-result.tsx` · `paywall.tsx` (a thin wrapper; the Scan tab renders
+the paywall itself) · `subscription-details.tsx` (long-form subscription wording, opened from the
+paywall's "Subscription details" link). `app/index.tsx` redirects to
   onboarding or the tabs. There is no separate pantry-detail screen (Pantry uses a `Modal`).
 - **Scan input:** camera capture (guide box + `Capture` button, optional `Scan More`), **Paste
   Text**, or **Choose Photo** — all feed the same pipeline (`src/ocr/`, `src/matching/`,
@@ -74,8 +76,14 @@ capture, guide box, recognition, stitching · `purchases/` · `review/` in-app r
 
 $24.99/yr auto-renewing subscription with a **7-day free trial** (the old 10-free-scan gate is
 retired; the `freeScansUsed` DB column remains but nothing reads or writes it). Gating is purely
-`isPremium`: the **Scan tab hard-locks** when not premium; every other tab stays usable.
-Details: `docs/08-monetization.md`.
+`isPremium`: the **Scan tab hard-locks** when not premium — it shows the paywall inline
+(`src/purchases/PaywallView.tsx`, also wrapped by the unused `app/paywall.tsx` route and meant for
+the future onboarding soft paywall); every other tab stays usable.
+Details: `docs/08-monetization.md`. **Reminders are in-app only — no push/local notifications, by
+design:** a trial-ending banner on Home (`src/purchases/TrialEndingBanner.tsx`, logic in
+`trialBanner.ts`) and a red dot on the Pantry tab for items due a recheck (`src/domain/pantryDue.ts`).
+Apple sends no pre-charge reminder, so the paywall promises an "in-app reminder" — don't reword it
+to promise notifications unless they're actually built.
 
 **Review requests** (`docs/10`): three, each at most once, each right after a completed scan once
 the user has left Results — (1) inside the 7-day trial, (2) after the trial ends, (3) 30+ days after

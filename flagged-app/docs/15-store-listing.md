@@ -124,5 +124,5 @@ Wire the same URLs into the Settings tab links (docs/05 Tab 4).
 - [ ] IAP review screenshot = the paywall
 - [ ] Privacy Policy + Terms hosted at public HTTPS URLs; linked in Settings
 - [ ] App Privacy / Data safety completed (Purchases only, camera on-device)
-- [ ] IAP `flagged_annual` attached to the version; iOS Agreements Active (docs/08/12)
+- [ ] IAP `Flagged_Pro_Annual` attached to the version; iOS Agreements Active (docs/08/12)
 - [ ] Description avoids medical/safety guarantees

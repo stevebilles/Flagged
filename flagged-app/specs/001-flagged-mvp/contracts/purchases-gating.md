@@ -1,7 +1,7 @@
 # Contract — Purchases & Scan Gating (`src/purchases/purchases.ts`, `app/(tabs)/scan.tsx`)
 
 Product reference: `docs/08-monetization.md`. One auto-renewing **annual subscription**
-(`flagged_annual`, $24.99/yr) with a **7-day free trial**, one entitlement (`premium`), offering
+(`Flagged_Pro_Annual`, $24.99/yr) with a **7-day free trial**, one entitlement (`premium`), offering
 `default`. Offline-first: a paid user is never locked out (bounded grace window).
 
 > **Rewritten 2026-09-23 to match the code.** The original contract described a one-time
@@ -35,15 +35,15 @@ Product reference: `docs/08-monetization.md`. One auto-renewing **annual subscri
   `totalRedFlagsCaught`, `totalCleanScans`).
 
 ## UI rules
-- Not premium → Scan tab State 2: a lock screen with `Start Your 7-Day Free Trial` (→ `paywall`).
-  Camera / Paste / Choose Photo are unavailable. **Every other tab stays usable.**
+- Not premium → Scan tab State 2: the paywall (`PaywallView`) rendered inline with a
+  `Start your 7-day free trial` button. Camera / Paste / Choose Photo are unavailable. **Every other tab stays usable.**
 - No scan meter anywhere; no in-result upsell (`Scan Another Item` is always offered).
 - Premium (trial or paid) → the lock is never shown.
 - Settings: an active subscriber sees `Flagged Pro · Active · Renews <date>` and Manage
   Subscription; there is a `Restore Purchase` row. Non-premium users see **no** upsell card
   (removed 2026-09-21).
-- Paywall (`app/paywall.tsx`): `$24.99 / yr` with the `$2.08 / mo` and daily breakdowns; buy →
-  `purchaseAnnual`.
+- Paywall (`src/purchases/PaywallView.tsx`; `app/paywall.tsx` wraps it): `$24.99 / year` with the
+  `$2.08/mo` and `$0.07/day` breakdowns; buy → `purchaseAnnual`.
 
 **Acceptance checks** (→ tests + device)
 - Not premium → Scan tab locked, other tabs usable (screen).

@@ -39,6 +39,66 @@ detail lives in git history and commit messages; this is the narrative summary.
 - Not read in full (only searched for retired terms): `docs/11`, `12`, `15`, `data-schema.md`,
   `legal/`.
 
+**New paywall in the Scan tab**
+- Rebuilt the Figma paywall mockup as `src/purchases/PaywallView.tsx` — "FLAGGED PRO" header,
+  $24.99/year card with a 7-day-trial pill, four feature rows, a CTA, a short summary sentence
+  under it ("7-day free trial, then $24.99 per year, renewing automatically. No charge today. You'll see
+  an in-app reminder before billing, and you can cancel anytime."), and the
+  required subscription disclosure — in the app's design system (Atkinson Hyperlegible, brand
+  cyan instead of the mockup's green, theme tokens, Dynamic Type sizes only).
+- The Scan tab now shows it inline for non-subscribers instead of the old lock icon + button;
+  `app/paywall.tsx` now just wraps the same component (kept for the future onboarding soft
+  paywall). `withAlpha` is now exported from `src/design/components.tsx`. Mockup saved as
+  `docs/screenshots/paywall.png`. Docs/contracts updated. Typecheck, lint, 120 tests pass.
+- Paywall legal text trimmed: removed the Terms/Privacy links (they stay in Settings — Apple
+  requires them in the app and App Store metadata, not on the purchase screen) and cut the
+  disclosure to one line + a "Subscription details" link to a new in-app screen
+  (`app/subscription-details.tsx`) holding the longer wording, with a Back button. Restore
+  Purchase stays in Settings only (add to the paywall if App Review asks). The details wording is
+  standard auto-renewal boilerplate and hasn't been reviewed by a lawyer.
+- RevenueCat wiring check: the paywall is shown exactly when `isPremium` is false (cache at launch →
+  confirmed by RevenueCat in bootstrap → refreshed on foreground / purchase / restore). Added a live
+  RevenueCat listener (`subscribeToEntitlement`, activation-only) so an Ask-to-Buy approval or
+  redeemed code unlocks the app without a restart. Dashboard (project "Flagged-Food Label
+  Scanner"): entitlement `premium` ← Flagged Annual products, offering `default` with an Annual
+  package — all present.
+- Verified on a device (2026-09-23, sandbox): paywall → Apple purchase sheet
+  ([Environment: Sandbox]) → RevenueCat records `flagged_annual` and the `premium` entitlement →
+  the Scan tab unlocks by itself. Getting there needed a fix on the user's side: the RevenueCat iOS
+  key in `.env` matched neither Flagged RevenueCat project (401 "Invalid API Key"); it now matches
+  the "Flagged iOS" app in project "Flagged-Food Label Scanner".
+- **Trial mismatch found and fixed (RevenueCat side):** the sandbox purchase was NOT a free trial
+  (Apple's sheet showed "$24.99 per year" / "Subscribe"; the period ended about an hour later).
+  Cause: the free-week introductory offer (Sep 21, 2026, no end date; US/CA/UK/AU/NZ) is on the App
+  Store Connect subscription whose Product ID is **`Flagged_Pro_Annual`** — the only subscription in
+  the "Flagged Pro" group — but the app/RevenueCat were still using a leftover `flagged_annual`
+  product from an earlier setup, which has no trial. Fix: created RevenueCat product
+  `Flagged_Pro_Annual` (id `proddda71ffb3d`) on the Flagged iOS app, attached it to the `premium`
+  entitlement and the `default` offering's Annual package, detached the old iOS product from that
+  package (left on the entitlement, not deleted), and set `ANNUAL_PRODUCT_ID` and the docs to
+  `Flagged_Pro_Annual`. **Still to verify:** a fresh sandbox tester (or cleared purchase history +
+  reinstall) should now see "7 days free" on Apple's sheet.
+- Product note: some real users won't be eligible for the trial (already used it, returning
+  subscribers); the paywall currently always says "7-day free trial / No charge today". Planned:
+  check eligibility via RevenueCat and show the trial wording only to eligible users.
+
+**In-app reminders: trial-ending banner + Pantry red dot**
+- Apple sends no reminder before a trial converts to a charge (owner-verified), so the paywall now
+  promises an "in-app reminder" and the app delivers it — no push notifications, by design:
+  - Home banner during the last 3 days of a trial that hasn't been cancelled: "Your free trial ends
+    Tue 5:42 PM — Cancel by Mon 5:42 PM if you don't want to be charged $24.99" + Manage
+    subscription. Shows the cancel-by time (Apple needs 24h notice), not a countdown; in the final
+    24 hours it says the cancel window has passed. Logic is the pure, tested `trialBanner.ts`
+    (11 tests, written test-first); UI is `TrialEndingBanner.tsx`.
+  - Red dot on the Pantry tab icon while any item is >30 days since last verified
+    (`src/domain/pantryDue.ts`, 6 tests) — the Pantry already lists those at the top.
+  - `purchases.ts` now caches the entitlement's `periodType` and `willRenew` (needed to know a trial
+    is active and not already cancelled) and notifies the app store when they change.
+  - Settings' dev-only buttons "Simulate trial ending in 48h / 20h" show the banner without waiting.
+- Paywall wording updated to match ("You'll see an in-app reminder before your trial ends, so you can
+  cancel before your card is charged"; bullet 4 now describes the Pantry recheck instead of a
+  reminder). Typecheck, lint, and all 137 tests pass. **Not yet checked on a device.**
+
 **Review requests redesigned for the 7-day trial**
 - Replaced the old "Aha" (5th flagged ingredient) and "Habit" (30 days premium / 50 scans)
   triggers with three requests, each at most once, each right after a completed scan once the user
