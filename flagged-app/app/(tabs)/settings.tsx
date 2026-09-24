@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, ScrollView, TextInput, Pressable, Linking, Platform } from "react-native";
+import { View, ScrollView, TextInput, Pressable, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as StoreReview from "expo-store-review";
 import Constants from "expo-constants";
@@ -7,13 +7,13 @@ import { Screen, Text, Card, Button, SettingsRow } from "../../src/design/compon
 import { useTheme } from "../../src/design/ThemeProvider";
 import { getMetaValue, setMetaValue } from "../../src/db/appMeta";
 import { useAppStore } from "../../src/state/appStore";
-import { restorePurchases, cachedRenewalDate, setDevPremiumOverride } from "../../src/purchases/purchases";
-
-const MANAGE_SUBSCRIPTION_URL = Platform.select({
-  ios: "https://apps.apple.com/account/subscriptions",
-  android: "https://play.google.com/store/account/subscriptions",
-  default: undefined,
-});
+import {
+  restorePurchases,
+  cachedRenewalDate,
+  setDevPremiumOverride,
+  setDevTrialEndingOverride,
+  MANAGE_SUBSCRIPTION_URL,
+} from "../../src/purchases/purchases";
 
 /** Small filled-outline status pill ("Active") — a one-off look
  * specific to this card, not generalized into the design system since
@@ -129,7 +129,7 @@ export default function Settings() {
                 <Button
                   title="Manage Subscription"
                   kind="secondary"
-                  onPress={() => Linking.openURL(MANAGE_SUBSCRIPTION_URL)}
+                  onPress={() => Linking.openURL(MANAGE_SUBSCRIPTION_URL as string)}
                 />
               )}
             </Card>
@@ -180,6 +180,25 @@ export default function Settings() {
                   setDevPremiumOverride(next);
                   setPremium(next);
                   setDevNote(next ? "Premium on — trial/subscribed." : "Premium off.");
+                }}
+              />
+              {/* Fake a trial that's about to end, to see the Home banner without waiting days. */}
+              <Button
+                title="Simulate trial ending in 48h"
+                kind="secondary"
+                onPress={() => {
+                  setDevTrialEndingOverride(48);
+                  setPremium(true);
+                  setDevNote("Trial set to end in 48h — open Home to see the banner.");
+                }}
+              />
+              <Button
+                title="Simulate trial ending in 20h"
+                kind="secondary"
+                onPress={() => {
+                  setDevTrialEndingOverride(20);
+                  setPremium(true);
+                  setDevNote("Trial set to end in 20h (past the cancel cutoff) — open Home.");
                 }}
               />
               {devNote && <Text tone="cyan" variant="caption">{devNote}</Text>}

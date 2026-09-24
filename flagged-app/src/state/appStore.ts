@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { getMetaValue, setMetaValue } from "../db/appMeta";
 import { getProfiles } from "../db/repositories";
-import { isPremiumCached } from "../purchases/purchases";
+import { isPremiumCached, cachedTrialInfo } from "../purchases/purchases";
+import type { TrialInfo } from "../purchases/trialBanner";
 import type { Profile, ScanResultLike, RecheckHandoff } from "./storeTypes";
 
 interface AppState {
@@ -11,6 +12,8 @@ interface AppState {
   // its own — it's computed live from every real profile at scan time.
   scanAllProfiles: boolean;
   isPremium: boolean;
+  // Cached trial details behind the Home "trial ending" banner (purchases.ts / trialBanner.ts).
+  trialInfo: TrialInfo | null;
   hasOnboarded: boolean;
   // ephemeral hand-off of the last scan into the results route
   lastScan: ScanResultLike | null;
@@ -21,6 +24,7 @@ interface AppState {
   setActiveProfile: (id: string) => void;
   setScanAllProfiles: (v: boolean) => void;
   setPremium: (v: boolean) => void;
+  setTrialInfo: (i: TrialInfo | null) => void;
   completeOnboarding: () => void;
   setLastScan: (s: ScanResultLike | null) => void;
   setLastRecheck: (r: RecheckHandoff | null) => void;
@@ -34,6 +38,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeProfileId: null,
   scanAllProfiles: false,
   isPremium: false,
+  trialInfo: null,
   hasOnboarded: false,
   lastScan: null,
   lastRecheck: null,
@@ -49,6 +54,7 @@ export const useAppStore = create<AppState>((set) => ({
       activeProfileId,
       scanAllProfiles: getMetaValue(KEY_SCAN_ALL) === "1",
       isPremium: isPremiumCached(),
+      trialInfo: cachedTrialInfo(),
       hasOnboarded: getMetaValue(KEY_ONBOARDED) === "1",
     });
   },
@@ -62,6 +68,7 @@ export const useAppStore = create<AppState>((set) => ({
     set({ scanAllProfiles: v });
   },
   setPremium: (v) => set({ isPremium: v }),
+  setTrialInfo: (i) => set({ trialInfo: i }),
   completeOnboarding: () => {
     setMetaValue(KEY_ONBOARDED, "1");
     set({ hasOnboarded: true });

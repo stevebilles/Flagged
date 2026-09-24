@@ -16,7 +16,7 @@ import { useTheme } from "./ThemeProvider";
 /** Theme colors are opaque hex (docs/09 — no shared hex between modes), so a
  * translucent tint has to be derived at runtime rather than hard-coded, or
  * it'd silently be the wrong shade (or the wrong mode's color) in light mode. */
-function withAlpha(hex: string, alpha: number): string {
+export function withAlpha(hex: string, alpha: number): string {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);

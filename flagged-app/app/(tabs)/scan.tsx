@@ -13,6 +13,7 @@ import { extractIngredientList } from "../../src/matching/normalize";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
 import { useCameraCapture } from "../../src/ocr/CameraScanner";
+import { PaywallView } from "../../src/purchases/PaywallView";
 import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION } from "../../src/ocr/guideBox";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
 import { displayName } from "../../src/domain/types";
@@ -198,19 +199,11 @@ export default function Scan() {
     // State 2 — hard paywall lockout (docs/08: 7-day free trial, not a scan
     // count — start the trial to unlock scanning; the rest of the app, incl.
     // Settings and profile setup, stays fully usable while locked).
+    // The paywall renders right here (no separate screen); a successful
+    // purchase flips `isPremium`, and this tab re-renders into State 1.
     return (
       <Screen>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: t.spacing.lg }}>
-          <Ionicons name="lock-closed" size={72} color={t.colors.textMuted} />
-          <Text variant="title" bold style={{ textAlign: "center" }}>
-            Start your free trial to scan
-          </Text>
-          <Text tone="muted" style={{ textAlign: "center" }}>
-            Unlimited, offline label reading for every profile in your house — 7 days free, then
-            $24.99/yr.
-          </Text>
-          <Button title="Start Your 7-Day Free Trial" onPress={() => router.push("/paywall")} />
-        </View>
+        <PaywallView />
       </Screen>
     );
   }

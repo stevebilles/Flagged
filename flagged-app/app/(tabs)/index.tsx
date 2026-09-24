@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { useAppStore } from "../../src/state/appStore";
+import { TrialEndingBanner } from "../../src/purchases/TrialEndingBanner";
 import { getProfiles, getActivePantryItems, getCategories } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
 import { profileColor, initials } from "../../src/design/avatar";
@@ -80,6 +81,9 @@ export default function Home() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
+        {/* In-app "your free trial is ending" heads-up (docs/08) — renders nothing
+            unless a trial is in its last 3 days and hasn't been cancelled. */}
+        <TrialEndingBanner />
         <View>
           <Text tone="muted" variant="caption">
             {(greeting() + (firstName ? `, ${firstName}` : "")).toUpperCase()}

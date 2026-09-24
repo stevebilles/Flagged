@@ -1,7 +1,12 @@
 import { initializeDatabase } from "../db/seed";
 import { purgeExpiredDeletions } from "../db/repositories";
 import { deleteThumbnail } from "../domain/pantryImage";
-import { configurePurchases, refreshEntitlement } from "../purchases/purchases";
+import {
+  configurePurchases,
+  refreshEntitlement,
+  subscribeToEntitlement,
+  subscribeToTrialInfo,
+} from "../purchases/purchases";
 import { useAppStore } from "../state/appStore";
 
 /**
@@ -20,6 +25,10 @@ export async function bootstrap(): Promise<void> {
   useAppStore.getState().hydrate();
 
   configurePurchases();
+  // Unlock live if RevenueCat later reports an active entitlement (purchases.ts).
+  subscribeToEntitlement((active) => useAppStore.getState().setPremium(active));
+  // Keep the Home trial banner's data current after every purchase/refresh/restore.
+  subscribeToTrialInfo((info) => useAppStore.getState().setTrialInfo(info));
   const premium = await refreshEntitlement();
   useAppStore.getState().setPremium(premium);
 }
