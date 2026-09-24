@@ -2,6 +2,7 @@ import Purchases, { CustomerInfo } from "react-native-purchases";
 import { Platform } from "react-native";
 import { getMetaValue, setMetaValue } from "../db/appMeta";
 import type { TrialInfo } from "./trialBanner";
+import { eligibilityFromStatus, type TrialEligibility } from "./trialEligibility";
 
 /**
  * RevenueCat wrapper (docs/08). An auto-renewing **annual subscription** ($24.99/yr)
@@ -165,6 +166,26 @@ function sinceOf(info: CustomerInfo): number | null {
 function trialExtraOf(info: CustomerInfo): CacheExtra {
   const e = activeEntitlement(info);
   return { periodType: e?.periodType ?? null, willRenew: e?.willRenew ?? null };
+}
+
+/**
+ * Will the store give this user the free trial? Apple allows one introductory offer
+ * per Apple account per subscription group, so returning subscribers, reinstalls and
+ * anyone who already used it pay right away — the paywall must only promise the trial
+ * to people who get it (trialEligibility.ts). Never throws: any failure (offline,
+ * not configured) is "unknown", which does NOT promise a trial.
+ */
+export async function getTrialEligibility(): Promise<Exclude<TrialEligibility, "checking">> {
+  if (!configured) return "unknown";
+  try {
+    const offerings = await Purchases.getOfferings();
+    const offering = offerings.current ?? offerings.all[CURRENT_OFFERING];
+    const productId = offering?.availablePackages?.[0]?.product.identifier ?? ANNUAL_PRODUCT_ID;
+    const result = await Purchases.checkTrialOrIntroductoryPriceEligibility([productId]);
+    return eligibilityFromStatus(result[productId]?.status);
+  } catch {
+    return "unknown";
+  }
 }
 
 /** Refresh from the network when available; always update the offline cache. */

@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text, Button, withAlpha } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { useAppStore } from "../state/appStore";
-import { purchaseAnnual } from "./purchases";
+import { purchaseAnnual, getTrialEligibility } from "./purchases";
+import { paywallCopy, type TrialEligibility } from "./trialEligibility";
 import { markPremiumInstalled } from "../review/reviewTriggers";
 
 /**
@@ -57,6 +58,21 @@ export function PaywallView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only promise the free trial to people who'll actually get it (trialEligibility.ts).
+  // Starts as "checking" (shown with the trial wording — the lookup is quick); an
+  // ineligible or undetermined answer switches to plain "Subscribe" wording.
+  const [eligibility, setEligibility] = useState<TrialEligibility>("checking");
+  useEffect(() => {
+    let cancelled = false;
+    getTrialEligibility().then((e) => {
+      if (!cancelled) setEligibility(e);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const copy = paywallCopy(eligibility);
+
   async function startTrial() {
     setBusy(true);
     setError(null);
@@ -77,18 +93,24 @@ export function PaywallView({
   }
 
   const hairline = withAlpha(t.colors.textMuted, 0.25);
+  // Flexible spacers: gaps between blocks grow (up to xl) before the ends do.
+  const gapSpacer = { flexGrow: 3, flexShrink: 1, minHeight: t.spacing.sm, maxHeight: t.spacing.xl } as const;
+  const endSpacer = { flexGrow: 1, flexShrink: 1 } as const;
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
         style={{ flex: 1 }}
-        // space-between spreads any spare height evenly between the blocks (header,
-        // price card + reminder, feature list, and — via the empty spacer at the end —
-        // the button), so the gaps match; `gap` is the minimum on short phones, where
-        // it scrolls instead.
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", gap: t.spacing.sm }}
+        // The flexible spacers below (gapSpacer between blocks, endSpacer above and
+        // below the whole layout) share any spare height: each gap grows up to a sensible
+        // maximum, and whatever is left is split evenly above and below the content. So the
+        // layout stays balanced whether or not the trial wording is shown, instead of
+        // stretching into big gaps when there's less text. On a short phone the minimum
+        // gaps apply and it scrolls.
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
+        <View style={endSpacer} />
         <View style={{ gap: t.spacing.sm }}>
           <Text variant="caption" bold tone="cyan" style={{ letterSpacing: 1.5 }}>
             FLAGGED PRO
@@ -105,6 +127,7 @@ export function PaywallView({
           </Text>
         </View>
 
+        <View style={gapSpacer} />
         <View style={{ gap: t.spacing.sm }}>
           <View
             style={{
@@ -123,30 +146,35 @@ export function PaywallView({
                   {"  "}/ year
                 </Text>
               </Text>
-              <View
-                style={{
-                  backgroundColor: t.colors.cyan,
-                  borderRadius: t.radius.pill,
-                  paddingHorizontal: t.spacing.sm + 4,
-                  paddingVertical: t.spacing.xs,
-                }}
-              >
-                <Text variant="caption" bold style={{ color: t.colors.canvas }}>
-                  7-day free trial
-                </Text>
-              </View>
+              {copy.showTrialPill && (
+                <View
+                  style={{
+                    backgroundColor: t.colors.cyan,
+                    borderRadius: t.radius.pill,
+                    paddingHorizontal: t.spacing.sm + 4,
+                    paddingVertical: t.spacing.xs,
+                  }}
+                >
+                  <Text variant="caption" bold style={{ color: t.colors.canvas }}>
+                    7-day free trial
+                  </Text>
+                </View>
+              )}
             </View>
             <Text variant="subheadline" tone="muted">
               Only $2.08/mo · Just $0.07/day
             </Text>
           </View>
 
-          <Text variant="subheadline" tone="muted" style={{ textAlign: "center" }}>
-            You'll see an in-app reminder before your trial ends, so you can cancel before your card
-            is charged.
-          </Text>
+          {copy.showTrialReminder && (
+            <Text variant="subheadline" tone="muted" style={{ textAlign: "center" }}>
+              You'll see an in-app reminder before your trial ends, so you can cancel before your card
+              is charged.
+            </Text>
+          )}
         </View>
 
+        <View style={gapSpacer} />
         <View>
           {FEATURES.map((f, i) => (
             <View
@@ -182,9 +210,8 @@ export function PaywallView({
             </View>
           ))}
         </View>
-        {/* Empty spacer: as the last flex child it gives the gap between the last
-            bullet and the button the same share of spare space as the other gaps. */}
-        <View />
+        {/* Bottom spacer: with the top one, splits any leftover height evenly around the layout. */}
+        <View style={endSpacer} />
       </ScrollView>
 
       <View style={{ gap: t.spacing.sm }}>
@@ -194,7 +221,7 @@ export function PaywallView({
           </Text>
         )}
         <Button
-          title="Start your 7-day free trial"
+          title={copy.cta}
           loading={busy}
           onPress={startTrial}
           style={{
@@ -211,8 +238,7 @@ export function PaywallView({
             not here (Apple requires them in the app and App Store metadata, not
             on this screen). */}
         <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
-          7-day free trial, then $24.99 per year, renewing automatically. No charge today. You'll see
-          an in-app reminder before billing, and you can cancel anytime.
+          {copy.summary}
         </Text>
         <Pressable
           accessibilityRole="link"

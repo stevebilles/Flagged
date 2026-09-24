@@ -27,11 +27,11 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: "Price and length",
     body: [
-      "Flagged Pro is an auto-renewing annual subscription: $24.99 per year (about $2.08 a month). It starts with a 7-day free trial.",
+      "Flagged Pro is an auto-renewing annual subscription: $24.99 per year (about $2.08 a month). New subscribers who are eligible start with a 7-day free trial. If you've already used the free trial, you're charged $24.99 when you subscribe.",
     ],
   },
   {
-    title: "Your 7-day free trial",
+    title: "If you're eligible for the 7-day free trial",
     body: [
       "You aren't charged during the 7-day free trial. When the trial ends, your Apple ID is charged $24.99 and the subscription renews each year, unless you cancel at least 24 hours before the trial ends.",
       "If you cancel during the trial, you won't be charged, and you keep access until the trial ends. Any unused portion of a free trial is forfeited if you purchase a subscription before it ends.",
