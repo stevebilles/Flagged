@@ -82,6 +82,18 @@ detail lives in git history and commit messages; this is the narrative summary.
   subscribers); the paywall currently always says "7-day free trial / No charge today". Planned:
   check eligibility via RevenueCat and show the trial wording only to eligible users.
 
+**Trial eligibility: only promise the trial to people who get it**
+- Apple allows one introductory offer per Apple account per subscription group, so returning
+  subscribers, reinstalls and anyone who already used the trial pay right away — but the paywall
+  always said "7-day free trial / No charge today". Now `PaywallView` asks RevenueCat
+  (`getTrialEligibility`, using `checkTrialOrIntroductoryPriceEligibility`) and shows the trial
+  wording only to eligible users; everyone else gets "Subscribe for $24.99/year" with a plain
+  price-and-renewal summary. "Unknown" (e.g. offline) does not promise a trial. Copy rules are the
+  pure, tested `trialEligibility.ts` (10 tests, written test-first). The Subscription details
+  screen now words the trial as "if you're eligible". All 147 tests, typecheck and lint pass.
+  **Not yet verified on a device** (an account that already used the trial should see the plain
+  "Subscribe" wording; a fresh sandbox tester should see the trial wording).
+
 **In-app reminders: trial-ending banner + Pantry red dot**
 - Apple sends no reminder before a trial converts to a charge (owner-verified), so the paywall now
   promises an "in-app reminder" and the app delivers it — no push notifications, by design:

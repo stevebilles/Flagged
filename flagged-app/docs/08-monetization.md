@@ -49,6 +49,17 @@ starts**, not delayed until the first real charge.
   Privacy Policy links are **not** on the paywall — they're in Settings (Apple requires them in the
   app and in App Store metadata, not specifically on the purchase screen). Restore Purchase is also
   only in Settings for now; add it to the paywall if App Review asks.
+- **Trial eligibility (2026-09-24):** Apple gives one introductory offer per Apple account per
+  subscription group, so returning subscribers, reinstalls and anyone who already used the trial
+  pay immediately. The paywall therefore asks RevenueCat (`getTrialEligibility` in `purchases.ts`,
+  copy rules + tests in `trialEligibility.ts`) and shows the trial wording — the "7-day free trial"
+  pill, the in-app-reminder line, the "Start your 7-day free trial" button, and the "No charge
+  today" summary — **only to users who are eligible**. Everyone else sees "Subscribe for
+  $24.99/year" and "$24.99 per year, renewing automatically. You'll be charged when you subscribe,
+  and you can cancel anytime." While the lookup runs the trial wording shows (it's quick); if it
+  can't be determined (offline, etc.) the app does **not** promise a trial. Apple's own purchase
+  sheet always shows the real terms before anyone confirms. The Subscription details screen words
+  the trial as "if you're eligible".
 - **Settings no longer shows a subscription upsell.** A non-premium user sees no "Free Trial" or
   "Flagged Pro" card there at all (removed 2026-09-21) — the paywall lives in onboarding and the
   Scan tab now, not Settings. An **active** subscriber still sees their plan status and renewal

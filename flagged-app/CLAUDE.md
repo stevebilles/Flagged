@@ -83,7 +83,9 @@ Details: `docs/08-monetization.md`. **Reminders are in-app only — no push/loca
 design:** a trial-ending banner on Home (`src/purchases/TrialEndingBanner.tsx`, logic in
 `trialBanner.ts`) and a red dot on the Pantry tab for items due a recheck (`src/domain/pantryDue.ts`).
 Apple sends no pre-charge reminder, so the paywall promises an "in-app reminder" — don't reword it
-to promise notifications unless they're actually built.
+to promise notifications unless they're actually built. The paywall's free-trial wording only shows
+to users RevenueCat reports as **eligible** for the trial (`src/purchases/trialEligibility.ts`);
+everyone else gets a plain "Subscribe" — never promise a trial to someone who won't get it.
 
 **Review requests** (`docs/10`): three, each at most once, each right after a completed scan once
 the user has left Results — (1) inside the 7-day trial, (2) after the trial ends, (3) 30+ days after

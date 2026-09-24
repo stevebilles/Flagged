@@ -64,7 +64,9 @@ Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile*
   (`src/purchases/PaywallView.tsx`, see `08` and the `paywall.png` mockup in `17`): "FLAGGED PRO"
   header, the `$24.99 / year` price card with a "7-day free trial" pill, four feature rows, and a
   `[ Start your 7-day free trial ]` button with the required subscription disclosure beneath.
-  After a successful purchase the tab unlocks in place.
+  After a successful purchase the tab unlocks in place. The trial wording (the pill, the reminder
+  line, the button text and the summary) only shows to users RevenueCat reports as **eligible** for
+  the free trial; everyone else sees a plain `[ Subscribe for $24.99/year ]` (`08`).
 - Every other tab (Home, Pantry, Settings, profile setup) stays fully usable while locked.
 - Premium users (trial or paid) never see this state.
 
