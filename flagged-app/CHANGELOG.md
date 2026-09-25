@@ -6,6 +6,24 @@ detail lives in git history and commit messages; this is the narrative summary.
 
 ## 2026-09-24
 
+**Where things stand at the end of this session — pick up here**
+- **Everything below is committed and pushed, but only typecheck/lint/155 tests were run — none of
+  it has been looked at on a device yet.** First thing next session, with the phone on Metro
+  (`npm start`, dev client): (1) clean result shows only the stamp / "No red flags found" / "for
+  <profile>" with Save to Pantry, Scan Another, Return to Home, and the disclaimer *below* the
+  buttons (also check a flagged result); (2) Save to Pantry — both fields visible with the keyboard
+  up; (3) Onboarding name step — Continue/Skip above the keyboard; (4) Profile edit — ingredient
+  search results stay visible and tap on the first try; (5) launch on a very poor connection opens
+  within ~3 s.
+- **Check:** the 8:49 scan flagged 13 items for Steve and the 8:51 scan of a label with the same
+  wheat/soy/sugar ingredients came back CLEAN. It was assumed the profile's filters were switched off
+  to get a clean result — confirm that, since otherwise it's a false-clean bug.
+- **New small follow-ups:** `cleanForDisplay` (`src/matching/normalize.ts`) has no caller in the app
+  anymore (still unit-tested) — remove it and its tests if nothing needs it; Settings' name field
+  didn't get `keyboardAvoiding` (not needed today).
+- The 2026-09-23 open items (fresh sandbox tester for the eligible paywall / "7 days free", Pantry
+  red dot, app icon + splash, Terms/Privacy pages, EAS production build) are unchanged — see below.
+
 **Launch no longer waits indefinitely on RevenueCat**
 - `bootstrap()` used to `await refreshEntitlement()` with no time limit, so on a slow or hung
   connection the app sat on the launch spinner even though a valid cached entitlement was available.
@@ -19,6 +37,44 @@ detail lives in git history and commit messages; this is the narrative summary.
   tests, written test-first: in-time answer, timeout fallback, late answer delivered, late/early
   rejection handled, no leftover timer). `docs/08` updated. Typecheck, lint, all 155 tests pass.
   **Not yet checked on a device** — simulate with the phone on a throttled/very poor connection.
+
+**Clean result screen simplified**
+- Found on a device: the CLEAN result dumped the entire OCR'd ingredient list (nutrition-panel
+  debris and French duplicates included) and added an explanatory sentence, "None of the
+  ingredients flagged for X appear on the label we read." Neither belongs on a result.
+- `app/results.tsx` now shows, for a clean scan: the CLEAN stamp, "No red flags found", and the same
+  "for <profile>" line (profile color) the flagged result uses — then Save to Pantry / Scan Another /
+  Return to Home. The ingredient card and its highlighting code (`segments`) are gone; a flagged
+  result was already list-free (2026-09-13).
+- The old clean design lived in `docs/07`, the screens contract, and the `results_clean.png` mockup,
+  so all three were stale rather than the code being wrong: `docs/07` and the contract are updated,
+  and `docs/17` notes the mockup is out of date. `cleanForDisplay` (`normalize.ts`) now has no
+  caller in the app (still unit-tested) — remove it if nothing else needs it. Typecheck, lint, all
+  155 tests pass. **Not yet checked on a device** (Metro fast-refresh should show it).
+
+**Keyboard no longer hides text fields (Save to Pantry, Onboarding, Profile edit)**
+- Found on a device: tapping into Brand Name / Product Name on Save to Pantry raised the keyboard
+  over the form, and Product Name (and Save/Cancel) ended up underneath it. Nothing in the app
+  handled the keyboard at all.
+- The shared `Screen` (`src/design/components.tsx`) has a new opt-in `keyboardAvoiding` prop: it
+  wraps the content in a `KeyboardAvoidingView` (iOS `padding`), so the visible area shrinks to what's
+  above the keyboard. Default is off, so the other screens render exactly as before. Use it on any
+  screen with a text field, together with `keyboardShouldPersistTaps="handled"` on its ScrollView so
+  a tap on a button/result works with the keyboard up instead of only dismissing it.
+- Turned on for: **Save to Pantry** (both fields fit on a standard iPhone; scrolls on shorter ones;
+  still centered with the keyboard down), **Onboarding** (the name step autofocuses, so the keyboard
+  covered Continue/Skip — only the attribute changed; onboarding's copy/flow is still deferred), and
+  **Profile edit** (the ingredient-search results list grows below the field and was covered).
+- **Settings** was deliberately left alone: its name field is at the top of the screen, so the
+  keyboard can't cover it. Add `keyboardAvoiding` there if it ever grows a field lower down.
+- **Not yet checked on a device**, and not tested on a short-screen phone.
+
+**Results disclaimer moved below the buttons**
+- The "Flagged is an informational tool…" disclaimer sat between the verdict/content and the action
+  buttons on both clean and flagged results. It's now the last thing on the screen, below Save to
+  Pantry / Scan Another Item / Return to Home (`app/results.tsx`). It was the only disclaimer in the
+  app. Owner's standing rule — disclaimers and legal text go at the bottom, after the buttons — is now
+  in `CLAUDE.md` (Hard rules) and `docs/07`. Typecheck, lint, tests pass. Not yet checked on a device.
 
 ## 2026-09-23
 
