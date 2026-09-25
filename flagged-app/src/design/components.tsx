@@ -8,6 +8,8 @@ import {
   ViewProps,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -341,7 +343,18 @@ export function SettingsRow({
  * indicator — the app never wired up safe-area handling before, so content
  * (e.g. Home's greeting) rendered under the status bar on every screen.
  */
-export function Screen({ style, ...rest }: ViewProps) {
+/**
+ * Base screen container. Pass `keyboardAvoiding` on any screen with a text field: the content
+ * then shrinks to the space above the iOS keyboard, so fields and buttons aren't buried under it.
+ * (Pair it with `keyboardShouldPersistTaps="handled"` on the screen's ScrollView so a tap on a
+ * button or result works with the keyboard up instead of only dismissing it.)
+ */
+export function Screen({
+  style,
+  keyboardAvoiding,
+  children,
+  ...rest
+}: ViewProps & { keyboardAvoiding?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   return (
@@ -356,7 +369,15 @@ export function Screen({ style, ...rest }: ViewProps) {
         style,
       ]}
       {...rest}
-    />
+    >
+      {keyboardAvoiding ? (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          {children}
+        </KeyboardAvoidingView>
+      ) : (
+        children
+      )}
+    </View>
   );
 }
 

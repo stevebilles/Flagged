@@ -66,10 +66,13 @@ export default function SaveToPantry() {
   };
 
   return (
-    <Screen>
+    // Centered with the keyboard down; once it's up the content is taller than the space left,
+    // so it starts at the top and scrolls on short phones.
+    <Screen keyboardAvoiding>
       <ScrollView
         contentContainerStyle={{ gap: t.spacing.md, flexGrow: 1, justifyContent: "center" }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text variant="title" bold>Save to Pantry</Text>
         <Text tone="muted" variant="caption">

@@ -107,7 +107,9 @@ export default function Onboarding() {
   const s = SCREENS[step];
 
   return (
-    <Screen>
+    // keyboardAvoiding: the name step autofocuses, so the keyboard is up immediately and would
+    // otherwise cover Continue/Skip at the bottom.
+    <Screen keyboardAvoiding>
       <View style={{ flex: 1, justifyContent: "center", gap: t.spacing.lg }}>
         <Text tone="muted" variant="caption">
           {step + 1} / {SCREENS.length}

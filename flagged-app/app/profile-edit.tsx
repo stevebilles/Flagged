@@ -188,8 +188,14 @@ export default function ProfileEdit() {
   const categoryCount = profile.activeCategoryIds.length;
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ gap: t.spacing.lg }} showsVerticalScrollIndicator={false}>
+    // keyboardAvoiding + persistTaps: the ingredient search's results list grows below the field,
+    // so it must stay above the keyboard and stay tappable without a dismiss-first tap.
+    <Screen keyboardAvoiding>
+      <ScrollView
+        contentContainerStyle={{ gap: t.spacing.lg }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* HEADER — back button, name, and Save all on one row; subtitle below */}
         <View style={{ gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
