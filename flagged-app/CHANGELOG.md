@@ -15,9 +15,9 @@ detail lives in git history and commit messages; this is the narrative summary.
   up; (3) Onboarding name step — Continue/Skip above the keyboard; (4) Profile edit — ingredient
   search results stay visible and tap on the first try; (5) launch on a very poor connection opens
   within ~3 s.
-- **Check:** the 8:49 scan flagged 13 items for Steve and the 8:51 scan of a label with the same
-  wheat/soy/sugar ingredients came back CLEAN. It was assumed the profile's filters were switched off
-  to get a clean result — confirm that, since otherwise it's a false-clean bug.
+- **Resolved, not a bug:** the 8:49 scan flagged 13 items for Steve and the 8:51 scan of a label with
+  the same wheat/soy/sugar ingredients came back CLEAN because the owner had switched Steve's filters
+  off to get a clean result (confirmed 2026-09-24). Matching behaved correctly.
 - **New small follow-ups:** `cleanForDisplay` (`src/matching/normalize.ts`) has no caller in the app
   anymore (still unit-tested) — remove it and its tests if nothing needs it; Settings' name field
   didn't get `keyboardAvoiding` (not needed today).
