@@ -181,14 +181,40 @@ export default function Results() {
             Profile to see it explained the first time. */}
         {!clean && <ClassificationGuide />}
 
+        {/* A notice, not a caption: it stands in for the Save to Pantry button a clean
+            result shows, so a user looking for that button finds why it's missing. Filled
+            panel with an accent bar and left-aligned text — deliberately NOT outlined, so it
+            can't be mistaken for one of the (outlined, centered) buttons below. */}
+        {!clean && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "stretch",
+              overflow: "hidden",
+              borderRadius: t.radius.sm,
+              backgroundColor: t.colors.card,
+            }}
+          >
+            <View style={{ width: 4, backgroundColor: t.colors.textMuted }} />
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: t.spacing.sm,
+                padding: t.spacing.md,
+              }}
+            >
+              <Ionicons name="information-circle" size={20} color={t.colors.textMuted} style={{ marginTop: 1 }} />
+              <Text variant="subheadline" style={{ flex: 1 }}>
+                Flagged items can't be saved to your Pantry — only clean scans can.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View style={{ gap: t.spacing.sm }}>
-          {clean ? (
-            <Button title="Save to Pantry" onPress={() => router.push("/save-to-pantry")} />
-          ) : (
-            <Text tone="muted" variant="caption" style={{ textAlign: "center" }}>
-              Flagged items can't be saved to your Pantry — only clean scans can.
-            </Text>
-          )}
+          {clean && <Button title="Save to Pantry" onPress={() => router.push("/save-to-pantry")} />}
           {/* Reaching this screen at all already required an active
               entitlement (docs/08: Scan tab hard-locks otherwise), so there's
               no in-result upsell branch anymore — always offer to scan again. */}

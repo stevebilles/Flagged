@@ -42,7 +42,10 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 - Flagged: red `FLAGGED` stamp with count, "for <profile>" line, and the matched red-flag terms
   grouped by category, each group with its classification badge (no raw OCR paragraph).
 - Secondary: `Scan Another Item` and `Return to Home`. Flagged results can't be saved to the
-  Pantry — only clean scans show `Save to Pantry`.
+  Pantry — only clean scans show `Save to Pantry`. In its place a flagged result shows a notice
+  (filled panel, accent bar, info icon, left-aligned "Flagged items can't be saved to your Pantry —
+  only clean scans can.") directly above the buttons, so a user looking for the missing button sees
+  why. It is deliberately not outlined or centered, so it can't be mistaken for a button.
 - Commits stats once, on mount, via `commitScanStats`.
 
 ## `save-to-pantry.tsx` (`docs/07`)

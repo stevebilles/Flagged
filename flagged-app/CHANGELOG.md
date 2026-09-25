@@ -4,6 +4,25 @@ Session-by-session log of substantive work on Flagged, kept so a new session (hu
 can quickly see what happened and why without digging through commit-by-commit history. Full
 detail lives in git history and commit messages; this is the narrative summary.
 
+## 2026-09-25
+
+**Device check of the 2026-09-24 changes (in progress) — pick up here**
+- **Confirmed on a device:** the clean result (stamp / "No red flags found" / "for <profile>", Save to
+  Pantry + Scan Another + Return to Home, disclaimer below the buttons) and the flagged result
+  (disclaimer below the buttons). Still to check from the 2026-09-24 list below: (2) Save to Pantry
+  fields above the keyboard, (3) Onboarding name step, (4) Profile edit search results, (5) launch
+  on a poor connection.
+
+**Flagged result: the "can't be saved to your Pantry" note is now a notice, not a caption**
+- On a flagged result the old small, muted, centered line read as easy-to-miss (and sat below the
+  fold on long flag lists). It is now a filled panel with a left accent bar and an info icon,
+  left-aligned, directly above `Scan Another Item` / `Return to Home` (`app/results.tsx`) — in the
+  spot where the missing `Save to Pantry` button would be, so a user looking for it sees why.
+- First attempt used the buttons' outlined, rounded look and was mistaken for a button; the notice is
+  deliberately filled, un-outlined and left-aligned so it can't be. It is not a legal disclaimer, so
+  it stays above the disclaimer, which remains the last thing on the screen. Contract updated in
+  `specs/001-flagged-mvp/contracts/screens.md`.
+
 ## 2026-09-24
 
 **Where things stand at the end of this session — pick up here**
