@@ -4,6 +4,22 @@ Session-by-session log of substantive work on Flagged, kept so a new session (hu
 can quickly see what happened and why without digging through commit-by-commit history. Full
 detail lives in git history and commit messages; this is the narrative summary.
 
+## 2026-09-24
+
+**Launch no longer waits indefinitely on RevenueCat**
+- `bootstrap()` used to `await refreshEntitlement()` with no time limit, so on a slow or hung
+  connection the app sat on the launch spinner even though a valid cached entitlement was available.
+  It now races the refresh against a 3-second timeout (`ENTITLEMENT_LAUNCH_TIMEOUT_MS` in
+  `src/bootstrap/init.ts`): whichever finishes first decides launch, and on timeout the app opens on
+  the cached value (`isPremiumCached`).
+- The refresh is not abandoned: its late answer is still applied via `setPremium`, so a subscription
+  that lapsed while the app opened on the cache re-locks (the live listener is activation-only, so
+  it could not have done this). Offline/fast-failure behaviour is unchanged.
+- Logic is the pure, tested `src/purchases/launchEntitlement.ts` (`entitlementWithinTimeout`, 8
+  tests, written test-first: in-time answer, timeout fallback, late answer delivered, late/early
+  rejection handled, no leftover timer). `docs/08` updated. Typecheck, lint, all 155 tests pass.
+  **Not yet checked on a device** — simulate with the phone on a throttled/very poor connection.
+
 ## 2026-09-23
 
 **Where things stand at the end of this session (2026-09-24) — open items**
@@ -22,8 +38,8 @@ detail lives in git history and commit messages; this is the narrative summary.
   paywall if App Review asks.
 - **Known/deferred:** onboarding is still the original flow (stale 10-scan copy) — deliberately
   deferred; RevenueCat/Play Android side is not built; eligibility lookup could use a timeout on
-  slow connections; app launch waits on RevenueCat with no time limit (suggested cap: a few seconds,
-  fall back to the cache).
+  slow connections. (The launch wait on RevenueCat is now capped at 3 s — see the 2026-09-24 entry
+  above.)
 - **Later, after release:** move the repo folder into `C:\Users\steve\Apps\` (see CLAUDE.md /
   memory note for the steps).
 

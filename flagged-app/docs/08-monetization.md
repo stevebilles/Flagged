@@ -82,7 +82,9 @@ starts**, not delayed until the first real charge.
 
 **How the paywall knows (2026-09-23):** the Scan tab shows the paywall whenever `isPremium` is
 false. `isPremium` starts from the local cache at launch, is confirmed by RevenueCat during
-bootstrap (the app doesn't render until that finishes or fails), and is refreshed on every return
+bootstrap (the app doesn't render until that finishes, fails, or **3 seconds pass** — on a slow
+connection it opens on the cached value and RevenueCat's late answer is applied when it arrives,
+so a lapse still re-locks; see `src/purchases/launchEntitlement.ts`), and is refreshed on every return
 to the foreground, after a purchase, and after Restore Purchase. RevenueCat's live update listener
 (`subscribeToEntitlement` in `purchases.ts`) also unlocks the app immediately if an active
 entitlement is reported while the app is open (e.g. an Ask-to-Buy approval or redeemed offer code).

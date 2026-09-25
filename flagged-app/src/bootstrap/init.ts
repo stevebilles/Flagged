@@ -1,19 +1,24 @@
 import { initializeDatabase } from "../db/seed";
 import { purgeExpiredDeletions } from "../db/repositories";
 import { deleteThumbnail } from "../domain/pantryImage";
+import { entitlementWithinTimeout } from "../purchases/launchEntitlement";
 import {
   configurePurchases,
+  isPremiumCached,
   refreshEntitlement,
   subscribeToEntitlement,
   subscribeToTrialInfo,
 } from "../purchases/purchases";
 import { useAppStore } from "../state/appStore";
 
+/** How long launch waits on RevenueCat before opening on the cached entitlement instead. */
+const ENTITLEMENT_LAUNCH_TIMEOUT_MS = 3000;
+
 /**
  * One-time app bootstrap (docs/02, offline-first):
  *  1. seed the local DB from the bundled dictionary (idempotent)
  *  2. purge expired soft-deletes (24h window)
- *  3. configure purchases + refresh entitlement (falls back to cache offline)
+ *  3. configure purchases + refresh entitlement (cache offline, or after a few seconds if slow)
  *  4. hydrate app state
  */
 export async function bootstrap(): Promise<void> {
@@ -29,6 +34,14 @@ export async function bootstrap(): Promise<void> {
   subscribeToEntitlement((active) => useAppStore.getState().setPremium(active));
   // Keep the Home trial banner's data current after every purchase/refresh/restore.
   subscribeToTrialInfo((info) => useAppStore.getState().setTrialInfo(info));
-  const premium = await refreshEntitlement();
-  useAppStore.getState().setPremium(premium);
+  // Don't let a slow connection hold the spinner: after the timeout, open on the cache. The
+  // late RevenueCat answer still lands via setPremium, so a lapsed subscription re-locks.
+  const setPremium = (active: boolean) => useAppStore.getState().setPremium(active);
+  const premium = await entitlementWithinTimeout(
+    refreshEntitlement,
+    isPremiumCached,
+    ENTITLEMENT_LAUNCH_TIMEOUT_MS,
+    setPremium,
+  );
+  setPremium(premium);
 }
