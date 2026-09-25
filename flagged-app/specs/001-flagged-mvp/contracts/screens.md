@@ -37,10 +37,10 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 - On result → set `appStore.lastScan`, navigate to `results`.
 
 ## `results.tsx` (`docs/07`)
-- Clean: cyan header "No red flags detected", full paragraph, `Save to Pantry` →
-  `save-to-pantry`.
-- Flagged: red header "Red flags detected", offending tokens highlighted red, charcoal
-  breakdown card (ingredient · category · profile filter).
+- Clean: cyan `CLEAN` stamp, "No red flags found", "for <profile>" line — no ingredient list, no
+  explanatory sentence — then `Save to Pantry` → `save-to-pantry`.
+- Flagged: red `FLAGGED` stamp with count, "for <profile>" line, and the matched red-flag terms
+  grouped by category, each group with its classification badge (no raw OCR paragraph).
 - Secondary: `Scan Another Item` and `Return to Home`. Flagged results can't be saved to the
   Pantry — only clean scans show `Save to Pantry`.
 - Commits stats once, on mount, via `commitScanStats`.

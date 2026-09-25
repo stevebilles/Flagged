@@ -41,8 +41,10 @@ is taller than one viewport. Read all numbered variants together as a single scr
 > **Notes (2026-09-23):** (1) The code's `recheck-result.tsx` implements **two** outcomes —
 > `identical` and `changed_flagged` (`07` §7.1); the "Changed" mockup (a "changed but still
 > approved" state) no longer maps to a separate outcome. (2) Some mockups predate later UI
-> changes: Quick Pack pills were removed from the profile editor, and Settings' upsell card was
-> removed on 2026-09-21. Where a mockup and the code disagree, the code wins.
+> changes: Quick Pack pills were removed from the profile editor, Settings' upsell card was
+> removed on 2026-09-21, and `results_clean.png` still shows an INGREDIENTS card and an "All
+> ingredients clear for …" line that the clean result no longer has (2026-09-24 — it shows only the
+> verdict and "for <profile>"). Where a mockup and the code disagree, the code wins.
 
 ---
 

@@ -18,7 +18,6 @@ import { useAppStore } from "../src/state/appStore";
 import { getProfile, getProfiles } from "../src/db/repositories";
 import { commitScanStats, commitScanStatsForAll } from "../src/domain/scanService";
 import { onScanCompleted } from "../src/review/reviewTriggers";
-import { cleanForDisplay } from "../src/matching/normalize";
 import { profileColor } from "../src/design/avatar";
 import type { Match } from "../src/matching/matcher";
 
@@ -67,32 +66,6 @@ export default function Results() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Split the paragraph so ONLY the exact matched words/phrases are highlighted —
-  // not the whole comma-chunk they sit in (which was reddening "Contains:" etc).
-  const segments = useMemo(() => {
-    // Cosmetic-only cleanup (0->O, a lone apostrophe standing in for a
-    // dropped comma) for what's SHOWN — the raw text used for matching
-    // upstream is untouched. Cleaning before highlighting also means a term
-    // matched via the matcher's own digit-cleanup fallback (e.g. "oat" found
-    // inside a raw "0at") now actually lines up with the highlighted text.
-    const para = cleanForDisplay(lastScan?.paragraph ?? "");
-    const tokens = Array.from(
-      new Set((lastScan?.matches ?? []).map((m) => m.token.trim()).filter((s) => s.length > 1))
-    ).sort((a, b) => b.length - a.length); // longest first: "wheat flour" before "wheat"
-    if (tokens.length === 0) return [{ text: para, flag: false }];
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`(?<![A-Za-z])(${tokens.map(esc).join("|")})(?![A-Za-z])`, "gi");
-    const out: { text: string; flag: boolean }[] = [];
-    let last = 0;
-    for (let m = re.exec(para); m; m = re.exec(para)) {
-      if (m.index > last) out.push({ text: para.slice(last, m.index), flag: false });
-      out.push({ text: m[0], flag: true });
-      last = m.index + m[0].length;
-    }
-    if (last < para.length) out.push({ text: para.slice(last), flag: false });
-    return out;
-  }, [lastScan]);
 
   // Group matches by category (docs/17 redesign) so the card grid reads as
   // "here's what's wrong and why" instead of a flat list of terms — the
@@ -163,42 +136,20 @@ export default function Results() {
               ? "No red flags found"
               : `${lastScan.matches.length} red flag${lastScan.matches.length === 1 ? "" : "s"} on your list`}
           </Text>
-          {clean ? (
-            <Text tone="muted" style={{ textAlign: "center" }}>
-              {`None of the ingredients flagged${scannedFor ? ` for ${scannedFor}` : ""} appear on the label we read.`}
+          {/* Same "for <profile>" line for clean and flagged. Neither result shows the
+              raw OCR'd ingredient text — a flagged result lists just the matched red-flag
+              terms below (their own correct spelling), and a clean one has nothing to list. */}
+          {scannedFor && (
+            <Text
+              variant="title"
+              bold
+              tone="muted"
+              style={[{ textAlign: "center" }, scannedForColor ? { color: scannedForColor } : undefined]}
+            >
+              for {scannedFor}
             </Text>
-          ) : (
-            scannedFor && (
-              <Text
-                variant="title"
-                bold
-                tone="muted"
-                style={[{ textAlign: "center" }, scannedForColor ? { color: scannedForColor } : undefined]}
-              >
-                for {scannedFor}
-              </Text>
-            )
           )}
         </Card>
-
-        {/* Ingredient paragraph with the matched words highlighted — only for
-            a CLEAN result. A flagged result shows just the matched red-flag
-            terms below (their own correct spelling, not the raw OCR read) —
-            not a raw transcript for the user to proofread (2026-09-13). */}
-        {clean && (
-          <View style={{ gap: t.spacing.sm }}>
-            <Text tone="muted" variant="caption">INGREDIENTS</Text>
-            <Card>
-              <Text style={{ lineHeight: 24 }}>
-                {segments.map((seg, idx) => (
-                  <Text key={idx} tone={seg.flag ? "red" : "primary"} bold={seg.flag}>
-                    {seg.text}
-                  </Text>
-                ))}
-              </Text>
-            </Card>
-          </View>
-        )}
 
         {!clean &&
           groups.map((g) => (
@@ -230,17 +181,6 @@ export default function Results() {
             Profile to see it explained the first time. */}
         {!clean && <ClassificationGuide />}
 
-        {/* Compliance disclaimer (Terms of Service §2, condensed) — the app
-            flags candidate matches from OCR'd text, it doesn't verify safety. */}
-        <View style={{ flexDirection: "row", gap: t.spacing.sm, alignItems: "flex-start" }}>
-          <Ionicons name="shield-outline" size={16} color={t.colors.textMuted} style={{ marginTop: 2 }} />
-          <Text tone="muted" variant="caption" style={{ flex: 1, lineHeight: 18 }}>
-            Flagged is an informational tool that reads the label text you scan. Always verify the
-            physical label. This isn't medical advice, and it can't guarantee a food is free of any
-            ingredient.
-          </Text>
-        </View>
-
         <View style={{ gap: t.spacing.sm }}>
           {clean ? (
             <Button title="Save to Pantry" onPress={() => router.push("/save-to-pantry")} />
@@ -254,6 +194,18 @@ export default function Results() {
               no in-result upsell branch anymore — always offer to scan again. */}
           <Button title="Scan Another Item" kind="secondary" onPress={() => dismiss("scan")} />
           <Button title="Return to Home" kind="secondary" onPress={() => dismiss("home")} />
+        </View>
+
+        {/* Compliance disclaimer (Terms of Service §2, condensed) — the app flags candidate
+            matches from OCR'd text, it doesn't verify safety. Always the LAST thing on the
+            screen, below the action buttons, never in the middle of the content. */}
+        <View style={{ flexDirection: "row", gap: t.spacing.sm, alignItems: "flex-start" }}>
+          <Ionicons name="shield-outline" size={16} color={t.colors.textMuted} style={{ marginTop: 2 }} />
+          <Text tone="muted" variant="caption" style={{ flex: 1, lineHeight: 18 }}>
+            Flagged is an informational tool that reads the label text you scan. Always verify the
+            physical label. This isn't medical advice, and it can't guarantee a food is free of any
+            ingredient.
+          </Text>
         </View>
       </ScrollView>
     </Screen>

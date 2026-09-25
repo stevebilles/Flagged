@@ -5,8 +5,12 @@
 After the engine (`06`) produces matches, route to a Results Screen. Two outcomes.
 
 ### Outcome A — Clean Result
-- **Header:** Cyan icon + "No red flags detected."
-- **Ingredient list:** the full paragraph in plain primary text.
+- **Header:** cyan `CLEAN` verdict stamp, "No red flags found", and a "for <profile>" line in that
+  profile's color (same as the flagged result). **Nothing else describes the scan — in particular
+  no ingredient list and no explanatory sentence** (2026-09-24): the raw OCR text is often messy
+  (nutrition-panel debris, bilingual duplicates) and isn't something to proofread on the result.
+- **Required actions — the clean screen must always offer all three:** `[ Save to Pantry ]`
+  (clean results only), `[ Scan Another Item ]`, and `[ Return to Home ]`.
 - **Primary action:** `[ Save to Pantry ]`
   - Opens a quick camera viewfinder: "Snap a photo of the front of the packaging."
   - After the photo, a modal prompts for **Brand Name** and **Product Name**.
@@ -18,7 +22,8 @@ After the engine (`06`) produces matches, route to a Results Screen. Two outcome
 
 ### Outcome B — Flagged Result
 - **Header:** Alert Red icon + "Red flags detected."
-- **Ingredient list:** full paragraph; **flagged ingredients highlighted in Alert Red**.
+- **Flagged ingredients:** only the matched red-flag terms, grouped by category (their own correct
+  spelling) — not the raw OCR paragraph (removed 2026-09-13).
 - **The Breakdown:** a charcoal card explaining exactly **why** each flag fired (which
   ingredient / which category / which profile filter).
 - **Stats:** increment `totalRedFlagsCaught` by the number of highlighted ingredients (and
@@ -29,6 +34,11 @@ After the engine (`06`) produces matches, route to a Results Screen. Two outcome
   trial or subscription — the Scan tab hard-locks otherwise, see `08` — so there is no in-result
   upsell branch.)
 - `[ Return to Home ]`.
+
+### Disclaimer placement (both outcomes)
+The compliance disclaimer ("Flagged is an informational tool… Always verify the physical label…")
+is the **last thing on the screen, below all the action buttons** — never between the verdict/
+content and the buttons (2026-09-24).
 
 > Reminder: a scan's per-profile stats (`totalLabelsRead`, `totalRedFlagsCaught`,
 > `totalCleanScans`) are committed **only** because it reached this Results Screen (successful

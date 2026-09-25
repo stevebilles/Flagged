@@ -145,6 +145,9 @@ listed under "Known follow-ups" in `CHANGELOG.md`.
   15, `body` 17, `title` 20, `heading` 28, `display` 34) — don't add ad-hoc sizes.
 - Always check `docs/09-design-system.md` and `docs/screenshots/` before writing UI.
 - Always check `docs/03-data-models.md` and `src/domain/types.ts` before defining types.
+- **Disclaimers and legal/compliance text go at the very bottom of the screen, below the action
+  buttons** — never in the middle of the content (owner's rule, 2026-09-24). Today that's the
+  "informational tool" disclaimer on `app/results.tsx` (both clean and flagged).
 - Nothing may require a network to scan, match, save, or read the Pantry, and no user data leaves
   the device.
 
