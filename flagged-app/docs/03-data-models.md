@@ -67,7 +67,7 @@ profile {
 > **Effective red-flag set for a profile** =
 > (all ingredients in `activeCategoryIds`) − `excludedIngredientIds` + `customIngredients`.
 
-### 3.2 PantryItem (Approved Foods)
+### 3.2 PantryItem (a saved Pantry product)
 
 ```ts
 pantryItem {
@@ -77,7 +77,8 @@ pantryItem {
   productName: text,
   imageFilePath: text,         // local URI to compressed thumbnail; exclude from backup
   profileSnapshot: json,       // ProfileSnapshot — see below (07 §7.1, 2026-09-14)
-  dateAdded: int,              // epoch ms
+  dateAdded: int,              // epoch ms — when the user saved it
+  snapshotAt: int,             // epoch ms — when profileSnapshot was recorded: the save time, or the last recheck (a clean rescan or "Keep Item") (2026-09-25)
   lastVerifiedDate: int,       // epoch ms — most recent verifying scan; drives 30-day recheck
   deletedAt: int | null        // epoch ms — set for the 24-hour soft-delete window
 }
@@ -101,6 +102,15 @@ pantryItem {
   ```
   See `07` §7.1 for how this drives the recheck comparison, and 3.2a below for the change log that
   lets a recheck cite *when* a filter changed, not just that it did.
+- **`snapshotAt` (2026-09-25).** The snapshot is only meaningful with the moment it was taken.
+  Set to the save time by `addPantryItem` and moved forward by `rebaselinePantryItem` — on a **clean rescan**
+  (which re-records the filters as of that scan) and on "Keep Item" — to the rescan's own timestamp.
+  A recheck only counts profile edits made **at or after** `snapshotAt` as an explanation for a new
+  red flag — an edit from before the item was saved can't be why it's flagging now. Rows from before
+  the column existed read as `dateAdded`.
+- **One card per profile.** A clean "All profiles" scan saves a separate card for each profile it
+  was run for, each tagged to that profile and carrying that profile's own snapshot (they share one
+  photo file; the purge never deletes a photo another card still uses).
 
 ### 3.2a ProfileChangeLog (2026-09-14)
 
@@ -117,9 +127,43 @@ profileChangeLog {
   changeType: text,        // category_on | category_off | ingredient_excluded | ingredient_included | custom_added | custom_removed
   categoryId: text | null, // set for category_on/category_off
   categoryName: text | null, // denormalized display name (categories are static, safe to copy)
-  ingredientTerm: text | null // set for ingredient_excluded/included and custom_added/removed
+  ingredientTerm: text | null // custom_added/removed: the term. ingredient_excluded/included: the ingredient's ID (not its term)
 }
 ```
+
+### 3.2b PantryScanHistory (2026-09-25)
+
+The item's **scan history** — one append-only row for the save itself and one for every rescan after
+it, so the app can always say exactly when an item was scanned, what came back, and **which red-flag
+settings the profile was scanning for at that moment**. The owner's reason: a clean rescan re-records
+the item's *current* baseline (`pantryItem.profileSnapshot` / `snapshotAt`), which would otherwise
+overwrite the filters the product first came back clean under; the history keeps them, so the user can
+go back and see exactly what they were scanning for at any scan. Shown on the Scan History screen
+(`05`); the item screen shows the running total ("N scans" — the save counts as the first). Together
+with `snapshotAt` and the `profileChangeLog` (when the profile was edited), it's the timeline a
+recheck explains itself with (07 §7.1). Text only, a few hundred bytes per row; deleted with the item.
+
+```ts
+pantryScanHistory {
+  id: text PK,              // UUID
+  itemId: text,             // the pantryItem
+  profileId: text,          // the item's own profile
+  at: int,                  // epoch ms — the save time, or when the rescan was captured
+  kind: text,               // saved | rescan
+  outcome: text,            // rescans: no_red_flags | flagged; "" for the save
+  matchedTerms: json,       // string[] — the red-flag terms a flagged rescan matched
+  profileSnapshot: json     // ProfileSnapshot — the settings used for this scan; "" if not recorded
+}
+```
+- Written by `addPantryItem` (the `saved` row) and by the recheck-result screen when it opens (a
+  `rescan` row). Before any re-recording of an item's baseline, `ensureSavedHistoryEntry` persists the
+  original `saved` row (so it survives). An item saved before this table existed still shows a `saved`
+  entry (built from the item); its filters are known only if its baseline was never re-recorded since.
+
+**Timestamp rule (owner, 2026-09-25):** anything a user does that could later explain a result is
+stored with an exact epoch-ms timestamp — profile edits (`profileChangeLog`), saving to the Pantry
+(`dateAdded`), recording an item's red flags (`snapshotAt`), removing an item (`deletedAt`), and
+every scan (`pantryScanHistory.at`, `lastVerifiedDate`). Never overwrite history; append.
 
 ### 3.3 Stats — legacy singleton (retired)
 

@@ -43,8 +43,8 @@ chosen to avoid.
   Seed Oils, Hidden Sugars and more — then fine-tune down to individual ingredients.
 • Multiple family profiles. Different triggers for different people, switched with a tap.
 • Custom ingredients. Add anything you want flagged.
-• Your Safe List (Pantry). Save approved products, and get reminded to re-check items in case a
-  brand quietly changes the recipe.
+• My Pantry. Save products that scanned with no red flags under the profile you scanned for, and
+  get reminded to re-scan them in case a brand quietly changes the recipe.
 
 Try it free: 10 full scans with every feature unlocked. Then unlock unlimited scanning for
 $24.99/year — less than $0.07 a day.
@@ -71,7 +71,7 @@ looks final). Do NOT fabricate.
 2. A **Flagged** result — red highlights + breakdown card.
 3. A **Clean** result — "No red flags detected."
 4. Profile editor — Quick Packs + category toggles with classification badges.
-5. Pantry / Safe List.
+5. My Pantry.
 6. Pricing card — $24.99/year.
 
 **IAP review screenshot (App Store Connect → the in-app purchase):** a real capture of the

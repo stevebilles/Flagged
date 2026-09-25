@@ -146,7 +146,7 @@ done and appends any true gaps.
 
 ---
 
-## Phase 6: User Story 3 — Build and trust a Safe Foods list (Priority: P2)
+## Phase 6: User Story 3 — Save products to My Pantry (Priority: P2)
 
 **Goal**: save a clean-scanned product (photo + brand + product) to the Pantry grid.
 
@@ -165,7 +165,7 @@ done and appends any true gaps.
 - [ ] T057 [US3] Implement/verify Pantry empty state in `app/(tabs)/pantry.tsx` with verbatim copy from `docs/05`.
 - [ ] T058 [US3] Wire `Save to Pantry` primary action on the Clean result in `app/results.tsx` → `app/save-to-pantry.tsx`.
 
-**Checkpoint**: users can save and see safe foods.
+**Checkpoint**: users can save products and see them in My Pantry.
 
 ---
 

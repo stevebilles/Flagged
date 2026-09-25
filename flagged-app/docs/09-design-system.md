@@ -6,6 +6,11 @@ Use **Atkinson Hyperlegible** everywhere. It disambiguates easily-confused chara
 (`I`, `l`, `1`, `O`, `0`) and reduces eye strain — essential for an app whose whole job is reading
 ingredient text.
 
+**Slashed zero — keep it, but never in a circle or pill (owner, 2026-09-25).** Atkinson draws `0`
+with a slash on purpose (that's the 0-vs-O disambiguation above). Inside a round shape it looks like
+a "prohibited" ⊘ symbol, so never put a digit inside a circle or pill — show counts as plain text
+beside the label. Don't change the font or try to disable the slash.
+
 - Load via `expo-font` from `assets/fonts/` (bundle the TTFs; no network fetch).
 - Define weights (Regular / Bold, plus Italic variants) and expose through the theme.
 - Never fall back to a system font for primary content.
@@ -72,7 +77,7 @@ active color scheme. Define these as theme tokens; never hard-code hex in compon
 ### Semantic roles
 - **Cyan** = safe / scanning affordance (bounding boxes `#22D3EE`, clean-result header, meter).
 - **Red** = flagged ingredients + flagged-result header + destructive actions.
-- **Warning Orange** = the "Recipe Change Detected" (still-approved) recheck screen (`07`).
+- **Warning Orange** = the "Recipe Change Detected" recheck screen (`07`).
   Confirmed tokens: **Dark `#F59E0B`**, **Light `#B45309`** (exposed as `colors.warning`).
 - Cards use `#1F2937` (dark) / `#FFFFFF`+shadow (light).
 

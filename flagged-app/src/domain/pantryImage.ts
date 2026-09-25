@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { registerTempPhoto } from "./tempPhotos";
 
 /**
  * Pantry thumbnails (docs/03/07). The front-of-pack photo is compressed to a
@@ -47,6 +48,10 @@ export async function captureFrontOfPackThumbnail(): Promise<string | null> {
     quality: 1,
   });
   if (shot.canceled || !shot.assets?.[0]?.uri) return null;
+  // The picker's shot is a full-quality (quality: 1) COPY in the app's cache. Only the compressed
+  // thumbnail made from it is kept (in the documents folder, part of the product card); the big
+  // source is registered to be deleted ~20 min from now instead of piling up, one per product saved.
+  registerTempPhoto(shot.assets[0].uri);
   return storeThumbnail(shot.assets[0].uri);
 }
 

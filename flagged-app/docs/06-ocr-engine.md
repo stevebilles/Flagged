@@ -72,6 +72,22 @@ paragraph and the breakdown card in `07`.
   Skip camera/stitching. Still subject to the same validation rules.
 - **`[ Choose Photo ]`:** run on-device OCR on the still image → **Step 2** → **Step 3**.
 
+## Temporary photos are deleted after ~20 minutes (owner, 2026-09-25)
+Scanning writes several full-size photos to the phone's temp/cache folders and nothing used to delete
+them: the camera's original, the cropped copy the OCR reads (`correctPerspective`, a full-resolution
+JPEG in the temp folder), and the image picker's copy for **Choose Photo**. A heavy user would collect
+hundreds. Now each one is registered when it's created (`src/domain/tempPhotos.ts`, persisted in
+`app_meta` key `tempScanPhotos`) and deleted **20 minutes** after capture — long enough that the user
+has finished whatever they were doing with the scan. Sweeps run at launch, whenever the app returns to
+the foreground, and ~20 min after each capture while it stays open (`runCleanup` in `bootstrap/init.ts`).
+- **Safe by construction** (`tempPhotoRules.ts`, tested): only files the app itself registered, inside
+  its own temp/cache folders, are ever deleted — never the photo library, never a path with `..`.
+- **The product photo saved with a Pantry card is NOT part of this.** It's the compressed thumbnail in
+  the documents folder (`pantry/`), never registered, refused by the safety check, and kept until the
+  card is permanently deleted (24h undo, then removed). Only the phone camera's temporary *original*
+  that the thumbnail is made from (a separate cache copy) is cleaned up.
+- Nothing is ever stored from the ingredient-list photos — only the text read from them is used.
+
 ## Stats rule (reiterated — important)
 
 A scan's per-profile counters (`totalLabelsRead`, `totalRedFlagsCaught`, `totalCleanScans`) are

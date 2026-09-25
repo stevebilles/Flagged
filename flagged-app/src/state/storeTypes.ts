@@ -27,4 +27,7 @@ export interface RecheckHandoff {
   brandName: string;
   productName: string;
   outcome: RecheckOutcome;
+  /** When this rescan was captured (epoch ms) — stamped the moment it's evaluated, not when the
+   * result screen happens to open. */
+  scannedAt: number;
 }

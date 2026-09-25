@@ -52,21 +52,50 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 - Take a photo of the front of the packaging (`Take photo` / `Retake photo`), enter `Brand Name`
   and `Product Name` (`Save` stays disabled until both are filled), then write the `pantryItem`
   with a `profileSnapshot` of the profile's active filters at save time (no ingredient text is
-  stored — `docs/07` §7.1) and `dateAdded`/`lastVerifiedDate` = now.
+  stored — `docs/07` §7.1) and `dateAdded`/`snapshotAt`/`lastVerifiedDate` = now. A scan run for
+  several profiles ("All") saves one card per profile, each with that profile's own snapshot; the
+  screen says which profile(s) it is saving under.
 
-## `(tabs)/pantry.tsx` (`docs/05`, `docs/07`)
-- Section 1 Recheck list: items with `now − lastVerifiedDate > 30d` (clamp negatives).
-  Header `Reformulation Checks` + subtitle verbatim (`docs/05`). Tapping a task → intercept modal ("Only scan a NEWLY PURCHASED
-  box…") → `Yes, open camera` (→ recheck scan) / `Remind me later`.
-- Section 2 Grid: up-to-date items (thumbnail, brand, product).
-- Section 3 Recent Changes: items with `deletedAt` within 24h, each with `Undo`; purge after.
-- Empty state (grid AND log empty): calming graphic + verbatim copy.
+## `(tabs)/pantry.tsx` (`docs/05`, `docs/07`) — titled "My Pantry"
+- Wording: never "safe list / safe foods / approved / cleared / all clear" (`copyGuard.test.ts`).
+- Section 1 Recheck list (top): items with `now − lastVerifiedDate > 30d` (clamp negatives).
+  Label `Reformulation Checks`; while any item is due, ONE line above the cards, verbatim from the
+  mockup: "Next time you buy one of these, scan the new package to check if the recipe has
+  changed." (`docs/05` — not repeated per card). Each card:
+  small product photo (only if the item has one), brand, product, the profile it was saved for,
+  `Recheck →`. Tapping → straight to `recheck-capture` (no confirmation popup), whose text says
+  "Only scan the ingredient list on a NEWLY PURCHASED box." with `Open camera` / `Paste` / `Cancel`.
+  Drives the red dot on the Pantry tab icon.
+- Section 2 Saved Products: ALL saved items as cards, including ones also listed as due above
+  (photo or brand-initial tile, brand, product,
+  a tag for the profile it was saved for). With 2+ profiles, an `All` + per-profile filter row
+  with counts (local view filter only). Tapping a card → `pantry-item.tsx` (`?id=`).
+- Section 3 Recent Changes (bottom): items with `deletedAt` within 24h, each with `Undo`; purge after.
+- No invisible features: every section (recheck list, saved products + profile filter, recent
+  changes) is always shown, each with its own plain-words empty message (`docs/05`) — there is no
+  single "Pantry is empty" screen.
+
+## `pantry-item.tsx` (`docs/05`)
+- One saved item: photo, brand, product, `SAVED TO PROFILE` (the profile as a pill — no separate
+  saved / last-checked date rows; the Scan History has them), a `SCAN HISTORY` card ("N scans" running total + "First saved [date]", tap → `scan-history`),
+  and `Remove from Pantry` (soft delete → appears under Recent Changes with `Undo`). In a
+  `__DEV__` build only: a labelled `Force recheck (mark as due)` test button (`docs/05`).
+
+## `scan-history.tsx` (`docs/05`, `docs/03` §3.2b)
+- Header (back · "Scan History"), then a product block like the item's card (photo when it has one,
+  brand, product) so it's obvious which product this is, then a timeline of every scan, newest first
+  (the whole screen scrolls)
+  (`LATEST` on the top one). Each entry: date · time; "Saved to Pantry" / "Rescanned — no red flags
+  found" / "Rescanned — red flags found"; SCANNED FOR → the profile and the red flags it had on at
+  that scan. Text only, read-only. Removed with the item when it's permanently deleted.
 
 ## `recheck-result.tsx` (`docs/07` §7.1)
-- **Two** outcomes (`contracts/recheck-diff.md`): `identical` → green confirmation, reset the
-  30-day timer, `Back to Pantry`; `changed_flagged` → Alert Red screen, each match attributed
-  (reformulation vs. a dated/generic filter change), `Delete Item` (destructive) / `Keep Item`
-  (secondary). The old "changed_safe" outcome no longer exists.
+- **Two** outcomes (`contracts/recheck-diff.md`): `identical` → the owner's clean mockup (header with the product photo and NO `CLEAN` tag, verdict
+  card "No red flags found", PROFILE AT TIME OF EACH SCAN side-by-side filters, `Back to Pantry`;
+  `07`), reset the 30-day timer, `Back to Pantry`; `changed_flagged` → Alert Red screen with a saved/last-kept → this-scan
+  timeline (date and time), each match explained (reformulation, or the specific profile change
+  with its date and time — `recheckExplain.ts`), `Delete Item` (destructive) / `Keep Item`
+  (secondary). Every recheck is added to the item's scan history once on open (`pantry_scan_history`). The old "changed_safe" outcome no longer exists.
 - Applies the Keep/Delete repository effects and the recheck stat increments (once, on mount).
 
 ## `profile-edit.tsx` (`docs/05`, `docs/09`)

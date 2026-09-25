@@ -73,9 +73,20 @@ export function ensureTables(): void {
       product_name TEXT NOT NULL,
       image_file_path TEXT NOT NULL DEFAULT '',
       profile_snapshot TEXT NOT NULL DEFAULT '{}',
+      snapshot_at INTEGER NOT NULL DEFAULT 0,
       date_added INTEGER NOT NULL,
       last_verified_date INTEGER NOT NULL,
       deleted_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS pantry_scan_history (
+      id TEXT PRIMARY KEY NOT NULL,
+      item_id TEXT NOT NULL,
+      profile_id TEXT NOT NULL DEFAULT '',
+      at INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      outcome TEXT NOT NULL DEFAULT '',
+      matched_terms TEXT NOT NULL DEFAULT '[]',
+      profile_snapshot TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS profile_change_log (
       id TEXT PRIMARY KEY NOT NULL,
@@ -149,5 +160,12 @@ export function runMigrations(): void {
   // risking a DROP COLUMN across expo-sqlite/SQLite version differences.
   if (!pantryCols.includes("profile_snapshot")) {
     s.execSync("ALTER TABLE pantry_items ADD COLUMN profile_snapshot TEXT NOT NULL DEFAULT '{}'");
+  }
+  // snapshot_at = when profile_snapshot was recorded (2026-09-25). Existing rows get 0, which the
+  // repository reads as the row's own date_added (their snapshot WAS taken at save time).
+  // The pantry_scan_history table is created by the CREATE TABLE IF NOT EXISTS pass above. (An earlier
+  // dev-only `pantry_rechecks` table may still exist on a test install; it's no longer used.)
+  if (!pantryCols.includes("snapshot_at")) {
+    s.execSync("ALTER TABLE pantry_items ADD COLUMN snapshot_at INTEGER NOT NULL DEFAULT 0");
   }
 }

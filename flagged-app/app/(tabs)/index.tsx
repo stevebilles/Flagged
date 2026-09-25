@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, ScrollView, Pressable, Text as RNText } from "react-native";
+import { View, ScrollView, Pressable } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, Text, Card, Button } from "../../src/design/components";
@@ -8,7 +8,8 @@ import { useAppStore } from "../../src/state/appStore";
 import { TrialEndingBanner } from "../../src/purchases/TrialEndingBanner";
 import { getProfiles, getActivePantryItems, getCategories } from "../../src/db/repositories";
 import { getMetaValue } from "../../src/db/appMeta";
-import { profileColor, initials } from "../../src/design/avatar";
+import { profileColor } from "../../src/design/avatar";
+import { AvatarDot, ProfileChip, AllChip } from "../../src/design/profileChips";
 import { displayName } from "../../src/domain/types";
 import type { Profile, Category, PantryItem } from "../../src/domain/types";
 
@@ -208,98 +209,6 @@ function Pillar({
         {label.toUpperCase()}
       </Text>
     </Card>
-  );
-}
-
-/** Shared pill shell for the profile switcher row (docs/17 mockup). */
-function Chip({
-  selected,
-  onPress,
-  children,
-}: {
-  selected: boolean;
-  onPress: () => void;
-  children: React.ReactNode;
-}) {
-  const t = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        backgroundColor: t.colors.card,
-        borderRadius: t.radius.pill,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? t.colors.cyan : t.colors.textMuted,
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        opacity: pressed ? 0.85 : 1,
-      })}
-    >
-      {children}
-    </Pressable>
-  );
-}
-
-/** Small filled circle used for both the profile avatar and the "All" icon. */
-function AvatarDot({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <View
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: color,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {children}
-    </View>
-  );
-}
-
-function ProfileChip({
-  profile,
-  index,
-  selected,
-  onPress,
-}: {
-  profile: Profile;
-  index: number;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const t = useTheme();
-  return (
-    <Chip selected={selected} onPress={onPress}>
-      <AvatarDot color={profileColor(index)}>
-        <RNText style={{ fontSize: 10, fontFamily: t.fontFamily.bold, color: "#0B1220" }}>
-          {initials(profile.name)}
-        </RNText>
-      </AvatarDot>
-      <Text bold tone={selected ? "cyan" : "primary"}>
-        {displayName(profile.name)}
-      </Text>
-    </Chip>
-  );
-}
-
-function AllChip({ selected, onPress }: { selected: boolean; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Chip selected={selected} onPress={onPress}>
-      <AvatarDot color="rgba(34,211,238,0.18)">
-        <Ionicons name="shield-checkmark" size={13} color={t.colors.cyan} />
-      </AvatarDot>
-      <Text bold tone={selected ? "cyan" : "primary"}>
-        All Profiles
-      </Text>
-    </Chip>
   );
 }
 

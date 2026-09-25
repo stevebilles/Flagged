@@ -97,10 +97,10 @@ active profile, and confirm the same label produces different results for each.
 
 ---
 
-### User Story 3 - Build and trust a Safe Foods list (Priority: P2)
+### User Story 3 - Save products to My Pantry (Priority: P2)
 
 After a clean scan, a user saves the product (with a front-of-pack photo, brand, and product
-name) to their Pantry so they never have to re-check it from scratch.
+name) to their Pantry so they can keep track of it and be reminded to rescan it.
 
 **Why this priority**: Turns one-off scans into lasting peace of mind and gives users a
 reason to keep the app. Not required for the core "is this safe?" answer, so P2.
@@ -417,7 +417,7 @@ never in a way that games the rating.
 - **Profile**: one family member's filter set — a display name, the set of active categories,
   the set of individually excluded ingredients, and a list of custom free-text ingredients.
   Multiple profiles per install; one is active at a time.
-- **Pantry Item**: a saved approved product — brand, product name, local thumbnail path, the
+- **Pantry Item**: a saved product — brand, product name, local thumbnail path, the
   ordered ingredient list as saved, date added, last-verified date (drives the 30-day
   recheck), and an optional deletion timestamp (drives the 24-hour undo).
 - **Lifetime Stats (singleton)**: one record per install — free scans used, total labels

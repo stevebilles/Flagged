@@ -17,6 +17,7 @@ import { PaywallView } from "../../src/purchases/PaywallView";
 import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION } from "../../src/ocr/guideBox";
 import { photoResultToParagraph } from "../../src/ocr/recognition";
 import { displayName } from "../../src/domain/types";
+import { registerTempPhoto } from "../../src/domain/tempPhotos";
 
 /**
  * SCAN — the core action tab (docs/05 Tab 2).
@@ -173,6 +174,9 @@ export default function Scan() {
       });
       if (picked.canceled || !picked.assets?.[0]?.uri) return;
 
+      // The picker hands back a full-quality COPY of the photo in the app's cache (not the library
+      // original) — dead weight once the text is read, so it's deleted ~20 min from now.
+      registerTempPhoto(picked.assets[0].uri);
       // On-device OCR on the still image (docs/06/14). Requires a dev/EAS build
       // (native module) — will not run in Expo Go.
       const result = await recognizeText(picked.assets[0].uri);

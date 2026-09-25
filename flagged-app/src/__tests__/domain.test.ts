@@ -501,6 +501,57 @@ describe("recheck engine (pantry, docs/07 §7.1 — profile-snapshot comparison,
     const [attributedNew] = attributeRecheckMatches([newCustom], snapshot());
     expect(attributedNew.attribution.kind).toBe("profile_change");
   });
+
+  it("names WHICH kind of profile change explains a match (category added / custom added)", () => {
+    const [byCategory] = attributeRecheckMatches(
+      [match({ categoryId: "cat-msg", categoryName: "MSG & Glutamates" })],
+      snapshot()
+    );
+    expect(byCategory.attribution).toEqual({ kind: "profile_change", cause: "category_added" });
+
+    const [byCustom] = attributeRecheckMatches(
+      [match({ term: "carmine", categoryId: null, categoryName: "Custom ingredient" })],
+      snapshot()
+    );
+    expect(byCustom.attribution).toEqual({ kind: "profile_change", cause: "custom_added" });
+  });
+
+  it("attributes an ingredient the user had EXCLUDED at save time (then re-included) to a profile change, not a reformulation", () => {
+    // cat-dyes was active when saved, but the user had switched Red 40 off inside it. Turning it
+    // back on later makes it flag — that's their edit, not the recipe (docs/07 §7.1).
+    const termById = new Map([["ing-red40", "Red 40"]]);
+    const [attributed] = attributeRecheckMatches(
+      [match({ term: "red 40", categoryId: "cat-dyes" })],
+      snapshot({ excludedIngredientIds: ["ing-red40"] }),
+      termById
+    );
+    expect(attributed.attribution).toEqual({
+      kind: "profile_change",
+      cause: "ingredient_included",
+      ingredientId: "ing-red40",
+    });
+  });
+
+  it("still calls a match a reformulation when the user had excluded a DIFFERENT ingredient", () => {
+    const termById = new Map([
+      ["ing-red40", "red 40"],
+      ["ing-yellow5", "yellow 5"],
+    ]);
+    const [attributed] = attributeRecheckMatches(
+      [match({ term: "yellow 5", categoryId: "cat-dyes" })],
+      snapshot({ excludedIngredientIds: ["ing-red40"] }),
+      termById
+    );
+    expect(attributed.attribution.kind).toBe("reformulation");
+  });
+
+  it("treats a term that was already a custom red flag at save time as watched-for even if a category now catches it", () => {
+    const [attributed] = attributeRecheckMatches(
+      [match({ term: "shellac", categoryId: "cat-msg", categoryName: "MSG & Glutamates" })],
+      snapshot()
+    );
+    expect(attributed.attribution.kind).toBe("reformulation");
+  });
 });
 
 describe("snapshotFromProfile + diffProfileChanges (docs/03 §3.2/3.2a)", () => {

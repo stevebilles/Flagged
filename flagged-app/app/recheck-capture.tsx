@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, LayoutChangeEvent } from "react-native";
+import { View, Image, LayoutChangeEvent } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { Screen, Text, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getPantryItem, getProfile } from "../src/db/repositories";
+import { getPantryItem, getProfile, getIngredientTermMap } from "../src/db/repositories";
 import { extractIngredientList } from "../src/matching/normalize";
 import { evaluateScan } from "../src/domain/scanService";
 import { evaluateRecheck } from "../src/domain/recheckEngine";
@@ -14,8 +14,9 @@ import { logScanDebug } from "../src/domain/scanDebug";
 import { useCameraCapture } from "../src/ocr/CameraScanner";
 
 /**
- * Recheck capture (docs/07 §7.1). Reached from the Pantry intercept modal after
- * the user confirms they have a NEWLY PURCHASED box. Runs a completely fresh
+ * Recheck capture (docs/07 §7.1). Reached straight from a Pantry recheck card (there is no
+ * separate confirmation popup — this screen itself says to only scan a NEWLY PURCHASED box,
+ * so the user answers that once, not twice). Runs a completely fresh
  * scan and compares it against the item's saved profile snapshot — no
  * ingredient text is stored or diffed (2026-09-14; see docs/07 §7.1 for why).
  *
@@ -37,10 +38,17 @@ export default function RecheckCapture() {
   const item = useMemo(() => (id ? getPantryItem(id) : null), [id]);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The item's saved product photo (part of its Pantry card) — shown so the user can confirm this is
+  // the product they're about to rescan. Nothing new is stored or copied; if there's no photo, or it
+  // can't be read, the generic icon shows instead.
+  const [imageFailed, setImageFailed] = useState(false);
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
   function runRecheck(rawParagraph: string, source: "camera" | "paste" = "camera") {
     setError(null);
+    // Timestamp the scan itself (docs/07 §7.1) — the result screen explains a new red flag by
+    // comparing this against when the item was saved and when the profile was edited.
+    const scannedAt = Date.now();
     if (!item) {
       setError("That pantry item no longer exists.");
       return;
@@ -65,7 +73,12 @@ export default function RecheckCapture() {
       setError("Couldn't read an ingredient list. Try again.");
       return;
     }
-    const outcome = evaluateRecheck(evaln.result.isClean, evaln.result.matches, item.profileSnapshot);
+    const outcome = evaluateRecheck(
+      evaln.result.isClean,
+      evaln.result.matches,
+      item.profileSnapshot,
+      getIngredientTermMap()
+    );
     logScanDebug("recheck", rawParagraph, paragraph, `recheck → ${outcome.kind}`);
 
     setLastRecheck({
@@ -73,6 +86,7 @@ export default function RecheckCapture() {
       brandName: item.brandName,
       productName: item.productName,
       outcome,
+      scannedAt,
     });
     // Typed-routes types for this new file are generated on dev-server start.
     router.replace("/recheck-result" as never);
@@ -125,12 +139,21 @@ export default function RecheckCapture() {
           boxContent
         ) : (
           <>
-            <Ionicons name="repeat" size={72} color={t.colors.textMuted} />
+            {item?.imageFilePath && !imageFailed ? (
+              <Image
+                source={{ uri: item.imageFilePath }}
+                style={{ width: 120, height: 120, borderRadius: t.radius.md }}
+                resizeMode="cover"
+                onError={() => setImageFailed(true)}
+              />
+            ) : (
+              <Ionicons name="repeat" size={72} color={t.colors.textMuted} />
+            )}
             <Text variant="title" bold style={{ textAlign: "center" }}>
               {item ? `${item.brandName} — ${item.productName}` : "Recheck"}
             </Text>
             <Text tone="muted" style={{ textAlign: "center" }}>
-              Scan the ingredient list on the newly purchased box.
+              Only scan the ingredient list on a NEWLY PURCHASED box.
             </Text>
             {error && <Text tone="red" style={{ textAlign: "center" }}>{error}</Text>}
           </>

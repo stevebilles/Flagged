@@ -10,9 +10,9 @@ export interface ThemeColors {
   card: string;
   textPrimary: string;
   textMuted: string;
-  cyan: string; // safe / scanning affordance
+  cyan: string; // "no red flags found" / scanning affordance
   red: string; // flagged / destructive
-  warning: string; // "Recipe Change Detected" (still-approved) recheck screen
+  warning: string; // "Recipe Change Detected" recheck screen
   success: string; // camera guide: a clear, confidently-readable view (docs/06)
   // classification badge tints (docs/09)
   badgeRegulated: string;

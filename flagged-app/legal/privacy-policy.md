@@ -15,7 +15,7 @@ data.**
 ## 1. Our privacy approach
 
 Flagged is an offline food-label scanner. Reading labels, matching ingredients, saving your
-profiles and Safe List, and tracking your scan stats all happen **locally on your device**. We do
+profiles and Pantry, and tracking your scan stats all happen **locally on your device**. We do
 not operate servers that receive your content, and we do not require an account.
 
 ## 2. Information we do NOT collect
@@ -39,7 +39,7 @@ settings; the camera-dependent features will then be unavailable.
 The following are stored **locally** and are not sent to us:
 
 - Your filter profiles (selected Quick Packs, category and ingredient toggles, custom ingredients).
-- Your Pantry / Safe List items, including any packaging thumbnail and the saved ingredient text.
+- Your Pantry items, including any packaging thumbnail and the saved ingredient text.
 - Your scan statistics (labels read, red flags caught, clean scans) and free-trial count.
 - App settings (e.g., your first name, onboarding completion).
 

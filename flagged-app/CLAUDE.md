@@ -60,7 +60,8 @@ component tests; native modules must not be imported by anything under test.
   `recheck-capture.tsx` → `recheck-result.tsx` · `paywall.tsx` (a thin wrapper; the Scan tab renders
 the paywall itself) · `subscription-details.tsx` (long-form subscription wording, opened from the
 paywall's "Subscription details" link). `app/index.tsx` redirects to
-  onboarding or the tabs. There is no separate pantry-detail screen (Pantry uses a `Modal`).
+  onboarding or the tabs. `pantry-item.tsx` (`?id=`) is one saved Pantry item, opened by tapping a Pantry card. Tapping a due
+  item's `Recheck →` goes straight to `recheck-capture.tsx` (no confirmation popup — one step).
 - **Scan input:** camera capture (guide box + `Capture` button, optional `Scan More`), **Paste
   Text**, or **Choose Photo** — all feed the same pipeline (`src/ocr/`, `src/matching/`,
   `src/domain/scanService.ts`). Details: `docs/14`.
@@ -143,11 +144,37 @@ listed under "Known follow-ups" in `CHANGELOG.md`.
   (`ThemeProvider`); a light palette exists but there's no in-app appearance toggle yet.
 - Font sizes use the Apple Dynamic Type scale defined in `theme.ts` (`caption` 13, `subheadline`
   15, `body` 17, `title` 20, `heading` 28, `display` 34) — don't add ad-hoc sizes.
+- **Never put a digit inside a circle or a pill** (owner's rule, 2026-09-25). Atkinson Hyperlegible
+  draws a slashed zero on purpose (to tell 0 from O), and a "0" inside a round shape reads as a
+  "prohibited" ⊘ symbol. Show counts as plain text beside the label (the Pantry's filter chips do).
+  The font stays as it is — don't swap it or try to turn the slash off.
 - Always check `docs/09-design-system.md` and `docs/screenshots/` before writing UI.
 - Always check `docs/03-data-models.md` and `src/domain/types.ts` before defining types.
 - **Disclaimers and legal/compliance text go at the very bottom of the screen, below the action
   buttons** — never in the middle of the content (owner's rule, 2026-09-24). Today that's the
   "informational tool" disclaimer on `app/results.tsx` (both clean and flagged).
+- **No invisible features** (owner's rule, restated 2026-09-25): a section or feature never
+  disappears because it's empty or not currently relevant. It stays on screen and says, in plain
+  words, that there's nothing there yet and what will show up (e.g. the Pantry's "Reformulation
+  Checks" to-do list reads "Nothing to recheck yet…" until an item is due). The only exception is a
+  development-only test aid, which must be clearly labelled and gated on `__DEV__` (see the Pantry
+  item screen's "Force recheck"). Status *indicators* (the Pantry tab's red dot) appear only when
+  there is something to signal, but the list they point to is always there.
+- **Timestamp everything a user does that could later explain a result** (owner's rule,
+  2026-09-25): profile edits (`profile_change_log`), Pantry saves (`dateAdded`), when an item's red
+  flags were recorded (`snapshotAt`), removals (`deletedAt`), and each recheck
+  (`pantry_scan_history.at`) — exact epoch ms, append rather than overwrite, and show the time
+  (not just the date) wherever it's used to explain a flag. A rescan must be able to say *when* the
+  user changed their red flags vs. *when* the product was saved vs. *when* it was scanned.
+- **Never name or imply that a product is "safe", "approved" or "cleared"** (owner's rule,
+  2026-09-25, legal exposure): a scan only reports which of the user's red flags it found in the
+  text it read, and it can miss things. The Pantry is **"My Pantry"** — not a "safe list", "safe
+  foods", "approved list", "cleared products", "all clear" or "still approved"; a clean result is
+  "No red flags found", never "safe" or "still clean". Saving a product is a bookmark. This applies to
+  UI copy, docs, the store listing and legal pages; `src/__tests__/copyGuard.test.ts` fails the
+  build on the worst phrases — reword, don't add an exception. **No status pills/tags on results
+  screens** either (a "CLEAN" tag was removed from the clean rescan screen, 2026-09-25): a result says
+  what was found ("No red flags found") and nothing that reads like a verdict on the product.
 - Nothing may require a network to scan, match, save, or read the Pantry, and no user data leaves
   the device.
 

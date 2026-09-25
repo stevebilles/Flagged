@@ -8,8 +8,11 @@ import type {
   ProfileChangeLogEntry,
   ProfileSnapshot,
   QuickPack,
+  ScanHistoryEntry,
   Stats,
 } from "../domain/types";
+
+import { RECHECK_DAYS } from "../domain/types";
 
 const parse = <T>(json: string): T => JSON.parse(json) as T;
 
@@ -166,6 +169,8 @@ function mapPantry(r: any): PantryItem {
       customIngredients: snapshot.customIngredients ?? [],
     },
     dateAdded: r.date_added,
+    // 0 = a row from before snapshot_at existed; its snapshot was taken when it was saved.
+    snapshotAt: r.snapshot_at || r.date_added,
     lastVerifiedDate: r.last_verified_date,
     deletedAt: r.deleted_at ?? null,
   };
@@ -182,21 +187,35 @@ export function getPantryItem(itemId: string): PantryItem | null {
   return r ? mapPantry(r) : null;
 }
 
-export function getRecentlyDeleted(): PantryItem[] {
+/** Items removed within the last 24 hours (the undo window). Filtered by age HERE, not just when the
+ * purge runs — the purge only happens at launch / foreground, and an item removed 30 hours ago must
+ * not still show under "Recent Changes" with an Undo. */
+export function getRecentlyDeleted(nowMs = Date.now()): PantryItem[] {
+  const cutoff = nowMs - 24 * 60 * 60 * 1000;
   return sqlite()
     .getAllSync<any>(
-      "SELECT * FROM pantry_items WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+      "SELECT * FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC",
+      [cutoff]
     )
     .map(mapPantry);
 }
 
 export function addPantryItem(
-  input: Omit<PantryItem, "itemId" | "dateAdded" | "lastVerifiedDate" | "deletedAt">
+  input: Omit<PantryItem, "itemId" | "dateAdded" | "snapshotAt" | "lastVerifiedDate" | "deletedAt">
 ): PantryItem {
   const now = Date.now();
-  const item: PantryItem = { ...input, itemId: randomUUID(), dateAdded: now, lastVerifiedDate: now, deletedAt: null };
+  // Saved, snapshotted and last-verified are all the same moment: a Pantry save only ever follows
+  // a scan that just came back with no red flags for this profile's current filters.
+  const item: PantryItem = {
+    ...input,
+    itemId: randomUUID(),
+    dateAdded: now,
+    snapshotAt: now,
+    lastVerifiedDate: now,
+    deletedAt: null,
+  };
   sqlite().runSync(
-    "INSERT INTO pantry_items (item_id, profile_id, brand_name, product_name, image_file_path, profile_snapshot, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+    "INSERT INTO pantry_items (item_id, profile_id, brand_name, product_name, image_file_path, profile_snapshot, snapshot_at, date_added, last_verified_date, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
     [
       item.itemId,
       item.profileId,
@@ -204,10 +223,21 @@ export function addPantryItem(
       item.productName,
       item.imageFilePath,
       JSON.stringify(item.profileSnapshot),
+      item.snapshotAt,
       item.dateAdded,
       item.lastVerifiedDate,
     ]
   );
+  // The first scan-history entry: the save itself, with the filters it was checked clean under.
+  logScan({
+    itemId: item.itemId,
+    profileId: item.profileId,
+    at: item.dateAdded,
+    kind: "saved",
+    outcome: null,
+    matchedTerms: [],
+    snapshot: item.profileSnapshot,
+  });
   return item;
 }
 
@@ -222,11 +252,27 @@ export function undoDeletePantryItem(itemId: string): void {
 /** Keep-item: baseline against the profile's CURRENT filters and reset the
  * 30-day timer (docs/07 §7.1) — the new snapshot, not the old one, since a
  * "Keep" means the user has accepted today's flagged state as the new normal. */
-export function rebaselinePantryItem(itemId: string, snapshot: ProfileSnapshot): void {
+export function rebaselinePantryItem(itemId: string, snapshot: ProfileSnapshot, atMs: number = Date.now()): void {
+  // `atMs` is when the check actually happened (the rescan's timestamp), so the recorded filters
+  // are dated to the scan, not to whenever the user tapped a button afterwards.
+  // First make sure the ORIGINAL save (and the filters it was checked clean under) is in the scan
+  // history — the update below overwrites the item's current snapshot, which would lose them.
+  ensureSavedHistoryEntry(itemId);
   sqlite().runSync(
-    "UPDATE pantry_items SET profile_snapshot = ?, last_verified_date = ? WHERE item_id = ?",
-    [JSON.stringify(snapshot), Date.now(), itemId]
+    "UPDATE pantry_items SET profile_snapshot = ?, snapshot_at = ?, last_verified_date = ? WHERE item_id = ?",
+    [JSON.stringify(snapshot), atMs, atMs, itemId]
   );
+}
+
+/**
+ * DEVELOPMENT ONLY — called solely from a `__DEV__`-gated button on the Pantry item screen, so the
+ * recheck flow can be tested without waiting 30 days. Backdates the item's last check to just past
+ * the recheck window so it shows in Reformulation Checks and lights the Pantry tab's red dot.
+ * Touches ONLY `last_verified_date` (not the save time or the recorded red flags).
+ */
+export function devForceRecheckDue(itemId: string): void {
+  const dueSince = Date.now() - (RECHECK_DAYS + 1) * 24 * 60 * 60 * 1000;
+  sqlite().runSync("UPDATE pantry_items SET last_verified_date = ? WHERE item_id = ?", [dueSince, itemId]);
 }
 
 export function markVerified(itemId: string): void {
@@ -248,11 +294,23 @@ export function purgeExpiredDeletions(nowMs = Date.now()): string[] {
     "SELECT image_file_path FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
     [cutoff]
   );
+  // An item's scan history goes with it when it's permanently deleted.
+  sqlite().runSync(
+    "DELETE FROM pantry_scan_history WHERE item_id IN (SELECT item_id FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
+    [cutoff]
+  );
   sqlite().runSync(
     "DELETE FROM pantry_items WHERE deleted_at IS NOT NULL AND deleted_at < ?",
     [cutoff]
   );
-  return doomed.map((d) => d.image_file_path).filter(Boolean);
+  // Several cards can share one photo (an "All profiles" scan saves a card per profile) — only
+  // hand back files no remaining card still points at, or purging one would blank the others.
+  const stillUsed = new Set(
+    sqlite()
+      .getAllSync<{ image_file_path: string }>("SELECT image_file_path FROM pantry_items")
+      .map((r) => r.image_file_path)
+  );
+  return doomed.map((d) => d.image_file_path).filter((p) => Boolean(p) && !stillUsed.has(p));
 }
 
 // ---------------- Profile change log ----------------
@@ -284,25 +342,146 @@ export function logProfileChanges(entries: Omit<ProfileChangeLogEntry, "id">[]):
   }
 }
 
+// The three lookups below answer "when did the user change their red flags in a way that explains
+// this match?" — so each takes `sinceMs` (the item's snapshotAt) and ignores anything older: an
+// edit made BEFORE the product was saved can't be why it's flagging now.
+
 /** Most recent log entry that turned ON a given category for a profile
  * (docs/07 §7.1 recheck attribution) — null if none exists (e.g. the
  * category was already active before this logging system existed). */
-export function findCategoryEnabledChange(profileId: string, categoryId: string): ProfileChangeLogEntry | null {
+export function findCategoryEnabledChange(
+  profileId: string,
+  categoryId: string,
+  sinceMs = 0
+): ProfileChangeLogEntry | null {
   const r = sqlite().getFirstSync<any>(
-    "SELECT * FROM profile_change_log WHERE profile_id = ? AND category_id = ? AND change_type = 'category_on' ORDER BY timestamp DESC LIMIT 1",
-    [profileId, categoryId]
+    "SELECT * FROM profile_change_log WHERE profile_id = ? AND category_id = ? AND change_type = 'category_on' AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1",
+    [profileId, categoryId, sinceMs]
   );
   return r ? mapChangeLog(r) : null;
 }
 
 /** Most recent log entry that added a given custom ingredient term for a
  * profile (docs/07 §7.1 recheck attribution). */
-export function findCustomIngredientAddedChange(profileId: string, term: string): ProfileChangeLogEntry | null {
+export function findCustomIngredientAddedChange(
+  profileId: string,
+  term: string,
+  sinceMs = 0
+): ProfileChangeLogEntry | null {
   const r = sqlite().getFirstSync<any>(
-    "SELECT * FROM profile_change_log WHERE profile_id = ? AND ingredient_term = ? AND change_type = 'custom_added' ORDER BY timestamp DESC LIMIT 1",
-    [profileId, term.toLowerCase()]
+    "SELECT * FROM profile_change_log WHERE profile_id = ? AND ingredient_term = ? AND change_type = 'custom_added' AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1",
+    [profileId, term.toLowerCase(), sinceMs]
   );
   return r ? mapChangeLog(r) : null;
+}
+
+/** Most recent log entry where the user stopped excluding one ingredient (turned it back on
+ * inside a category that was already active). The log stores the ingredient's id in
+ * `ingredient_term` for exclude/include entries. */
+export function findIngredientIncludedChange(
+  profileId: string,
+  ingredientId: string,
+  sinceMs = 0
+): ProfileChangeLogEntry | null {
+  const r = sqlite().getFirstSync<any>(
+    "SELECT * FROM profile_change_log WHERE profile_id = ? AND ingredient_term = ? AND change_type = 'ingredient_included' AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1",
+    [profileId, ingredientId, sinceMs]
+  );
+  return r ? mapChangeLog(r) : null;
+}
+
+// ---------------- Pantry scan history (docs/03 §3.2b) ----------------
+// Append-only: one row for the save and one per rescan — when it happened, what it found, and the
+// red-flag settings the profile was scanning for. Text only; deleted with the item.
+
+function mapHistory(r: any): ScanHistoryEntry {
+  let snapshot: ProfileSnapshot | null = null;
+  if (r.profile_snapshot) {
+    const s = parse<Partial<ProfileSnapshot>>(r.profile_snapshot);
+    snapshot = {
+      activeCategoryIds: s.activeCategoryIds ?? [],
+      excludedIngredientIds: s.excludedIngredientIds ?? [],
+      customIngredients: s.customIngredients ?? [],
+    };
+  }
+  return {
+    id: r.id,
+    itemId: r.item_id,
+    profileId: r.profile_id ?? "",
+    at: r.at,
+    kind: r.kind,
+    outcome: r.outcome === "no_red_flags" || r.outcome === "flagged" ? r.outcome : null,
+    matchedTerms: parse<string[]>(r.matched_terms),
+    snapshot,
+  };
+}
+
+export function logScan(entry: Omit<ScanHistoryEntry, "id">): void {
+  sqlite().runSync(
+    "INSERT INTO pantry_scan_history (id, item_id, profile_id, at, kind, outcome, matched_terms, profile_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      randomUUID(),
+      entry.itemId,
+      entry.profileId,
+      entry.at,
+      entry.kind,
+      entry.outcome ?? "",
+      JSON.stringify(entry.matchedTerms),
+      entry.snapshot ? JSON.stringify(entry.snapshot) : "",
+    ]
+  );
+}
+
+/** The "saved" entry for an item that has none in the history (saved before the history existed).
+ * Its filters are only known if the item's snapshot has never been re-recorded since the save
+ * (`snapshot_at` still equals `date_added`); otherwise they're gone and the entry says so (null). */
+function legacySavedEntry(r: any): ScanHistoryEntry {
+  const untouched = (r.snapshot_at || r.date_added) === r.date_added;
+  return {
+    id: `legacy-${r.item_id}`,
+    itemId: r.item_id,
+    profileId: r.profile_id ?? "",
+    at: r.date_added,
+    kind: "saved",
+    outcome: null,
+    matchedTerms: [],
+    snapshot: untouched && r.profile_snapshot ? mapPantry(r).profileSnapshot : null,
+  };
+}
+
+/** Persist the original "saved" entry if the history doesn't have one yet — called before the item's
+ * snapshot is overwritten, so the original filters survive. */
+function ensureSavedHistoryEntry(itemId: string): void {
+  const has = sqlite().getFirstSync<any>(
+    "SELECT id FROM pantry_scan_history WHERE item_id = ? AND kind = 'saved' LIMIT 1",
+    [itemId]
+  );
+  if (has) return;
+  const r = sqlite().getFirstSync<any>("SELECT * FROM pantry_items WHERE item_id = ?", [itemId]);
+  if (!r) return;
+  const e = legacySavedEntry(r);
+  logScan({
+    itemId: e.itemId,
+    profileId: e.profileId,
+    at: e.at,
+    kind: "saved",
+    outcome: null,
+    matchedTerms: [],
+    snapshot: e.snapshot,
+  });
+}
+
+/** An item's whole scan history, newest first. An item saved before the history existed still gets
+ * its "saved" entry (built from the item itself) so it never shows an empty history. */
+export function getScanHistory(itemId: string): ScanHistoryEntry[] {
+  const rows = sqlite()
+    .getAllSync<any>("SELECT * FROM pantry_scan_history WHERE item_id = ?", [itemId])
+    .map(mapHistory);
+  if (!rows.some((e) => e.kind === "saved")) {
+    const r = sqlite().getFirstSync<any>("SELECT * FROM pantry_items WHERE item_id = ?", [itemId]);
+    if (r) rows.push(legacySavedEntry(r));
+  }
+  return rows.sort((a, b) => b.at - a.at);
 }
 
 // ---------------- Stats (singleton) ----------------
