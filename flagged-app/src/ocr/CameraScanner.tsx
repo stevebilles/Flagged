@@ -6,6 +6,7 @@ import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
 import { photoResultToParagraph } from "./recognition";
 import { stitch } from "./stitch";
+import { registerTempPhoto } from "../domain/tempPhotos";
 import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION, guideBoxToPhotoCorners } from "./guideBox";
 
 /**
@@ -112,9 +113,14 @@ export function useCameraCapture({
     try {
       const photo = await camera.takePhoto({ flash: "off" });
       const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
+      // Both the camera's original and the cropped copy below are full-size temp files that are
+      // dead weight once the text is read — register them to be deleted ~20 min from now
+      // (tempPhotos.ts), even if OCR throws.
+      registerTempPhoto(uri);
       const { width, height } = await getImageSize(uri);
       const corners = guideBoxToPhotoCorners(boxWidth, boxHeight, width, height);
       const correctedUri = await correctPerspective(uri, corners);
+      registerTempPhoto(correctedUri);
       const result = await recognizeText(correctedUri);
       if (__DEV__) {
         // Diagnostic only (docs/06/14): confirms the guide-box crop actually

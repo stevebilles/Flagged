@@ -69,9 +69,24 @@ export const pantryItems = sqliteTable("pantry_items", {
   imageFilePath: text("image_file_path").notNull().default(""),
   // Replaces originalIngredients (2026-09-14, docs/07 §7.1) — see ProfileSnapshot.
   profileSnapshot: text("profile_snapshot").notNull().default("{}"),
+  // When profileSnapshot was recorded (epoch ms): the save time, or the last "Keep Item".
+  snapshotAt: integer("snapshot_at").notNull().default(0),
   dateAdded: integer("date_added").notNull(),
   lastVerifiedDate: integer("last_verified_date").notNull(),
   deletedAt: integer("deleted_at"),
+});
+
+/** One entry in a Pantry item's scan history (docs/03 §3.2b) — the save and every rescan, append-only,
+ * each with the exact time and the profile's red-flag settings used for that scan. */
+export const pantryScanHistory = sqliteTable("pantry_scan_history", {
+  id: text("id").primaryKey(),
+  itemId: text("item_id").notNull(),
+  profileId: text("profile_id").notNull().default(""),
+  at: integer("at").notNull(),
+  kind: text("kind").notNull(), // "saved" | "rescan"
+  outcome: text("outcome").notNull().default(""), // "no_red_flags" | "flagged" | "" (for the save)
+  matchedTerms: text("matched_terms").notNull().default("[]"),
+  profileSnapshot: text("profile_snapshot").notNull().default(""), // ProfileSnapshot JSON, or ""
 });
 
 /** One profile-editor mutation (docs/03 §3.2a) — lets a recheck cite exactly

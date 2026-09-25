@@ -30,6 +30,9 @@ GoogleService-Info.plist
 .env.*
 !.env.example
 
+# Personal Claude Code settings (per-developer overrides — not shared)
+.claude/settings.local.json
+
 # Editors / OS
 .DS_Store
 .idea/

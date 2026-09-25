@@ -23,6 +23,168 @@ detail lives in git history and commit messages; this is the narrative summary.
   it stays above the disclaimer, which remains the last thing on the screen. Contract updated in
   `specs/001-flagged-mvp/contracts/screens.md`.
 
+**My Pantry rebuilt to the mockup, and "safe"-style wording removed everywhere**
+- **Why:** the Pantry tab had been built from the spec's text only — plain text cards, no photo, no
+  profile shown, no way to open or remove an item — and titled "My Safe Foods" (wording that came from
+  the first spec doc, not from the design). The owner's rule: never name or imply a product is
+  "safe", "approved" or "cleared" — a scan can miss things, which is why the disclaimer exists.
+- **Renamed** to **My Pantry** (screen title, empty state, store listing, privacy policy, docs, Spec
+  Kit headings). Removed "safe list / safe foods / second-guess / still approved"; the recheck
+  "Still clean." headline is now "No red flags found." **Guard:** `src/__tests__/copyGuard.test.ts`
+  fails on those phrases in `app/`, `src/`, `legal/` and the store listing. Rule added to CLAUDE.md.
+- **Layout** (`app/(tabs)/pantry.tsx`): Reformulation Checks to-do list on top (each card now says to
+  buy the product again first, then scan the new package, and shows its profile) → saved-product
+  cards (front-of-pack photo or brand-initial tile, brand over product, a tag for the profile it was
+  saved for) with an All + per-profile filter (2+ profiles) → Recent Changes / Undo at the bottom.
+  Re-reads on every focus (it used to go stale, e.g. after Undo).
+- **New:** `app/pantry-item.tsx` (tap a card: photo, profile, saved / last-checked dates, **Remove
+  from Pantry** → soft delete, undoable for 24h). Home's profile chips moved to
+  `src/design/profileChips.tsx` so the Pantry filter reuses them. Not built from the mockup: item
+  Edit, scan-history timeline, ingredient list (the app stores no ingredient text).
+
+**"CLEAN" pill removed from the clean rescan screen**
+- The header's `CLEAN` tag came from the owner's mockup, but a status tag can be taken literally and
+  works against the disclaimer. Removed; the verdict card ("No red flags found") says what was found
+  and nothing more. Rule added to CLAUDE.md, and `copyGuard.test.ts` now fails on a `<Text>` whose
+  whole content is CLEAN / CLEAR / SAFE / OK. (The scan-result screen's `CLEAN` / `FLAGGED` verdict
+  *stamp* is a different element and was left as designed.)
+
+**Product photo carries through every recheck screen**
+- After forcing a rescan on a device: the photo was on the capture screen but not on the two result
+  screens. New small `ProductPhoto` component (`src/design/ProductPhoto.tsx` — renders nothing if
+  there's no photo or it can't load; only displays the saved file) is now on the clean result (56px,
+  in the header) and the flagged result (80px, under "Red Flag Detected!"), as well as the capture
+  screen. Rule recorded in `docs/07`.
+
+**Scan History screen: product block at the top; "SCANNED FOR"**
+- After seeing it on a device: "Real Foods · Corn Thins" in the header was easy to miss, so the screen
+  now shows a product block like the item card — photo (when it has one), brand, product — under the
+  title, then the timeline (newest first, `LATEST` on top; the whole screen scrolls). The label
+  "SCANNING FOR" became **"SCANNED FOR"** (it's a past snapshot of the profile's red flags). The clean
+  rescan screen's card is the owner's own mockup wording, so it was left as drawn.
+
+**Pantry item screen de-duplicated**
+- The item screen repeated itself: "Saved for Steve", a "Saved" date, a "Last checked" date, then the
+  Scan History card showing the same first-saved date. Now: photo · brand/product · **SAVED TO
+  PROFILE** (a pill with the profile's dot and name, per the owner's mockup style) · Scan History ·
+  Remove. The two date rows are gone — the Scan History card has the first-saved date and the history
+  screen has every scan's date and time.
+
+**Scan History: every Pantry item keeps a log of each scan and the red flags used**
+- From the owner's two mockups (`pantry_item_scan_history_v2.png`, `scan_history_v2.png`; only the
+  Scan History parts): the item screen has a **Scan History** card ("N scans" running total — the
+  save counts as the first — and "First saved [date]"), which opens `app/scan-history.tsx`, a
+  timeline (newest first, `LATEST` tag) of each scan's date · time, what it was, and the profile +
+  red flags it was scanning for at that scan.
+- **Why it's needed:** a clean rescan re-records the item's current baseline, which would overwrite the
+  filters it first came back clean under. New table `pantry_scan_history` (replaces the short-lived
+  `pantry_rechecks`, which had no filters) keeps them: a `saved` row from `addPantryItem` and a
+  `rescan` row from the recheck-result screen, each with the exact time and the settings used.
+  `ensureSavedHistoryEntry` persists the original save before any re-recording; an item saved before
+  the history existed still shows its "saved" entry (filters known only if never re-recorded).
+- Text only (a few hundred bytes per entry); deleted with the item at the 24h purge (that also fixes
+  the old rescan-log rows being left behind). Pure, tested wording in `src/domain/scanHistory.ts`.
+  Tests: 187.
+
+**A clean rescan becomes the new baseline (so the side-by-side moves forward)**
+- Before: a clean rescan only reset the 30-day timer, so the "Profile at time of each scan" card kept
+  comparing against the *original save* forever. Now, when a clean result opens, the item's recorded
+  filters are re-recorded as of that scan and `snapshotAt` / `lastVerifiedDate` become the scan's
+  timestamp (`rebaselinePantryItem` takes the scan time). In 30 days the left column shows this
+  scan's date and filters and "Today" is the new rescan. Done on open (not on the button), so the
+  back arrow or a swipe can't skip it; the open screen still shows the previous baseline.
+- "Keep Item" uses the scan's timestamp too, and flagged-screen wording after any recheck reads
+  "you last checked this on…" / "LAST CHECKED" (was "kept"). `markVerified` is now unused (dead code).
+
+**Due items now stay in Saved Products; photo on the to-do card**
+- An item due for a recheck used to be removed from Saved Products (the original spec said it "moves
+  out of the main grid"), so the header and filter counts said 2 while the grid showed 1 and the item
+  looked deleted. It now appears in **both** places (owner's call); counts match what's on screen.
+  `docs/05` corrected.
+- The Reformulation Checks card now shows the item's small saved product photo (~64px) on the left,
+  only if it has one.
+
+**Storage cleanup: temporary scan photos deleted after ~20 minutes; product photo on the recheck screen**
+- **Leak found:** every scan left full-size photos in the phone's temp/cache folders forever — the
+  camera's original, the cropped copy the OCR reads (~1–3 MB JPEG), the Choose Photo copy, and the
+  full-quality source of every Pantry product photo. New `src/domain/tempPhotos.ts` (+ pure, tested
+  `tempPhotoRules.ts`): each is registered when created and deleted 20 minutes later. Sweeps run at
+  launch, on returning to the foreground, and ~20 min after each capture. Only registered files
+  inside the app's own temp/cache folders can be deleted — never the Pantry thumbnails or the photo
+  library.
+- **The product photo saved with a Pantry card is untouched** (compressed file in `pantry/`, kept
+  until the card is permanently deleted). Only the camera's temporary full-size original that it's
+  made from is cleaned up.
+- **24-hour undo fixed:** Recent Changes now filters by age when it's read (an item removed >24h ago
+  used to show with an Undo until the next launch), and the permanent purge — the row and its photo
+  file — now also runs whenever the app returns to the foreground, not just at launch.
+- **Recheck capture screen** shows the item's saved product photo (~120px, above the name) when it
+  has a readable one — for visual confirmation only; no new copy is stored. No photo → the generic icon.
+- Tests: 184 (was 177).
+
+**Recheck flow: one step to the capture screen, not two**
+- Tapping `Recheck →` used to open a "Grab the new box — Yes, open camera / Remind me later" popup,
+  which then opened the capture screen with its own "Open camera" button: the same question asked
+  twice. The popup is gone; `Recheck →` goes straight to `recheck-capture.tsx`, which now reads "Only
+  scan the ingredient list on a NEWLY PURCHASED box." (the rule the popup carried) with Open camera /
+  Paste / Cancel. (The Spec Kit files `spec.md` FR-017 / `tasks.md` still describe the popup — they're
+  the historical planning record; `docs/05` and the screens contract are current.)
+
+**Clean rescan screen rebuilt to the owner's new mockup**
+- `app/recheck-result.tsx` (no-red-flags outcome) now follows `docs/screenshots/recheck_result_clean_v2.png`:
+  header (back · brand/product · `CLEAN` tag), teal verdict card, a **PROFILE AT TIME OF EACH SCAN**
+  card, Back to Pantry. Much shorter than the old paragraph version. The back arrow accepts the
+  result (resets the 30-day timer), like the button.
+- **Profile-at-time-of-each-scan card:** two columns — the date the item's red flags were recorded
+  (`snapshotAt`) with the categories it was saved under, and "Today" with the profile's filters now
+  (`filterSetLines`, `sameFilterSet` in the new `src/domain/filterSet.ts`, tested). Footer: "Same
+  filter set — no new red flags detected." — or, if the filters changed but the rescan is still
+  clean (a case the mockup doesn't cover), "Your filters changed since you saved this — no red flags
+  detected with the current set." so it never claims "same" falsely.
+- The owner's updated mockup already uses the compliant wording ("No red flags found", "Back to
+  Pantry"). The older recheck mockups in `docs/screenshots/` are marked superseded in `docs/17`; the
+  flagged-rescan screen is next, from the owner's new mockup.
+
+**No invisible features: the Pantry always shows every section; dev-only "Force recheck"**
+- The Reformulation Checks to-do list, the profile filter and Recent Changes used to disappear when
+  empty (and the whole screen collapsed to one message when nothing was saved). Every section is now
+  always on screen with a plain-words empty message ("Nothing to recheck yet…"). Rule added to
+  CLAUDE.md, `docs/05` and the screens contract — it was not written down before.
+- **Dev-only test aid:** the Pantry item screen has a labelled **Force recheck (mark as due)** button
+  in `__DEV__` builds only (`devForceRecheckDue` backdates just `lastVerifiedDate` to 31 days ago) so
+  the to-do list, red dot and full recheck flow can be tested without waiting 30 days.
+- The Pantry tab's red dot now also refreshes on any route change (it used to miss returns from the
+  item screen / a recheck result until you switched tabs).
+
+**Recheck explains itself with exact timestamps (owner's rule: every change is timestamped)**
+- **The scenario it must handle:** Hidden sugars on → scan comes back clean → saved to the Pantry →
+  30 days later the user has also added Preservatives → the rescan flags Preservatives. The app now
+  knows and shows *when the item was saved*, *when Preservatives was added to the profile*, and *when
+  the rescan happened*, all with the time of day, and says why it's flagging.
+- **New data** (additive, guarded migration in `src/db/client.ts`): `pantry_items.snapshot_at` (when
+  an item's red flags were recorded — the save time, or the last "Keep Item"; old rows read as their
+  `date_added`) and an append-only `pantry_rechecks` table (item, profile, `scanned_at`, outcome,
+  matched terms — written once when the recheck result opens). The change-log lookups now only count
+  profile edits made at or after `snapshot_at`. The scan itself is stamped in `recheck-capture.tsx`.
+- **Four attributions, not two** (`recheckEngine.ts`): reformulation, or a profile change that is a
+  category added / an ingredient the user had excluded and turned back on / a custom term added. The
+  "excluded then re-included" case used to be mislabeled a reformulation. Messages live in the new
+  pure `src/domain/recheckExplain.ts`; a reformulation is now worded as "the recipe may have changed —
+  or the earlier scan missed it. Check the label." (a clean scan can miss things), never as fact.
+  The flagged recheck screen also shows a saved/last-kept → this-scan timeline.
+- **"All profiles" save:** a clean scan run for several profiles now saves one card per profile, each
+  tagged to it with its own snapshot (previously one card on the active profile only). They share one
+  photo file; the 24h purge no longer deletes a photo another card still uses. The Save screen says
+  which profiles it's saving under.
+- **Known limit:** the snapshot stores category / exclusion / custom settings, not the resulting term
+  list, so a dictionary update that adds an ingredient to a category (the dictionary re-seeds when its
+  schema version changes) would read as a reformulation. A fix would be to snapshot the profile's own
+  red-flag terms (from the bundled dictionary — exact, never OCR'd label text; the app deliberately
+  stores no scanned ingredient text, see docs/07 §7.1) — not built, low priority. Also: only Pantry rechecks are logged as scans — normal Scan-tab scans aren't stored (they
+  only update the profile's counters).
+- **Not yet checked on a device:** the migration on an existing install (adds `snapshot_at`), and the
+  whole flagged-recheck flow with real dates. Tests: 168 (was 157).
+
 ## 2026-09-24
 
 **Where things stand at the end of this session — pick up here**

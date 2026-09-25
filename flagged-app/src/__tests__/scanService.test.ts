@@ -193,7 +193,7 @@ describe("commitRecheckStats (docs/07 §7.1, redesigned 2026-09-14 — profile-s
   it("changed_flagged with ONLY a profile-change-attributed match: red flags added, but NOT counted as a reformulation", () => {
     // A filter the user just turned on catching an unrelated, unchanged
     // product isn't evidence the product itself changed (docs/07 §7.1).
-    const outcome: RecheckOutcome = { kind: "changed_flagged", matches: [attributedMatch({ kind: "profile_change" })] };
+    const outcome: RecheckOutcome = { kind: "changed_flagged", matches: [attributedMatch({ kind: "profile_change", cause: "category_added" })] };
     commitRecheckStats(outcome, emptyProfile);
     const p = lastUpdatedProfile();
     expect(p.totalRedFlagsCaught).toBe(1);
@@ -204,7 +204,7 @@ describe("commitRecheckStats (docs/07 §7.1, redesigned 2026-09-14 — profile-s
     const outcome: RecheckOutcome = {
       kind: "changed_flagged",
       matches: [
-        attributedMatch({ kind: "profile_change" }, { term: "msg" }),
+        attributedMatch({ kind: "profile_change", cause: "category_added" }, { term: "msg" }),
         attributedMatch({ kind: "reformulation" }, { term: "red 40" }),
       ],
     };

@@ -83,7 +83,8 @@ export interface ProfileSnapshot {
   customIngredients: string[];
 }
 
-/** An approved food (docs/03 §3.2). Belongs to whichever profile scanned it —
+/** A product saved to the Pantry after a scan found no red flags (docs/03 §3.2). Saving is a
+ * bookmark, never a safety claim. Belongs to whichever profile scanned it —
  * the Pantry tab filters by profile the same way Home does (docs/17). Always
  * recheck against `profileId`, never whichever profile is globally active. */
 export interface PantryItem {
@@ -94,8 +95,33 @@ export interface PantryItem {
   imageFilePath: string;
   profileSnapshot: ProfileSnapshot;
   dateAdded: number;
+  /** When `profileSnapshot` was recorded (epoch ms) — the save time, or the time of the last
+   * "Keep Item" (which re-records it). A recheck only counts profile edits made AFTER this as
+   * an explanation for a new red flag. Rows saved before this existed read as `dateAdded`. */
+  snapshotAt: number;
   lastVerifiedDate: number;
   deletedAt: number | null;
+}
+
+/** One entry in a Pantry item's scan history (docs/03 §3.2b) — append-only: the save itself
+ * (`kind: "saved"`) and every rescan after it (`kind: "rescan"`), each with the exact time and the
+ * red-flag settings the profile was scanning for at that moment. This is what lets the user go back
+ * to "the filters I used when this first came back clean" even after later clean rescans re-record
+ * the item's current baseline. Text only. */
+export interface ScanHistoryEntry {
+  id: string;
+  itemId: string;
+  profileId: string;
+  /** When the scan happened (epoch ms). */
+  at: number;
+  kind: "saved" | "rescan";
+  /** Rescans only (null for the save). */
+  outcome: "no_red_flags" | "flagged" | null;
+  /** The red-flag terms a flagged rescan matched. */
+  matchedTerms: string[];
+  /** The profile's settings used for this scan; null when they weren't recorded (an entry from
+   * before this history existed). */
+  snapshot: ProfileSnapshot | null;
 }
 
 /** One profile-editor mutation (docs/03 §3.2a) — written at every `persist()`

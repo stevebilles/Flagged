@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AppState, View } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, useSegments } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/design/ThemeProvider";
 import { getActivePantryItems } from "../../src/db/repositories";
@@ -22,6 +22,13 @@ export default function TabsLayout() {
     });
     return () => sub.remove();
   }, [refreshDue]);
+  // The tab listeners above don't fire when a screen pushed ON TOP of the tabs closes (the item
+  // screen, a recheck result), so also re-check whenever the route changes — otherwise the dot
+  // would stay stale after removing an item or finishing a recheck.
+  const route = useSegments().join("/");
+  useEffect(() => {
+    refreshDue();
+  }, [route, refreshDue]);
 
   return (
     <Tabs

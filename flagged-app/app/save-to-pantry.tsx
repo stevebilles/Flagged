@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, TextInput, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
 import { addPantryItem, getProfile } from "../src/db/repositories";
 import { snapshotFromProfile } from "../src/domain/activation";
+import { displayName } from "../src/domain/types";
 import { captureFrontOfPackThumbnail } from "../src/domain/pantryImage";
 
 /**
@@ -38,23 +39,34 @@ export default function SaveToPantry() {
     }
   }
 
+  // Every profile this clean scan was run for — one for a normal scan, every profile for an "All
+  // profiles" scan. Each gets its OWN card, tagged to it and carrying that profile's own filters
+  // (the "who was this scanned for" answer the recheck later depends on), instead of one card
+  // guessed onto whichever profile happens to be active.
+  const profileIds = lastScan?.profileIds?.length ? lastScan.profileIds : activeProfileId ? [activeProfileId] : [];
+  const savingFor = useMemo(
+    () => profileIds.map((id) => getProfile(id)).filter((p): p is NonNullable<typeof p> => !!p),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lastScan, activeProfileId]
+  );
+
   function save() {
-    // The profile this card belongs to (docs/17 Pantry mockup) — the profile
-    // that was active when the scan ran, even if it was checked via "All".
-    const profileId = activeProfileId ?? lastScan?.profileIds?.[0] ?? "";
-    const profile = profileId ? getProfile(profileId) : null;
     // No ingredient text is stored (docs/07 §7.1, 2026-09-14) — a Pantry save
     // only ever happens on a clean result, so what matters for the recheck
-    // later is exactly what this profile was screening for right now.
-    addPantryItem({
-      profileId,
-      brandName: brand.trim(),
-      productName: product.trim(),
-      imageFilePath: photoUri,
-      profileSnapshot: profile
-        ? snapshotFromProfile(profile)
-        : { activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [] },
-    });
+    // later is exactly what each profile was screening for right now. addPantryItem stamps the
+    // save time and the snapshot time (docs/03 §3.2).
+    const targets = savingFor.length > 0 ? savingFor : [null];
+    for (const profile of targets) {
+      addPantryItem({
+        profileId: profile?.profileId ?? "",
+        brandName: brand.trim(),
+        productName: product.trim(),
+        imageFilePath: photoUri,
+        profileSnapshot: profile
+          ? snapshotFromProfile(profile)
+          : { activeCategoryIds: [], excludedIngredientIds: [], customIngredients: [] },
+      });
+    }
     useAppStore.getState().setLastScan(null);
     router.replace("/(tabs)/pantry");
   }
@@ -78,6 +90,13 @@ export default function SaveToPantry() {
         <Text tone="muted" variant="caption">
           Snap a photo of the front of the packaging, then name it.
         </Text>
+        {savingFor.length > 0 && (
+          <Text tone="muted" variant="caption">
+            {savingFor.length === 1
+              ? `Saving under ${displayName(savingFor[0].name)}.`
+              : `Saving a copy under each profile you scanned for: ${savingFor.map((p) => displayName(p.name)).join(", ")}.`}
+          </Text>
+        )}
 
         <Card style={{ alignItems: "center", gap: t.spacing.sm }}>
           {photoUri ? (

@@ -71,17 +71,37 @@ against what was being screened for **then** vs. **now**:
 1. Run the new photo through OCR + matching (`06`) using the current profile's active filters.
 2. **New scan is clean** → nothing to report. Reset `lastVerifiedDate`, return to the grid.
 3. **New scan is flagged** → for **each individual match**, decide why it's new by checking whether
-   that match's category (or, for a custom ingredient, that exact term) was already part of the
-   saved `profileSnapshot`:
-   - **Was already being screened for** → the product was clean under this exact filter before and
-     isn't now, so the ingredient itself is presumably new — a reformulation. Message: *"This
-     ingredient wasn't present in your last scan."*
-   - **Wasn't in the snapshot** (the filter itself is what's new, not necessarily the ingredient) →
-     look up the `ProfileChangeLog` (`03` §3.2a) for the most recent entry that turned this
-     category/ingredient on for this profile. Found → cite it: *"On [date], you added [filter] to
-     your red flags — that's why this is now flagging."* Not found (e.g. a pre-2026-09-14 profile
-     edit, before logging existed) → the generic fallback: *"This now matches a filter you've added
-     since you last saved this item."*
+   that exact term was already being screened for in the saved `profileSnapshot` (`attributeRecheckMatches`):
+   - **Was already being screened for** — its category was active, the user hadn't excluded that
+     ingredient, or (custom) the term was already in the custom list → a **reformulation**
+     (counts toward `totalReformulationsCaught`). It is never stated as fact — a clean scan only
+     means nothing matched in the text it read, and it can miss things. Message: *"Not flagged
+     when you saved this on [date, time], even though you were already watching for it. The recipe
+     may have changed — or the earlier scan missed it. Check the label."*
+   - **Wasn't being screened for** (the filter changed, not necessarily the product) → a
+     **profile change**, with a `cause`, each looked up in the `ProfileChangeLog` (`03` §3.2a) for the
+     most recent entry **made at or after the item's `snapshotAt`**:
+     - `category_added` — its category wasn't active at save time. *"You added [filter] to your red
+       flags on [date, time], after you saved this on [date, time]. That's why it's flagging now."*
+     - `ingredient_included` — the category was active, but the user had **excluded this ingredient**
+       at save time and has since turned it back on. *"You stopped excluding [X] on … after you
+       saved this on …"* (This used to be mislabeled a reformulation.)
+     - `custom_added` — a custom term added after saving. *"You added "[X]" to your custom red
+       flags on …"*
+     - No log entry found (e.g. an edit from before change logging existed) → the same message
+       without the edit time: *"[filter] wasn't on your red flags when you saved this on …"*
+   - After a **Keep Item** the item's red flags are re-recorded, so the wording says "kept" instead
+     of "saved" and the dates use that moment.
+
+   Every moment involved is stored with an exact timestamp (`03` §3.2 `dateAdded` / `snapshotAt`,
+   §3.2a `timestamp`, §3.2b `scannedAt`) and shown with the time, not just the date. The flagged
+   result screen also shows a small timeline: *saved (or last kept)* → *this scan*; the profile-edit
+   time is cited per match.
+   Known limit: the snapshot records the profile's category/exclusion/custom settings, not the
+   resulting list of red-flag terms from the app's own dictionary (never the OCR'd label text, which
+   is deliberately not stored), so if a future app update changes which ingredients a category contains
+   (the dictionary is re-seeded when its schema version changes), a newly-included term reads as a
+   reformulation rather than a dictionary change.
 
 This recovers **reformulation** (an ingredient appearing that wasn't there) without ever storing
 ingredient text. It cannot recover **skimpflation** (relative order shifting among ingredients that
@@ -91,15 +111,46 @@ no longer exists (see `03` §3.1).
 
 ### Recheck results UI
 
-**Outcome 1 — Still Clean**
-- Green confirmation: "No changes detected." (Note: this means "still clean under current
-  filters," not a provable claim that nothing about the product changed — see above.)
-- Reset `lastVerifiedDate` to today; return the item to the normal Pantry grid.
+**The product's saved photo carries through the whole recheck** (owner, 2026-09-25): if the item has
+a photo, it's shown on the capture screen (larger), the clean result (small, in the header beside
+the name) and the flagged result (under "Red Flag Detected!"), so the user always sees which product
+they're rescanning. No photo → nothing extra. It only displays the existing saved file
+(`ProductPhoto`, `src/design/ProductPhoto.tsx`); nothing is copied.
+
+**Outcome 1 — No red flags found**
+- Layout from the owner's mockup (`docs/screenshots/recheck_result_clean_v2.png`, 2026-09-25): a
+  header (back arrow · product photo · brand / product — **no `CLEAN` pill/tag**, owner 2026-09-25:
+  a status tag can be read as a safety claim and works against the disclaimer; the mockup's tag was
+  removed), a teal verdict card (check in a circle,
+  **"No red flags found"**, "No new red flags found for **[Profile]'s** current profile."), a
+  **PROFILE AT TIME OF EACH SCAN** card, and a **Back to Pantry** button. The back arrow and the
+  button both accept the result.
+- **The "Profile at time of each scan" card** is a side-by-side comparison of what was being scanned
+  for: left = the date the item's red flags were recorded (`snapshotAt`) over **SCANNING FOR** + the
+  categories in its saved `profileSnapshot` (plus custom red flags, and "N ingredients turned off"
+  when any); right = "Today" (the rescan date) over the profile's filters now. Footer, italic:
+  **"Same filter set — no new red flags detected."** when the two sets are identical
+  (`sameFilterSet`, `src/domain/filterSet.ts`). If the user changed their filters since saving but
+  the rescan is still clean, the footer instead says **"Your filters changed since you saved this —
+  no red flags detected with the current set."** — the card never claims "same" when it isn't.
+- This means only that nothing matched the current filters this time — not that nothing about the
+  product changed, and not a safety claim; see above. Exact times are still stored (`03` §3.2b).
+- **A clean rescan becomes the item's new baseline** (owner, 2026-09-25), recorded the moment the
+  screen opens (not on a button, so backing out can't skip it): the item's `profileSnapshot` is
+  re-recorded as the profile's filters *as of this scan*, `snapshotAt` and `lastVerifiedDate` are set
+  to the scan's timestamp (30-day timer restarts), and the scan is logged (`03` §3.2b). So in 30
+  days the left side of the "Profile at time of each scan" card shows **this** scan's date and
+  filters, and "Today" is the new rescan — the comparison always runs from the previous check.
+  (The screen you're looking at still shows the *previous* baseline; it's read before this runs.)
 
 **Outcome 2 — Now Flagged**
 - Trigger the **Alert Red** warning screen.
-- **Breakdown:** each matched ingredient, with its own attribution message (reformulation, dated
-  filter change, or generic filter-change fallback — see above) and which filter caught it.
+- **Timeline card:** when the item was saved (or last kept) and when this scan happened.
+- **Breakdown:** each matched ingredient, with its own explanation (`src/domain/recheckExplain.ts`:
+  reformulation, or the specific profile change with its date and time — see above).
+
+Either way, the rescan is added to the item's scan history once when the result opens (`03` §3.2b: when, the red flags used, and
+what matched).
 - **Choice:**
   > "Red Flag Detected! This new recipe contains an ingredient you are avoiding. Do you want to
   > remove this item from your pantry?"
@@ -108,7 +159,8 @@ no longer exists (see `03` §3.1).
 ### Post-choice behavior
 
 - **`[ Keep Item ]`:** replace the item's `profileSnapshot` with the profile's **current** filter
-  state and reset the **30-day** timer (`lastVerifiedDate` = now).
+  state, set `snapshotAt` = the rescan's timestamp, and reset the **30-day** timer
+  (`lastVerifiedDate` = the same). Afterwards the flagged-screen wording says "last checked", not "saved".
 - **`[ Delete Item ]`:** send the item to the **Recent Changes** log with the **24-hour undo** timer
   (`deletedAt` = now; purge after 24h).
 
