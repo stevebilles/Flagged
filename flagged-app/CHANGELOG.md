@@ -21,9 +21,10 @@ cropped); off-column + above-the-header text dropped from camera captures (the f
    matching word with context.
 2. **A two-photo scan ("Scan More")** — a list too wide for one photo; confirm nothing is cut off between
    the photos (the above-header rule is first-photo-only by design).
-3. Pantry: Save to Pantry fields above the keyboard; the red dot on the Pantry tab; the 24-hour undo
-   actually expiring; the 20-minute temp-photo cleanup. Also the whole-photo display, the clean rescan
-   screen (one-sentence hero, pill-style card, "same red flag profile…" footer).
+3. Pantry: the 24-hour undo actually expiring; the 20-minute temp-photo cleanup. Also the whole-photo
+   display, the clean rescan screen (one-sentence hero, pill-style card, "same red flag profile…"
+   footer). (Already confirmed working by the owner, so NOT to re-check: Save to Pantry fields above the
+   keyboard, and the Pantry tab's red dot when a rescan to-do item appears.)
 
 *Plans / open decisions, in the order I'd take them:*
 1. **Top-line cue on the guide box** (awaiting the owner's go + wording): bold top and left edge with a
@@ -162,9 +163,9 @@ only when asked.
 **Device check of the 2026-09-24 changes (partly done — the remaining items are in "Where we left off" above)**
 - **Confirmed on a device:** the clean result (stamp / "No red flags found" / "for <profile>", Save to
   Pantry + Scan Another + Return to Home, disclaimer below the buttons) and the flagged result
-  (disclaimer below the buttons). Still to check from the 2026-09-24 list below: (2) Save to Pantry
-  fields above the keyboard, (3) Onboarding name step, (4) Profile edit search results, (5) launch
-  on a poor connection.
+  (disclaimer below the buttons). Still to check from the 2026-09-24 list below: (3) Onboarding name step,
+  (4) Profile edit search results, (5) launch on a poor connection. ((2) Save to Pantry fields above the
+  keyboard was later confirmed working by the owner.)
 
 **Flagged result: the "can't be saved to your Pantry" note is now a notice, not a caption**
 - On a flagged result the old small, muted, centered line read as easy-to-miss (and sat below the
@@ -505,7 +506,7 @@ only when asked.
   paywall ("Subscribe for $24.99/year", no trial promise) displays correctly.
 - **Not yet verified on a device:** the *eligible*-user paywall after the spacing rework (needs a
   fresh sandbox tester who hasn't used the trial); the Pantry red dot (needs an item >30 days old —
-  a dev-only "age an item" button would help); a subscription lapsing back to the paywall.
+  a dev-only "age an item" button would help — since added, and the owner has confirmed the dot works); a subscription lapsing back to the paywall.
 - **Before App Store submission:** app icon (1024×1024, in progress) + splash config; Terms of
   Service and Privacy Policy pages hosted at a URL the owner controls (`flagged.app` currently
   serves a different product; drafts are in `legal/`); subscription Display Name/Description are
