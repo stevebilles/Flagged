@@ -141,7 +141,9 @@ Four tiles in a 2×2 grid (`app/(tabs)/index.tsx`), read from the **per-profile*
   ("Saved to Pantry" / "Rescanned — no red flags found" / "Rescanned — red flags found"), then
   **SCANNED FOR** (past tense — a snapshot of the profile at the time of that scan, per the owner):
   the profile (color dot + name) and the red flags it had switched on at that
-  moment (category names, custom red flags, "N ingredients turned off"). This is the record the user
+  moment (category names, custom red flags, "N ingredients turned off") as a **true two-column list**
+  — the first half down the left column, the rest continuing at the top of the right (not a
+  wrapping row, which scattered short items) — so a long list takes half the height. This is the record the user
   can go back to for "the filters I used when this first came back clean". Data: `03` §3.2b.
 
 ### Section 3 — Recent Changes log (24-hour undo)

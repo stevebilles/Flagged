@@ -10,6 +10,8 @@ import { useAppStore } from "../../src/state/appStore";
 import { getProfile, getProfiles } from "../../src/db/repositories";
 import { evaluateScan, evaluateScanForAll } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
+import { looksLikeNonEnglish } from "../../src/matching/language";
+import { LanguageWarning } from "../../src/design/LanguageWarning";
 import { logScanDebug } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
 import { useCameraCapture } from "../../src/ocr/CameraScanner";
@@ -54,6 +56,8 @@ export default function Scan() {
   const locked = !isPremium;
   const [error, setError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  // The "this isn't English" warning (LanguageWarning) — shown instead of a result.
+  const [languageWarning, setLanguageWarning] = useState(false);
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
 
   // Who this scan will run for, and whether that's actually possible right now
@@ -86,12 +90,23 @@ export default function Scan() {
     // instead, extracting the wrong language's text entirely. Matching
     // English red-flag terms against a paragraph that happens to include
     // some French is harmless (French words don't fuzzy-match English
-    // ones) — there was nothing this extraction step was protecting
-    // against here that the matcher doesn't already handle on its own.
+    // ones) — but a capture that is ALL French finds almost nothing, which
+    // is why the language check below warns about that case.
     // "Paste"/"Choose Photo" are different: those really can be a whole,
     // unbounded label (a photo of the entire package, pasted text copied
     // from anywhere), where isolating the ingredients section still helps.
     const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
+
+    // The dictionary only has English names, so the French/Portuguese/… side of a bilingual label
+    // matches almost nothing and would come back looking like a real (nearly empty) result — a real
+    // 2026-09-25 test gave 1 red flag instead of 7. If the bulk of the words aren't English, warn
+    // before showing any result (owner, 2026-09-25). Not language-specific; see matching/language.ts.
+    // The warning is the app's own (LanguageWarning) with ONE way out — scan again; no "continue".
+    if (looksLikeNonEnglish(paragraph)) {
+      logScanDebug(source, rawParagraph, paragraph, "NON-ENGLISH warning shown");
+      setLanguageWarning(true);
+      return;
+    }
 
     let evaln;
     let scannedFor: string;
@@ -218,6 +233,16 @@ export default function Scan() {
   return (
     <Screen>
       <Text variant="heading" bold>Scan</Text>
+
+      {/* Its one button goes back to the standby screen (the camera would otherwise stay on the
+          capture just taken) so the user can scan the English side. */}
+      <LanguageWarning
+        visible={languageWarning}
+        onScanAgain={() => {
+          setLanguageWarning(false);
+          setCameraOpen(false);
+        }}
+      />
 
       <View
         onLayout={onBoxLayout}

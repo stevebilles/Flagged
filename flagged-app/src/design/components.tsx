@@ -224,45 +224,6 @@ export function IngredientChip({ label }: { label: string }) {
   );
 }
 
-/** Big circular verdict badge for the Results screen header (docs/17) — a
- * stamp-like focal point in place of a small icon + caption, so the result
- * reads at a glance instead of needing the text below it to land the point. */
-export function VerdictStamp({
-  tone,
-  icon,
-  label,
-  count,
-}: {
-  tone: "red" | "cyan";
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  label: string;
-  count?: number;
-}) {
-  const t = useTheme();
-  const color = tone === "red" ? t.colors.red : t.colors.cyan;
-  return (
-    <View
-      style={{
-        width: 148,
-        height: 148,
-        borderRadius: 74,
-        borderWidth: 3,
-        borderColor: color,
-        backgroundColor: withAlpha(color, 0.12),
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 2,
-      }}
-    >
-      <Ionicons name={icon} size={28} color={color} />
-      <RNText style={{ color, fontFamily: t.fontFamily.bold, fontSize: 20, letterSpacing: 1 }}>{label}</RNText>
-      {count !== undefined && (
-        <RNText style={{ color, fontFamily: t.fontFamily.bold, fontSize: 32 }}>{count}</RNText>
-      )}
-    </View>
-  );
-}
-
 /** Canonical copy for what each classification means (docs/09) — shared so
  * the Profile editor and Results screen never drift out of sync with each
  * other. */

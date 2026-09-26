@@ -33,6 +33,10 @@ export type AttributedMatch = Match & { attribution: MatchAttribution };
 
 export type RecheckOutcome =
   | { kind: "identical" } // still clean under the current profile — NOT a provable claim that nothing changed, just that nothing currently flags
+  // Flags were found, but every one was ALREADY found at the item's last scan — nothing new has shown
+  // up (owner, 2026-09-25). Handled like a clean recheck, not "new red flags detected"; the known flags
+  // are still shown so it's never hidden that they're on the label.
+  | { kind: "known_flags"; matches: AttributedMatch[] }
   | { kind: "changed_flagged"; matches: AttributedMatch[] };
 
 /**
@@ -78,13 +82,24 @@ export function attributeRecheckMatches(
 
 /** Evaluate a completed recheck scan (docs/07 §7.1). `matches`/`isClean` come
  * from a fresh scan run against the item's own profile (see recheck-capture.tsx —
- * never the globally active profile). */
+ * never the globally active profile).
+ *
+ * `lastFlaggedTerms` are the red-flag terms the item's LAST scan matched (empty if it was clean, or
+ * was the save). If this scan flags something, but every term it flags was already flagged last time,
+ * nothing NEW has shown up — that's "known_flags", not "changed_flagged". Only a term that wasn't
+ * flagged last time counts as new (a possible reformulation, or a filter the user added). */
 export function evaluateRecheck(
   isClean: boolean,
   matches: Match[],
   oldSnapshot: ProfileSnapshot,
-  ingredientTermById?: Map<string, string>
+  ingredientTermById?: Map<string, string>,
+  lastFlaggedTerms: readonly string[] = []
 ): RecheckOutcome {
   if (isClean) return { kind: "identical" };
-  return { kind: "changed_flagged", matches: attributeRecheckMatches(matches, oldSnapshot, ingredientTermById) };
+  const attributed = attributeRecheckMatches(matches, oldSnapshot, ingredientTermById);
+  const known = new Set(lastFlaggedTerms.map((t) => t.toLowerCase()));
+  if (matches.length > 0 && matches.every((m) => known.has(m.term.toLowerCase()))) {
+    return { kind: "known_flags", matches: attributed };
+  }
+  return { kind: "changed_flagged", matches: attributed };
 }

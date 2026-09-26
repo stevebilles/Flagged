@@ -11,6 +11,16 @@ export function scanCountLabel(count: number): string {
   return `${count} ${count === 1 ? "scan" : "scans"}`;
 }
 
+/** The red-flag terms an item's LAST scan matched (`history` is newest first, as `getScanHistory`
+ * returns it). A save or a no-red-flags rescan matched nothing, so the answer is empty. A rescan that
+ * finds only these same terms again has nothing new to report (`evaluateRecheck`). */
+export function lastFlaggedTerms(
+  history: readonly (Pick<ScanHistoryEntry, "kind" | "outcome"> & { matchedTerms: readonly string[] })[]
+): string[] {
+  const last = history[0];
+  return last && last.kind === "rescan" && last.outcome === "flagged" ? [...last.matchedTerms] : [];
+}
+
 /** The line under an entry's date on the history screen, and whether it's shown as neutral/positive
  * (cyan) or as a flag (red). */
 export function scanEntryLabel(entry: Pick<ScanHistoryEntry, "kind" | "outcome">): {

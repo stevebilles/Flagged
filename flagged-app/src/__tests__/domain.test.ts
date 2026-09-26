@@ -475,6 +475,20 @@ describe("recheck engine (pantry, docs/07 §7.1 — profile-snapshot comparison,
     }
   });
 
+  it("evaluateRecheck: flags that were ALL already found at the last scan are 'known_flags', not new", () => {
+    const outcome = evaluateRecheck(false, [match()], snapshot(), undefined, ["Red 40"]);
+    expect(outcome.kind).toBe("known_flags");
+  });
+
+  it("evaluateRecheck: one flag the last scan didn't have makes it changed_flagged (possible reformulation)", () => {
+    const outcome = evaluateRecheck(false, [match(), match({ term: "yellow 5", token: "yellow 5" })], snapshot(), undefined, ["red 40"]);
+    expect(outcome.kind).toBe("changed_flagged");
+  });
+
+  it("evaluateRecheck: with nothing flagged last time, any flag is new", () => {
+    expect(evaluateRecheck(false, [match()], snapshot(), undefined, []).kind).toBe("changed_flagged");
+  });
+
   it("attributes a match as reformulation when its category was already being screened for", () => {
     // The old snapshot already had cat-dyes active — the product was clean
     // under that exact filter before, so the ingredient itself is presumably new.

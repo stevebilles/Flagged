@@ -94,6 +94,39 @@ export default function ScanHistoryScreen() {
   );
 }
 
+/**
+ * The red flags a scan was checked against, as a real two-column list: the first half runs down the
+ * left column and the rest continues at the top of the right one, so the order reads naturally and a
+ * long list takes half the height. (It used to be a wrapping row, which dropped short items wherever
+ * they happened to fit — e.g. "Trans fats" sitting beside the second item.)
+ *
+ * The columns are sized to their CONTENT, not forced to equal halves (owner, 2026-09-25): equal halves
+ * made "Synthetic preservatives" wrap even though the other column had room to spare. Each column
+ * takes what its longest item needs and only shrinks — wrapping text — when both together don't fit.
+ * Wrapping is always BETWEEN words (never "glut / mates"); the `minWidth` keeps a shrinking column
+ * from getting narrower than a normal category name's longest word, which is the only thing that
+ * could force a mid-word break.
+ */
+function TwoColumnList({ lines }: { lines: string[] }) {
+  const t = useTheme();
+  const half = Math.ceil(lines.length / 2);
+  const columns = [lines.slice(0, half), lines.slice(half)];
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", columnGap: t.spacing.md }}>
+      {columns.map((col, c) => (
+        <View key={c} style={{ flexShrink: 1, minWidth: "35%", gap: t.spacing.xs }}>
+          {col.map((line, i) => (
+            <View key={i} style={{ flexDirection: "row", gap: 6 }}>
+              <Text variant="subheadline" tone="muted">•</Text>
+              <Text variant="subheadline" tone="muted" style={{ flexShrink: 1 }}>{line}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** One scan on the timeline: a dot on the rail, and a card with the date/time, what it was, and the
  * profile + the red flags it was scanning for. */
 function HistoryRow({
@@ -169,11 +202,7 @@ function HistoryRow({
             <Text bold>{profileIndex >= 0 ? displayName(profiles[profileIndex].name) : "Deleted profile"}</Text>
           </View>
           {lines ? (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: t.spacing.md, rowGap: t.spacing.xs }}>
-              {lines.map((line, i) => (
-                <Text key={i} variant="subheadline" tone="muted">• {line}</Text>
-              ))}
-            </View>
+            <TwoColumnList lines={lines} />
           ) : (
             <Text variant="subheadline" tone="muted">The red flags used weren't recorded for this scan.</Text>
           )}

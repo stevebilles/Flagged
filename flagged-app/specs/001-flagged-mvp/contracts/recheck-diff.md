@@ -13,9 +13,13 @@ A Pantry save only happens on a **clean** result, so none of the then-active fil
 present at save time. A recheck rescans the new box and interprets any match against what was
 being screened for **then** (the saved `ProfileSnapshot`) vs. **now** (the live profile).
 
-## `evaluateRecheck(isClean, matches, oldSnapshot): RecheckOutcome`
+## `evaluateRecheck(isClean, matches, oldSnapshot, ingredientTermById?, lastFlaggedTerms = []): RecheckOutcome`
 - `isClean` → `{ kind: "identical" }` — still clean under the current profile. (Not a provable
   claim that nothing changed, only that nothing currently flags.)
+- flagged, and **every** matched term is in `lastFlaggedTerms` (the terms the item's last scan
+  already found — `lastFlaggedTerms(getScanHistory(id))`, empty after the save or a clean rescan) →
+  `{ kind: "known_flags", matches }` — nothing new since the last scan (owner, 2026-09-25); handled
+  like a clean rescan.
 - otherwise → `{ kind: "changed_flagged", matches: AttributedMatch[] }`.
 
 ## `attributeRecheckMatches(matches, oldSnapshot): AttributedMatch[]`
@@ -38,7 +42,9 @@ active one):
 - No skimpflation counter and no free-scan counter exist any more.
 
 ## Post-choice behaviour (UI → repository)
-- **identical**: reset the 30-day timer (`lastVerifiedDate = now`); item returns to the list.
+- **identical** and **known_flags**: re-baseline on screen open and reset the 30-day timer
+  (`lastVerifiedDate = now`); `known_flags` adds no red-flag / reformulation counts (`totalLabelsRead`
+  only) and is logged with its terms so the next rescan compares against them.
 - **changed_flagged**: `Keep Item` accepts today's flagged state as the new normal; `Delete Item`
   soft-deletes (`softDeletePantryItem`) into the 24-hour undo log, purged after 24h (negative
   elapsed time clamped to 0). See `app/recheck-result.tsx`.

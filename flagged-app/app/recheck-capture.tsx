@@ -6,8 +6,11 @@ import * as Clipboard from "expo-clipboard";
 import { Screen, Text, Button } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getPantryItem, getProfile, getIngredientTermMap } from "../src/db/repositories";
+import { getPantryItem, getProfile, getIngredientTermMap, getScanHistory } from "../src/db/repositories";
+import { lastFlaggedTerms } from "../src/domain/scanHistory";
 import { extractIngredientList } from "../src/matching/normalize";
+import { looksLikeNonEnglish } from "../src/matching/language";
+import { LanguageWarning } from "../src/design/LanguageWarning";
 import { evaluateScan } from "../src/domain/scanService";
 import { evaluateRecheck } from "../src/domain/recheckEngine";
 import { logScanDebug } from "../src/domain/scanDebug";
@@ -37,6 +40,7 @@ export default function RecheckCapture() {
 
   const item = useMemo(() => (id ? getPantryItem(id) : null), [id]);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [languageWarning, setLanguageWarning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The item's saved product photo (part of its Pantry card) — shown so the user can confirm this is
   // the product they're about to rescan. Nothing new is stored or copied; if there's no photo, or it
@@ -64,6 +68,15 @@ export default function RecheckCapture() {
     // an already-targeted capture (real 2026-09-13 failure: that hunt broke
     // on an OCR punctuation slip and extracted the wrong language).
     const paragraph = source === "camera" ? rawParagraph : extractIngredientList(rawParagraph);
+    // Same warning as the Scan tab (owner, 2026-09-25): if the bulk of the words aren't English, the
+    // English-only dictionary would find almost nothing — and a rescan that finds nothing would
+    // re-baseline the item as if it had been checked. Warn before evaluating anything; the warning
+    // (LanguageWarning) has ONE way out — scan again — no "continue anyway".
+    if (looksLikeNonEnglish(paragraph)) {
+      logScanDebug("recheck", rawParagraph, paragraph, "NON-ENGLISH warning shown");
+      setLanguageWarning(true);
+      return;
+    }
     // Reusing evaluateScan (matching + attribution, same as a normal Scan)
     // rather than reimplementing it here also means a recheck now correctly
     // rejects an illegible capture instead of silently mismatching, which
@@ -77,7 +90,9 @@ export default function RecheckCapture() {
       evaln.result.isClean,
       evaln.result.matches,
       item.profileSnapshot,
-      getIngredientTermMap()
+      getIngredientTermMap(),
+      // What the last scan already flagged: flags that turn up again aren't new.
+      lastFlaggedTerms(getScanHistory(item.itemId))
     );
     logScanDebug("recheck", rawParagraph, paragraph, `recheck → ${outcome.kind}`);
 
@@ -123,6 +138,13 @@ export default function RecheckCapture() {
 
   return (
     <Screen>
+      <LanguageWarning
+        visible={languageWarning}
+        onScanAgain={() => {
+          setLanguageWarning(false);
+          setCameraOpen(false);
+        }}
+      />
       <View
         onLayout={onBoxLayout}
         style={{

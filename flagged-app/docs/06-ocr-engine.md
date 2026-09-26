@@ -72,6 +72,27 @@ paragraph and the breakdown card in `07`.
   Skip camera/stitching. Still subject to the same validation rules.
 - **`[ Choose Photo ]`:** run on-device OCR on the still image → **Step 2** → **Step 3**.
 
+## Language check — warn when the scan isn't English (owner, 2026-09-25)
+The dictionary only has English ingredient names. A real test on a bilingual label: the English side
+gave 7 red flags, the French side gave 1 (TBHQ is spelled the same) — and nothing on screen said the
+scan had read the wrong side. That's a false-negative risk, so both scan entry points (the Scan tab —
+camera, Paste, Choose Photo — and the recheck capture screen) check the language **before** evaluating.
+- **Rule** (`src/matching/language.ts`, `looksLikeNonEnglish`): if the bulk of the words aren't English —
+  at least 3 words that are unmistakably another language (words like "farine", "harina", "zutaten", or
+  any word with a letter English doesn't use, or a non-Latin script) **and** more of those than
+  recognisably-English words — an alert appears. It is **not French-specific**: it doesn't name a
+  language (a Portuguese product can carry a Portuguese and an English list). An English list with a
+  couple of "crème"/"purée" words, a chemical name we don't know, or a capture containing both sides
+  roughly evenly doesn't trip it. On-device, no language service.
+- **The warning** (`src/design/LanguageWarning.tsx`): drawn by the app in its own style — a card with a
+  language icon over a dimmed background, **not** the phone's native alert (owner, 2026-09-25: the native
+  one felt like an iOS notification, not part of Flagged). "Check the language — Most of the words in
+  this scan don't look like English. Flagged only checks English ingredient names, so a scan in another
+  language can miss red flags. Please scan the English ingredient list." It has **one button, Scan
+  again**, which returns to the standby screen. There is deliberately **no "continue anyway"** and it
+  can't be dismissed by tapping outside it: a scan in the wrong language can't be trusted.
+- Nothing is stored or counted for a scan that hits the warning, and no result is shown.
+
 ## Temporary photos are deleted after ~20 minutes (owner, 2026-09-25)
 Scanning writes several full-size photos to the phone's temp/cache folders and nothing used to delete
 them: the camera's original, the cropped copy the OCR reads (`correctPerspective`, a full-resolution

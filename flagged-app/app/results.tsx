@@ -9,26 +9,27 @@ import {
   Button,
   Badge,
   IngredientChip,
-  VerdictStamp,
   ClassificationGuide,
   type Classification,
 } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getProfile, getProfiles } from "../src/db/repositories";
+import { getProfile } from "../src/db/repositories";
 import { commitScanStats, commitScanStatsForAll } from "../src/domain/scanService";
 import { onScanCompleted } from "../src/review/reviewTriggers";
-import { profileColor } from "../src/design/avatar";
 import type { Match } from "../src/matching/matcher";
+import { displayTerm as formatTerm } from "../src/domain/displayTerm";
+import { HeroCard } from "../src/design/HeroCard";
 
 /** The correctly-spelled term itself, not the raw (possibly OCR-garbled)
  * label text that triggered it — 2026-09-13: OCR will never be 100%
  * typo-free on real glossy print, on any engine, and showing its raw output
  * as if it were a finished transcript made the app look unreliable even
  * when the underlying match was already correct. A term is always shown
- * exactly as configured (the profile's own filter list), never as read. */
+ * exactly as configured (the profile's own filter list), never as read.
+ * Abbreviations (TBHQ, BHA, E320…) show in capitals — see `src/domain/displayTerm.ts`. */
 function displayTerm(m: Match): string {
-  return m.term.charAt(0).toUpperCase() + m.term.slice(1);
+  return formatTerm(m.term);
 }
 
 /**
@@ -44,16 +45,6 @@ export default function Results() {
   // not re-derived from the current active profile, which may have changed
   // since this scan ran.
   const scannedFor = lastScan?.scannedFor ?? "";
-
-  // Only a SINGLE named profile gets its own color — "all N profiles" has
-  // no one profile to represent, and the palette itself (avatar.ts) is
-  // already guaranteed to stay clear of the verdict's own red/cyan.
-  const scannedForColor = useMemo(() => {
-    const ids = lastScan?.profileIds ?? [];
-    if (ids.length !== 1) return null;
-    const index = getProfiles().findIndex((p) => p.profileId === ids[0]);
-    return index >= 0 ? profileColor(index) : null;
-  }, [lastScan]);
 
   useEffect(() => {
     if (!lastScan) return;
@@ -124,32 +115,21 @@ export default function Results() {
           <Text variant="title" bold>Result</Text>
         </View>
 
-        <Card style={{ alignItems: "center", gap: t.spacing.md }}>
-          <VerdictStamp
-            tone={clean ? "cyan" : "red"}
-            icon={clean ? "checkmark" : "flag"}
-            label={clean ? "CLEAN" : "FLAGGED"}
-            count={clean ? undefined : lastScan.matches.length}
-          />
-          <Text variant="title" bold tone={clean ? "cyan" : "red"} style={{ textAlign: "center" }}>
-            {clean
+        {/* Compact hero (owner, 2026-09-25) — the same card the rescan result uses; no big stamp and
+            no CLEAN/FLAGGED label (a status tag reads like a verdict on the product). Same "for
+            <profile>" line for clean and flagged. Neither result shows the raw OCR'd ingredient text —
+            a flagged result lists just the matched red-flag terms below (their own correct spelling),
+            and a clean one has nothing to list. */}
+        <HeroCard
+          tone={clean ? "cyan" : "red"}
+          icon={clean ? "checkmark" : "flag"}
+          title={
+            clean
               ? "No red flags found"
-              : `${lastScan.matches.length} red flag${lastScan.matches.length === 1 ? "" : "s"} on your list`}
-          </Text>
-          {/* Same "for <profile>" line for clean and flagged. Neither result shows the
-              raw OCR'd ingredient text — a flagged result lists just the matched red-flag
-              terms below (their own correct spelling), and a clean one has nothing to list. */}
-          {scannedFor && (
-            <Text
-              variant="title"
-              bold
-              tone="muted"
-              style={[{ textAlign: "center" }, scannedForColor ? { color: scannedForColor } : undefined]}
-            >
-              for {scannedFor}
-            </Text>
-          )}
-        </Card>
+              : `${lastScan.matches.length} red flag${lastScan.matches.length === 1 ? "" : "s"} on your list`
+          }
+          subtitle={scannedFor ? `for ${scannedFor}` : undefined}
+        />
 
         {!clean &&
           groups.map((g) => (

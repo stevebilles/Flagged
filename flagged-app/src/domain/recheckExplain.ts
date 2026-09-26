@@ -41,6 +41,32 @@ export function formatDayOrToday(ms: number, nowMs: number = Date.now()): string
   return sameDay ? "Today" : formatDate(ms);
 }
 
+/**
+ * The short footer of the flagged rescan's "Why is this flagging now?" card (owner's mockups,
+ * 2026-09-25). The pills above it already SHOW what changed, so this stays to one line — an earlier
+ * version spelled out every filter change with its exact time and was cut as too much text. When the
+ * profile changed, `source` picks the honest wording: "Probably not a reformulation" is only said when
+ * EVERY flag comes from a filter the user added. "Likely"/"probably" on purpose: a scan can't prove a
+ * recipe changed (or that an earlier scan missed nothing).
+ */
+export function flaggedFooter(sameFilters: boolean, source: FlagSource = "product"): string {
+  if (sameFilters) return "Same red flag set — this is likely a product reformulation.";
+  if (source === "profile") return "Red flags triggered by your updated profile. Probably not a product reformulation.";
+  if (source === "mixed") return "Some red flags come from your updated profile; the rest are likely a product reformulation.";
+  return "Your profile was updated, but these flags come from filters you already had — likely a product reformulation.";
+}
+
+/** Where a flagged rescan's flags come from, judged from each match's attribution: all from filters
+ * the user ADDED since the item was last checked ("profile"), none of them ("product" — the flag is
+ * from a filter that was already on), or a mix. Decides which footer is honest when the profile changed. */
+export type FlagSource = "profile" | "product" | "mixed";
+
+export function flagSource(matches: readonly Pick<AttributedMatch, "attribution">[]): FlagSource {
+  const fromProfile = matches.filter((m) => m.attribution.kind === "profile_change").length;
+  if (fromProfile === 0) return "product";
+  return fromProfile === matches.length ? "profile" : "mixed";
+}
+
 export interface ExplainContext {
   /** When the item's filters were recorded — `PantryItem.snapshotAt`. */
   savedAt: number;

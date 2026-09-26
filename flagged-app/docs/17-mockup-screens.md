@@ -31,7 +31,7 @@ is taller than one viewport. Read all numbered variants together as a single scr
 | Recheck Detail | *(no separate screen — mockup only; tapping Recheck on the Pantry goes straight to `app/recheck-capture.tsx`)* | `recheck_detail.png` |
 | Recheck Result — Unchanged | `app/recheck-result.tsx` | `recheck_result_clean_v2.png` — the owner's 2026-09-25 mockup, build from this one. The older `recheck_result_clean.png` is **superseded** — ignore it. |
 | Recheck Result — Changed | `app/recheck-result.tsx` *(see note below)* | `recheck_result_changed.png` → `recheck_result_changed_2.png` |
-| Recheck Result — New Red Flag | `app/recheck-result.tsx` | `recheck_result_red_flag.png` → `recheck_result_red_flag_2.png` — **superseded** (the owner is supplying a new mockup, 2026-09-25); don't build from these. |
+| Recheck Result — New Red Flag | `app/recheck-result.tsx` | `recheck_result_flagged_v3.png` and `recheck_result_flagged_profile_changed_v3.png` — the owner's latest 2026-09-25 mockups: **build the "Why is this flagging now?" card from these** (same profile / profile changed); `recheck_result_flagged_v2.png` is the rest of the screen (the "same profile" case; its header pill is a mockup-only state label, NOT built; the "profile changed" footer is the app's own honest counterpart, see `07`). The older `recheck_result_red_flag.png` → `_2.png` are **superseded** — don't build from them. |
 | Profile Edit | `app/profile-edit.tsx` (`?id=<profileId>`) | `profile_edit.png` → `profile_edit_2.png` → `profile_edit_3.png` → `profile_edit_4.png` |
 | Profile New | `app/profile-edit.tsx` (`?new=1`) | `profile_new.png` → `profile_new_2.png` → `profile_new_3.png` |
 | Save to Pantry | `app/save-to-pantry.tsx` | *(no mockup)* |

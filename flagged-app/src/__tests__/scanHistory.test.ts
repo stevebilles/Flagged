@@ -1,4 +1,28 @@
-import { scanCountLabel, scanEntryLabel } from "../domain/scanHistory";
+import { lastFlaggedTerms, scanCountLabel, scanEntryLabel } from "../domain/scanHistory";
+
+describe("lastFlaggedTerms (what the last scan already found — newest entry first)", () => {
+  it("is the terms of a flagged rescan", () => {
+    const history = [
+      { kind: "rescan", outcome: "flagged", matchedTerms: ["red 40"] },
+      { kind: "saved", outcome: null, matchedTerms: [] },
+    ] as const;
+    expect(lastFlaggedTerms(history)).toEqual(["red 40"]);
+  });
+
+  it("is empty after a clean rescan, after the save, or with no history", () => {
+    expect(lastFlaggedTerms([{ kind: "rescan", outcome: "no_red_flags", matchedTerms: [] }])).toEqual([]);
+    expect(lastFlaggedTerms([{ kind: "saved", outcome: null, matchedTerms: [] }])).toEqual([]);
+    expect(lastFlaggedTerms([])).toEqual([]);
+  });
+
+  it("only looks at the latest scan, not older flagged ones", () => {
+    const history = [
+      { kind: "rescan", outcome: "no_red_flags", matchedTerms: [] },
+      { kind: "rescan", outcome: "flagged", matchedTerms: ["red 40"] },
+    ] as const;
+    expect(lastFlaggedTerms(history)).toEqual([]);
+  });
+});
 
 describe("scanCountLabel (the running total on the item screen)", () => {
   it("is singular for one scan and plural otherwise", () => {

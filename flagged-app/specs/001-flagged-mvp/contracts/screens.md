@@ -34,12 +34,18 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
   it unlocks in place after purchase.
 - State 3 Active: inline live camera + dashed cyan guide box + `Capture` (manual shutter), then
   `Done` / `Scan More` — see `contracts/ocr-pipeline.md`.
+- Language check (all inputs, and `recheck-capture`): if the bulk of the scanned words aren't English
+  (`src/matching/language.ts`), the in-app `LanguageWarning` card ("Check the language") appears
+  before any result, with a single `Scan again` button — no "continue anyway", not a native alert
+  (`docs/06`).
 - On result → set `appStore.lastScan`, navigate to `results`.
 
 ## `results.tsx` (`docs/07`)
-- Clean: cyan `CLEAN` stamp, "No red flags found", "for <profile>" line — no ingredient list, no
+- Both results open with the compact `HeroCard` (small icon in a circle beside the headline; owner,
+  2026-09-25 — no big stamp, no `CLEAN`/`FLAGGED` tag, no digit in a circle).
+- Clean: cyan hero "No red flags found", "for <profile>" line under it — no ingredient list, no
   explanatory sentence — then `Save to Pantry` → `save-to-pantry`.
-- Flagged: red `FLAGGED` stamp with count, "for <profile>" line, and the matched red-flag terms
+- Flagged: red hero "N red flags on your list", "for <profile>" line, and the matched red-flag terms
   grouped by category, each group with its classification badge (no raw OCR paragraph).
 - Secondary: `Scan Another Item` and `Return to Home`. Flagged results can't be saved to the
   Pantry — only clean scans show `Save to Pantry`. In its place a flagged result shows a notice
@@ -90,12 +96,21 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
   that scan. Text only, read-only. Removed with the item when it's permanently deleted.
 
 ## `recheck-result.tsx` (`docs/07` §7.1)
-- **Two** outcomes (`contracts/recheck-diff.md`): `identical` → the owner's clean mockup (header with the product photo and NO `CLEAN` tag, verdict
+- `known_flags` (every flag was already found at the last scan): the clean layout with the headline
+  one bold sentence "No new red flags found for [Profile]'s current profile" (flag icon; not "No red flags found"), then the known flags as
+  cards under "SAME RED FLAGS AS YOUR LAST SCAN", the pill-style profile card, then `Back to Pantry`
+  (primary, on top) and `Remove from Pantry` (plain secondary, not red) (`docs/07` Outcome 1b).
+- Otherwise **two** outcomes (`contracts/recheck-diff.md`): `identical` → the owner's clean mockup (header with the product photo and NO `CLEAN` tag, verdict
   card "No red flags found", PROFILE AT TIME OF EACH SCAN side-by-side filters, `Back to Pantry`;
-  `07`), reset the 30-day timer, `Back to Pantry`; `changed_flagged` → Alert Red screen with a saved/last-kept → this-scan
-  timeline (date and time), each match explained (reformulation, or the specific profile change
-  with its date and time — `recheckExplain.ts`), `Delete Item` (destructive) / `Keep Item`
-  (secondary). Every recheck is added to the item's scan history once on open (`pantry_scan_history`). The old "changed_safe" outcome no longer exists.
+  `07`), reset the 30-day timer, `Back to Pantry`; `changed_flagged` → the owner's flagged mockup: header (back + "Rescan Result" title, then
+  photo + brand/product — no pill; the mockup's `SAME PROFILE` label is mockup-only), compact red hero card (icon beside "New red flag detected — for [Profile]"; the clean result uses the same card in cyan), the "WHY IS THIS FLAGGING
+  NOW?" card (Profile of last scan · date → down arrow → Profile of today's scan, each as filter pills)
+  **directly under the banner** (no scroll to see why), then one card per
+  flagged filter (name + classification badge + ingredient chips); the card's one-line footer (`flaggedFooter`: same filters → "Same red flag set — this is likely a
+  product reformulation."; profile changed → the added filters
+  as cyan "+" pills and a footer chosen by `flagSource` so "probably not a reformulation" is only
+  said when every flag comes from an added filter), `Remove from Pantry`
+  (destructive) / `Keep anyway` (secondary). Every recheck is added to the item's scan history once on open (`pantry_scan_history`). The old "changed_safe" outcome no longer exists.
 - Applies the Keep/Delete repository effects and the recheck stat increments (once, on mount).
 
 ## `profile-edit.tsx` (`docs/05`, `docs/09`)

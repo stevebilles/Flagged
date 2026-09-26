@@ -6,6 +6,57 @@ detail lives in git history and commit messages; this is the narrative summary.
 
 ## 2026-09-25
 
+**Warning when a scan isn't English (found on a device: French side of a label gave 1 flag, not 7)**
+- **What happened:** the same product scanned on its English side gave 7 red flags, on its French side
+  1 (only TBHQ, which is spelled the same). Not a regression — the Metro log showed the camera had read
+  "Ingrédients : Farine de blé…" — but it's a real false-negative risk: the dictionary is English only,
+  so another language's list looks like a normal, nearly-empty result.
+- **Fix (owner chose option 1, not language-specific):** `src/matching/language.ts` —
+  `looksLikeNonEnglish(text)` is true when at least 3 words are clearly another language (foreign
+  function/food words, letters English doesn't use, non-Latin scripts) and they outnumber recognisably
+  English words. The Scan tab and the recheck capture screen show a warning first: "Check the language…
+  please scan the English ingredient list". **First version used the phone's native alert with Scan
+  again / Continue anyway; the owner rejected both** — it looked like an iOS notification rather than
+  part of the app, and "Continue anyway" defeated the point. It is now an in-app card
+  (`src/design/LanguageWarning.tsx`) with a single **Scan again** button and no way past it.
+  Doesn't name a language, so a Portuguese + English label works the same way. Tests use the real English
+  and French text from the log plus Portuguese, Spanish, German, Italian and Cyrillic samples.
+- **Not done (bigger job, only if wanted):** adding French/other-language names to the dictionary so
+  those scans actually match. Until then the warning is the safeguard.
+
+**Scan result screen: compact hero card, and abbreviations shown in capitals**
+- The normal (non-rescan) Results screen still had the old big circular `CLEAN`/`FLAGGED` stamp (with
+  the count inside a circle). It now uses the same compact `HeroCard` as the rescan results — moved to
+  `src/design/HeroCard.tsx` and shared — for both clean ("No red flags found" / "for <profile>") and
+  flagged ("N red flags on your list" / "for <profile>"). The unused `VerdictStamp` was deleted.
+- Everything in the hero card is one style — same size, same bold weight, same color (red or cyan) —
+  on every result screen, clean and flagged, scan and rescan. The "for Steve" line used to be smaller,
+  gray, with only the name bold and in the profile's color; that read as not bold at all next to the
+  headline, and bolding it alone wasn't enough. So the profile color on the scan result's "for
+  <profile>" is gone (`HeroCard`'s second line is a plain string in the headline's own style).
+- "TBHQ" was showing as "Tbhq" (it *is* in the Synthetic preservatives list). Terms were shown with only
+  the first letter capitalized; new `src/domain/displayTerm.ts` shows abbreviations and E-numbers in
+  capitals (TBHQ, BHA, BHT, EDTA, MSG, HFCS, FD&C, E320…) on both result screens. Tests added.
+
+**Rescan logic fix: flags already found at the last scan aren't "new" (`known_flags`)**
+- **Bug (owner found it on a device):** force-rescanning the same product, with no profile change,
+  showed "New red flags detected … likely a product reformulation" — because after **Keep anyway** the
+  filters were re-baselined but *which flags were accepted* wasn't remembered, so any flag counted as new.
+- **Fix:** `evaluateRecheck` now also takes the terms the last scan matched (newest scan-history entry,
+  `lastFlaggedTerms`). If a rescan's flags are all in that list, the outcome is the new `known_flags`;
+  one term the last scan didn't have still gives `changed_flagged` (a real possible reformulation).
+- **Screen:** clean layout, headline as ONE bold sentence, **"No new red flags found for [Profile]'s current profile"**, with a
+  flag icon (an earlier "Nothing new since your last scan" line repeated it, and a half-bold split was
+  rejected too) — not "No
+  red flags found", since the flags are still on the label — plus the known flags listed under "SAME RED
+  FLAGS AS YOUR LAST SCAN", with `Back to Pantry` (filled, on top) above a plain, non-red `Remove from Pantry` (owner
+  asked to keep Remove here) and the flagged screen's pill-style profile card (first version wrongly reused the clean
+  screen's side-by-side bullets). Re-baselines on open, logged with its terms, no
+  red-flag/reformulation counts added. Tests added (engine, helper, stats); docs/07 Outcome 1b.
+- **Wording deviation to confirm with the owner:** the owner's phrasing was "clean recheck"/"clean
+  scan"; the screen says "No new red flags found" instead, because "clean" would read as no
+  red flags found.
+
 **Device check of the 2026-09-24 changes (in progress) — pick up here**
 - **Confirmed on a device:** the clean result (stamp / "No red flags found" / "for <profile>", Save to
   Pantry + Scan Another + Return to Home, disclaimer below the buttons) and the flagged result
@@ -41,6 +92,93 @@ detail lives in git history and commit messages; this is the narrative summary.
   from Pantry** → soft delete, undoable for 24h). Home's profile chips moved to
   `src/design/profileChips.tsx` so the Pantry filter reuses them. Not built from the mockup: item
   Edit, scan-history timeline, ingredient list (the app stores no ingredient text).
+
+**Scan History two-column list: content-sized columns (no needless wrapping)**
+- The first two-column version used equal halves, so "Synthetic preservatives" wrapped on a phone even
+  though the other column had spare room. Columns are now sized to their content (each takes what its
+  longest item needs and only shrinks — wrapping — when both together don't fit). Trade-off: the right
+  column's start varies slightly between cards. Couldn't measure on a device from here; from the
+  screenshot the two columns should fit on one line each with ~20pt to spare on this phone.
+
+**Scan History: red flags in a real two-column list**
+- The list of red flags under "SCANNED FOR" was a wrapping row, so short items sat wherever they
+  fitted ("Trans fats" beside the second item) and a long list would have been very tall. Now a true
+  two-column list: the first half down the left column, the rest continuing at the top of the right,
+  with wrapped names hanging under their text. (`TwoColumnList` in `app/scan-history.tsx`.)
+
+**Compact hero card on both rescan results**
+- The big centered hero (80px icon, headline, sub-line stacked) took about a third of the screen. New
+  shared `HeroCard` from the owner's mockup (`recheck_result_compact_hero_v4.png`; only the hero was
+  changed in it): a 48px icon in a circle on the left with the headline and "for [name]" beside it.
+  Used by the flagged result (red, flag, "New red flag(s) detected — for Steve") and the clean result
+  (cyan, checkmark, "No red flags found" / "No new red flags found for Steve's current profile.").
+  Everything below now starts higher.
+
+**Flagged rescan: parallel labels in the "Why is this flagging now?" card**
+- After seeing it on a device: "Last checked · Sep 25" vs "Today's scan · profile updated" didn't line
+  up. Now **"Profile of last scan · [date]"** and **"Profile of today's scan"** (both white); cyan is
+  used only for the filters added since the last scan (the "+" pills). The "When first saved" /
+  "Last checked" switch is gone — the last scan is the last scan, whether it was the save or a rescan.
+
+**Flagged rescan: the "profile changed" version of the card**
+- From the owner's mockup of the case that actually happens (`recheck_result_flagged_profile_changed_v3.png`):
+  when the profile changed, today's label turns cyan — "Today's scan · profile updated" — and the
+  filters added since the last check are highlighted (cyan pill, "+ Seed Oils", "+ Preservatives")
+  next to the unchanged neutral ones. The "View scan history" link I'd added was removed (not in the
+  mockup). The mockup's `PROFILE CHANGED` header pill is a mockup-only state label — not built.
+- **Footer kept honest:** the mockup's "Red flags triggered by your updated profile. Probably not a
+  product reformulation." is only true if EVERY flag comes from an added filter, so `flagSource`
+  (from each match's attribution, tested) picks the wording: all from added filters → the mockup's
+  line; a mix → "Some red flags come from your updated profile; the rest are likely a product
+  reformulation."; none → "Your profile was updated, but these flags come from filters you already
+  had — likely a product reformulation." Tests: 192.
+
+**Flagged rescan: "Why is this flagging now?" card (replaces the clunky two-column section)**
+- Rebuilt from the owner's new mockup (`recheck_result_flagged_v3.png`): a card titled **WHY IS THIS
+  FLAGGING NOW?** — "When first saved · [date]" (or "Last checked · [date]" after a recheck) with that
+  scan's red flags as pills, a divider with a down arrow, "Today's scan" with today's red flags as
+  pills, then the one-line footer ("Same red flag set — this is likely a product reformulation." /
+  "Your filters changed since you last checked this." + the View scan history link). The clean
+  result keeps its two-column "Profile at time of each scan" card.
+
+**Flagged rescan: the long "what changed and when" text is gone**
+- The side-by-side's footer had grown into a paragraph naming every filter change with its exact time
+  ("Hidden sugars added on Sep 25, 2026 at 6:26 PM; Synthetic preservatives added on … That's likely
+  why it's flagging now."). Cut as too much text: the side-by-side already shows what changed. Now
+  one short line — "Your filters changed since you last checked this." — with a **View scan
+  history →** link (opens the item's Scan History). Same-filters footer unchanged.
+- Trade-off, by the owner's choice: the exact times a filter was added are no longer spelled out on
+  this screen. They're still recorded (`profile_change_log`); the scan history lists what each scan
+  was checked against. The per-match attribution logic (reformulation / added / re-included) still
+  runs and is tested, but the screen no longer uses it — the change-time lookups it needed
+  (`findCategoryEnabledChange` etc.) are now unused. Tests: 189.
+
+**Flagged rescan: the side-by-side moves up under the banner**
+- The "Profile at time of each scan" card now sits directly under "New red flags detected — for
+  Steve", above the per-filter cards, so the reason for the flag (what the profile was scanning for
+  then vs. now, and what changed) is visible without scrolling. Order: header → banner → side-by-side
+  → flagged filters → Remove / Keep anyway.
+
+**Rescan result screens get a title ("Rescan Result")**
+- After seeing the flagged screen on a device: the header jumped straight to the product with nothing
+  saying what the screen was, unlike every other screen (Pantry Item, Scan History, Result). Both
+  rescan results (clean and flagged) now have the back arrow with the title **"Rescan Result"**, and
+  the product photo · brand/product on a row below.
+
+**Flagged rescan screen rebuilt to the owner's mockup**
+- Same idea as the clean screen: header (back · photo · brand/product — no pill), a red banner ("New red flag detected — for Steve"), one card per flagged
+  filter (name + classification badge + ingredient chips — replacing the paragraph repeated for every
+  ingredient), the shared **Profile at time of each scan** side-by-side, and **Remove from Pantry** /
+  **Keep anyway**. Header and side-by-side card are now shared with the clean screen.
+- Footer of the side-by-side (`flaggedFooter`, tested): same filters → "Same red flag filter set —
+  this is likely a product reformulation, not a profile change." Filters changed → it says what
+  changed and the exact time ("Preservatives added on Oct 20, 2026, 3:12 PM … likely why it's
+  flagging now"), so that explanation survives dropping the per-flag paragraphs. The mockup drew only
+  the same-filters case; the changed case is the app's own honest counterpart.
+- Mockup saved as `docs/screenshots/recheck_result_flagged_v2.png`; older flagged mockups marked
+  superseded. I first built the mockup's header pill ("SAME PROFILE" / "PROFILE CHANGED"); the owner
+  clarified it's a mockup-only label for switching states, so it was removed. Lesson: pills/labels in
+  the owner's mockups can be state switchers — ask before building one. Tests: 192.
 
 **"CLEAN" pill removed from the clean rescan screen**
 - The header's `CLEAN` tag came from the owner's mockup, but a status tag can be taken literally and

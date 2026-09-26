@@ -1,4 +1,4 @@
-import { explainMatch, formatDateTime, formatDayOrToday } from "../domain/recheckExplain";
+import { explainMatch, flaggedFooter, flagSource, formatDateTime, formatDayOrToday } from "../domain/recheckExplain";
 import type { AttributedMatch } from "../domain/recheckEngine";
 
 // The explanation a user reads when a rescan flags something (docs/07 §7.1): it must say WHEN they
@@ -13,6 +13,43 @@ const category = (attribution: AttributedMatch["attribution"]): AttributedMatch 
   categoryId: "cat-preservatives",
   categoryName: "Preservatives",
   attribution,
+});
+
+describe("flaggedFooter (the 'Why is this flagging now?' card's one-line footer)", () => {
+  it("same filters: says the flag is likely a product reformulation (the owner's mockup wording)", () => {
+    expect(flaggedFooter(true)).toBe("Same red flag set — this is likely a product reformulation.");
+  });
+
+  it("changed filters, every flag from an added filter: the owner's mockup wording", () => {
+    expect(flaggedFooter(false, "profile")).toBe(
+      "Red flags triggered by your updated profile. Probably not a product reformulation."
+    );
+  });
+
+  it("changed filters, but SOME flags are from filters already on: doesn't claim 'not a reformulation'", () => {
+    const text = flaggedFooter(false, "mixed");
+    expect(text).toContain("Some red flags come from your updated profile");
+    expect(text).toContain("likely a product reformulation");
+    expect(text).not.toContain("Probably not");
+  });
+
+  it("changed filters, but the flags are all from filters already on: likely a reformulation", () => {
+    const text = flaggedFooter(false, "product");
+    expect(text).toContain("filters you already had");
+    expect(text).toContain("likely a product reformulation");
+    expect(text).not.toContain("Probably not");
+  });
+});
+
+describe("flagSource (where a flagged rescan's flags come from)", () => {
+  const profileChange = { attribution: { kind: "profile_change" as const, cause: "category_added" as const } };
+  const reformulation = { attribution: { kind: "reformulation" as const } };
+
+  it("all from added filters → profile; none → product; a mix → mixed", () => {
+    expect(flagSource([profileChange, profileChange])).toBe("profile");
+    expect(flagSource([reformulation, reformulation])).toBe("product");
+    expect(flagSource([profileChange, reformulation])).toBe("mixed");
+  });
 });
 
 describe("formatDayOrToday (the clean recheck screen's compact date fields)", () => {

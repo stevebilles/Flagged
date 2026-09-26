@@ -182,6 +182,15 @@ describe("commitRecheckStats (docs/07 §7.1, redesigned 2026-09-14 — profile-s
     expect(p.totalRedFlagsCaught).toBe(0);
   });
 
+  it("known_flags (nothing new): +1 label only — no red flags or reformulations added again", () => {
+    const outcome: RecheckOutcome = { kind: "known_flags", matches: [attributedMatch({ kind: "reformulation" })] };
+    commitRecheckStats(outcome, emptyProfile);
+    const p = lastUpdatedProfile();
+    expect(p.totalLabelsRead).toBe(1);
+    expect(p.totalRedFlagsCaught).toBe(0);
+    expect(p.totalReformulationsCaught).toBe(0);
+  });
+
   it("changed_flagged with a reformulation-attributed match: +1 reformulations, red flags added", () => {
     const outcome: RecheckOutcome = { kind: "changed_flagged", matches: [attributedMatch({ kind: "reformulation" })] };
     commitRecheckStats(outcome, emptyProfile);
