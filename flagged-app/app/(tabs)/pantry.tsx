@@ -275,7 +275,7 @@ function RecheckRow({
             alignSelf: "center",
             marginLeft: t.spacing.md,
           }}
-          resizeMode="cover"
+          resizeMode="contain"
           onError={() => setImageFailed(true)}
         />
       )}
@@ -322,7 +322,7 @@ function ItemCard({
             <Image
               source={{ uri: item.imageFilePath }}
               style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
+              resizeMode="contain"
               onError={() => setImageFailed(true)}
             />
           ) : (

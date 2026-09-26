@@ -72,6 +72,42 @@ paragraph and the breakdown card in `07`.
   Skip camera/stitching. Still subject to the same validation rules.
 - **`[ Choose Photo ]`:** run on-device OCR on the still image → **Step 2** → **Step 3**.
 
+## Off-column text is dropped from a camera capture (owner, 2026-09-25)
+A rescan of a bread-crumb tin flagged **Fish** as a new red flag. The ingredient list has no fish: the
+camera frame also caught a recipe printed down the tin's right side ("Dip fish, chicken…"), and nothing
+checked *where* text was, so it was matched like the ingredients. The Metro log's block geometry showed
+it plainly — ingredient lines at x ≈ 240–1450, the recipe strip at x ≈ 1440–1740, a separate column.
+- **Rule** (`splitOffColumnBlocks`, `src/ocr/recognition.ts`) — **position only; nothing may depend on a
+  label having French (or any second language) on it** (owner, 2026-09-25: most users, e.g. in the US,
+  never see French; the French on this tin is just what the capture happened to contain): the long
+  lines (≥ 60% of the widest block) define the main column; a block with less than half its width inside that column is dropped.
+  Applied to guide-box **camera** captures only (`dropOffColumnText`), not Choose Photo (a whole,
+  uncropped label). Cautious by design: with fewer than 3 long lines it drops nothing; multi-column
+  ingredient lists are safe (each column's lines are long, so the span covers both).
+- **Tested on the real capture's positions** (`recognition.test.ts`): the 13 side-strip blocks are
+  dropped; the ingredient list, "Contains" line, French repeat and nutrition % values are kept.
+- **Text up high, above the list is dropped too** (`splitAboveListBlocks`, same file; owner: "if the OCR
+  has identified the ingredient list, everything up high in the corners that isn't in the general
+  vicinity should be ignored"). The anchor is the topmost block whose first word looks like
+  "ingredient(s)" (fuzzy, colon not required); only if there is none, the topmost block starting with
+  "contains" ("ingredient(s)" preferred so a trailing "Contains:" allergen line can't cut the list
+  above it). A block whose bottom is more than one header-height above the header's top is dropped, so
+  a footnote directly above stays, but a nutrition panel in the corner ("Sodium 210mg", "9%") goes —
+  and so would "Dip fish," on the real capture, on its own. No anchor found → nothing dropped. Nothing
+  here changes matching or the extraction rules (`extractIngredientList`), and nothing may rely on a
+  "Contains" line at the end or a French header.
+- **Not covered:** text *below* the list (e.g. a distributor line); nothing needed yet.
+- **Decided against (owner, 2026-09-25): finding the list's edges from image colors** (white label →
+  black tin, white space). It would need new native pixel-reading code and a new build, and breaks on
+  glossy/curved packaging, glare and colored backgrounds. Any further edge-finding uses the OCR's own
+  block positions instead (e.g. growing from the guide box's top-left corner, stopping at a bigger
+  vertical gap or a shift in the left edge). Don't re-propose color detection.
+- **Two-photo scans:** the "above the header" rule is first-photo-only and drops only short blocks, so a
+  "Scan More" continuation can't be cut (see `splitAboveListBlocks`); stitching stays text-only.
+- **Dev log:** each camera capture also prints `OFF-COLUMN TEXT DROPPED` with what was removed and
+  where; the scan log now prints the full text (was cut at 600 characters) and, for every red flag, the
+  exact word that matched and its surroundings (`describeMatches`, `src/domain/scanDebug.ts`).
+
 ## Language check — warn when the scan isn't English (owner, 2026-09-25)
 The dictionary only has English ingredient names. A real test on a bilingual label: the English side
 gave 7 red flags, the French side gave 1 (TBHQ is spelled the same) — and nothing on screen said the

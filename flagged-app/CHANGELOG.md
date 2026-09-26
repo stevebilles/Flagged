@@ -6,6 +6,108 @@ detail lives in git history and commit messages; this is the narrative summary.
 
 ## 2026-09-25
 
+**WHERE WE LEFT OFF (end of 2026-09-25) — pick up here tomorrow**
+
+*Built today, all committed (see the sections below for detail):* My Pantry rebuild + Scan History +
+timestamps; rescan results (clean / "nothing new" / new red flags) rebuilt to the owner's mockups with
+the compact `HeroCard` everywhere and the pill-style profile card; the "nothing new" (`known_flags`)
+logic fix; "What we checked for" card on the clean scan result; acronyms shown in capitals (TBHQ);
+non-English scan warning (in-app card, one "Scan again" button); product photos shown whole (never
+cropped); off-column + above-the-header text dropped from camera captures (the false "Fish" flag).
+
+*Needs a check on the phone (built and tested in code, not yet seen working):*
+1. **Rescan the bread-crumb tin** — Fish should no longer flag; the Metro log prints
+   `OFF-COLUMN TEXT DROPPED` (what was removed and where), the full scan text, and each flag's exact
+   matching word with context.
+2. **A two-photo scan ("Scan More")** — a list too wide for one photo; confirm nothing is cut off between
+   the photos (the above-header rule is first-photo-only by design).
+3. Pantry: Save to Pantry fields above the keyboard; the red dot on the Pantry tab; the 24-hour undo
+   actually expiring; the 20-minute temp-photo cleanup. Also the whole-photo display, the clean rescan
+   screen (one-sentence hero, pill-style card, "same red flag profile…" footer).
+
+*Plans / open decisions, in the order I'd take them:*
+1. **Top-line cue on the guide box** (awaiting the owner's go + wording): bold top and left edge with a
+   short label ("Line up just above the first ingredient"), ignore everything above it, warn if the
+   first line of the list looks cut off. Then, only if needed, grow the list's right/bottom edge from
+   that top-left corner using **OCR block positions** (stop at a bigger vertical gap or a shift in the
+   left edge) — collect more real captures first (curved can/bottle, other packaging, a two-photo list).
+   **Colour-based edge detection was ruled out.**
+2. Start-anchor rule for a list, if a trim is ever built: "ingredient(s)" first, "contains" only when no
+   ingredient header exists; must not depend on a trailing "Contains" line or on French. The owner does
+   NOT want the scan/matching/extraction rules rewritten — position-only additions.
+3. Pantry photos in iCloud backups: needs the small Expo config plugin (T110) + a new EAS build.
+4. Undecided: item Edit (rename brand/product) on the Pantry item screen — not built.
+5. Not planned: French/other-language names in the dictionary (the warning is the safeguard).
+6. Older open items: fresh sandbox tester for the trial-eligible paywall, app icon + splash, Terms/Privacy
+   pages, EAS production build, onboarding redesign, the 2026-09-24 device checks (Onboarding name step,
+   Profile edit search results, launch on a poor connection).
+
+*Standing rules to keep following (all in `CLAUDE.md`):* follow the owner's mockups but ask before building
+mockup-only labels; no invisible features; never "safe/approved/cleared" wording; no status pills on result
+screens; never a digit in a circle; theme text sizes only; timestamp everything; store no OCR text; commit
+only when asked.
+
+**Two-photo scans protected; colour-based edge detection ruled out**
+- `splitAboveListBlocks` now (1) drops only SHORT blocks (nutrition rows, corner text), never long list
+  lines, and (2) is applied to the first photo of a scan only (`CameraScanner`), because stitching is
+  text-only and photo positions can't be compared — a "Scan More" continuation with a later header in
+  frame is never cut. Tested with a simulated second photo.
+- Owner decided **not** to detect the list's edges from image colours (needs native pixel code, fragile
+  on glossy/curved packs). If edge-finding is extended it will use OCR block positions, optionally
+  anchored on the guide box's top-left (not built; the "top line" cue idea is awaiting the owner's go).
+
+**False "Fish" flag: text from a side panel of the tin was scanned — off-column text is now dropped**
+- A rescan of a bread-crumb tin flagged Fish as a new red flag; the ingredient list has none. The
+  camera frame also caught a recipe printed down the tin's side ("Dip fish, chicken…"). Confirmed from
+  the dev log's block positions: ingredient lines x ≈ 240–1450, the recipe strip x ≈ 1440–1740. The OCR
+  gives every block's position but the app only used it for reading order, so the strip was matched
+  like the ingredients (the owner pointed out position should have been a giveaway — it was).
+- **Fix:** `splitOffColumnBlocks` (`src/ocr/recognition.ts`) drops text outside the main column of the
+  long lines, for camera captures only. Tested with that capture's real positions. **Also**
+  `splitAboveListBlocks`: once the ingredient header is found ("ingredient(s)" first, "contains" only if
+  none), text well above it (the nutrition panel, corner text — "Dip fish," alone would have been caught)
+  is dropped. Owner's constraints: position-only, no rewrite of the scan/extraction rules, nothing that
+  relies on a "Contains" line at the end or on French. Dev log now shows the full scan text, each flag's exact
+  matching word with context, and what was dropped. Needs a device re-test: rescan the tin.
+
+**Clean rescan footer no longer says "no NEW red flags"**
+- "Same filter set — no new red flags detected." implied red flags had existed. The clean rescan's
+  profile-card footer is now `cleanRescanFooter`: "Same red flag profile as your last scan — no red
+  flags were found either time." (or "…this time, no red flags were found." when the previous scan
+  DID have flags; or "Your red flag profile has changed…" when the filters changed). The "nothing new"
+  screen keeps "no new" because flags were found there. Tests added; the previous scan is read once on
+  first render (before this scan is logged).
+
+**Clean rescan screen brought in line (repeated hero sentence + old side-by-side card)**
+- The clean rescan still showed "No red flags found" over "No new red flags found for Steve's current
+  profile." (two lines saying the same thing — fixed earlier only for the "nothing new" screen) and the
+  old side-by-side bullet columns. I had left it because the clean mockup showed them, and said so, but
+  the owner expected them gone everywhere. Now the clean rescan and "nothing new" share one hero
+  sentence and the pill-style "Profile at time of each scan" card; the old `ProfileAtScanCard` /
+  `FilterColumn` are deleted so it can't reappear.
+
+**Product photos are shown whole, never cropped**
+- A tall Cheez-It shot lost the top of its brand name on the item screen. The saved photo was never
+  cropped (the camera call has no crop step and it's stored at 600px wide, full frame) — the crop was
+  only in how it was DISPLAYED: every screen fit it into a square with `resizeMode="cover"`, which trims
+  the top and bottom of a tall photo. All of them now use `contain` (whole photo, leftover space is the
+  card's own color) and the big ones got taller boxes: Pantry item 300, Save to Pantry preview 260 (so
+  the user sees it's all in frame before saving), Scan History 200, recheck capture 180; thumbnails
+  (Pantry tiles and recheck rows, `ProductPhoto`) fit the whole photo in their box. Photos already
+  saved are fixed too — nothing to redo.
+- Not built: a crop/reposition step at capture time (iOS' built-in editor forces a fixed crop). Ask if
+  wanted.
+
+**Clean scan result: "What we checked for" card**
+- With the compact hero the clean result was top-heavy with an empty lower half. Added the owner's
+  mockup section under the hero: `WHAT WE CHECKED FOR` — the scanned profile(s)' switched-on red flags
+  as pills, and "None of these red flags were found in the ingredient list that was scanned." (new pure
+  `checkedForLines` in `src/domain/filterSet.ts`, tested; `FilterPill` moved to `src/design/`).
+- **Deliberate deviations from the mockup (owner to confirm):** no ✓ on the pills (reads as "verified
+  free of it" — legal wording rule); footer says "red flags" rather than "filter packs" (Quick Packs
+  were removed from the app); "TRY FLAGGED" is a mockup-only label, not built; disclaimer kept at the
+  bottom per the standing rule. With nothing switched on the card says so rather than disappearing.
+
 **Warning when a scan isn't English (found on a device: French side of a label gave 1 flag, not 7)**
 - **What happened:** the same product scanned on its English side gave 7 red flags, on its French side
   1 (only TBHQ, which is spelled the same). Not a regression — the Metro log showed the camera had read
@@ -57,7 +159,7 @@ detail lives in git history and commit messages; this is the narrative summary.
   scan"; the screen says "No new red flags found" instead, because "clean" would read as no
   red flags found.
 
-**Device check of the 2026-09-24 changes (in progress) — pick up here**
+**Device check of the 2026-09-24 changes (partly done — the remaining items are in "Where we left off" above)**
 - **Confirmed on a device:** the clean result (stamp / "No red flags found" / "for <profile>", Save to
   Pantry + Scan Another + Return to Home, disclaimer below the buttons) and the flagged result
   (disclaimer below the buttons). Still to check from the 2026-09-24 list below: (2) Save to Pantry

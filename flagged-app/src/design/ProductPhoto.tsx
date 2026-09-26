@@ -15,7 +15,7 @@ export function ProductPhoto({ uri, size }: { uri: string | null | undefined; si
     <Image
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: size <= 64 ? t.radius.sm : t.radius.md }}
-      resizeMode="cover"
+      resizeMode="contain"
       onError={() => setFailed(true)}
     />
   );

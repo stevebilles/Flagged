@@ -43,7 +43,9 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
 ## `results.tsx` (`docs/07`)
 - Both results open with the compact `HeroCard` (small icon in a circle beside the headline; owner,
   2026-09-25 — no big stamp, no `CLEAN`/`FLAGGED` tag, no digit in a circle).
-- Clean: cyan hero "No red flags found", "for <profile>" line under it — no ingredient list, no
+- Clean: cyan hero "No red flags found", "for <profile>" line under it, then a `WHAT WE CHECKED FOR`
+  card (the scanned profile(s)' switched-on red flags as plain pills — no checkmarks — plus "None of
+  these red flags were found in the ingredient list that was scanned."; `docs/07`) — no ingredient list, no
   explanatory sentence — then `Save to Pantry` → `save-to-pantry`.
 - Flagged: red hero "N red flags on your list", "for <profile>" line, and the matched red-flag terms
   grouped by category, each group with its classification badge (no raw OCR paragraph).
@@ -101,7 +103,7 @@ profile) · **4. Name** (first-name field, "why we ask" copy, Continue/Skip) · 
   cards under "SAME RED FLAGS AS YOUR LAST SCAN", the pill-style profile card, then `Back to Pantry`
   (primary, on top) and `Remove from Pantry` (plain secondary, not red) (`docs/07` Outcome 1b).
 - Otherwise **two** outcomes (`contracts/recheck-diff.md`): `identical` → the owner's clean mockup (header with the product photo and NO `CLEAN` tag, verdict
-  card "No red flags found", PROFILE AT TIME OF EACH SCAN side-by-side filters, `Back to Pantry`;
+  card as one bold sentence "No new red flags found for [Profile]'s current profile", PROFILE AT TIME OF EACH SCAN as the pill-style card (not side-by-side columns), `Back to Pantry`;
   `07`), reset the 30-day timer, `Back to Pantry`; `changed_flagged` → the owner's flagged mockup: header (back + "Rescan Result" title, then
   photo + brand/product — no pill; the mockup's `SAME PROFILE` label is mockup-only), compact red hero card (icon beside "New red flag detected — for [Profile]"; the clean result uses the same card in cyan), the "WHY IS THIS FLAGGING
   NOW?" card (Profile of last scan · date → down arrow → Profile of today's scan, each as filter pills)

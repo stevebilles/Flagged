@@ -12,7 +12,7 @@ import { evaluateScan, evaluateScanForAll } from "../../src/domain/scanService";
 import { extractIngredientList } from "../../src/matching/normalize";
 import { looksLikeNonEnglish } from "../../src/matching/language";
 import { LanguageWarning } from "../../src/design/LanguageWarning";
-import { logScanDebug } from "../../src/domain/scanDebug";
+import { logScanDebug, describeMatches } from "../../src/domain/scanDebug";
 import { recognizeText } from "vision-ocr";
 import { useCameraCapture } from "../../src/ocr/CameraScanner";
 import { PaywallView } from "../../src/purchases/PaywallView";
@@ -143,10 +143,7 @@ export default function Scan() {
       paragraph,
       evaln.result.isClean
         ? "CLEAN"
-        : `FLAGGED (${evaln.result.matches.length}) — ` +
-            evaln.result.matches
-              .map((mm) => mm.term + (mm.categoryName ? ` [${mm.categoryName}]` : ""))
-              .join(", ")
+        : `FLAGGED (${evaln.result.matches.length})` + describeMatches(paragraph, evaln.result.matches)
     );
     setLastScan({ paragraph, matches: evaln.result.matches, isClean: evaln.result.isClean, scannedFor, profileIds });
     router.push("/results");

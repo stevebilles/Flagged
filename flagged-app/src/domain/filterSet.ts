@@ -22,6 +22,31 @@ export function sameFilterSet(a: ProfileSnapshot, b: ProfileSnapshot): boolean {
   );
 }
 
+/**
+ * What a scan checked for — the "What we checked for" card on the scan result (owner's mockup,
+ * 2026-09-25). One snapshot for a single-profile scan; several when the scan was run for "all" profiles
+ * (everyone's red flags are checked in one pass), in which case it's the union: each category switched
+ * on for any of them (dictionary order), then each distinct custom red flag. The "N ingredients turned
+ * off" line is only given for a single profile — with several, an ingredient one profile turned off may
+ * still have been checked for another, so a count would mislead. Empty when nothing was switched on
+ * (unlike `filterSetLines`, which returns a placeholder line) so the screen can say so in its own words.
+ */
+export function checkedForLines(snapshots: ProfileSnapshot[], categories: Category[]): string[] {
+  const active = new Set(snapshots.flatMap((s) => s.activeCategoryIds));
+  const lines = categories.filter((c) => active.has(c.id)).map((c) => c.name);
+  const seen = new Set<string>();
+  for (const term of snapshots.flatMap((s) => s.customIngredients)) {
+    if (seen.has(term.toLowerCase())) continue;
+    seen.add(term.toLowerCase());
+    lines.push(`Custom: ${term}`);
+  }
+  if (snapshots.length === 1) {
+    const off = new Set(snapshots[0].excludedIngredientIds).size;
+    if (off > 0 && lines.length > 0) lines.push(`${off} ingredient${off === 1 ? "" : "s"} turned off`);
+  }
+  return lines;
+}
+
 /** The lines shown under "SCANNING FOR": each active category's name (dictionary order), then each
  * custom red flag, then — only when there are any — how many individual ingredients were turned off
  * (so two sets that differ only in exclusions don't look identical). Never empty. */

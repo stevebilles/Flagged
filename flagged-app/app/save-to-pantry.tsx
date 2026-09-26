@@ -102,8 +102,10 @@ export default function SaveToPantry() {
           {photoUri ? (
             <Image
               source={{ uri: photoUri }}
-              style={{ width: 140, height: 140, borderRadius: t.radius.md }}
-              resizeMode="cover"
+              // The whole shot, so the user can see it's all in frame (brand and product name
+              // included) before saving — retake it if not. Never cropped (owner, 2026-09-25).
+              style={{ width: "100%", height: 260, borderRadius: t.radius.md }}
+              resizeMode="contain"
             />
           ) : (
             <Ionicons name="camera-outline" size={64} color={t.colors.textMuted} />

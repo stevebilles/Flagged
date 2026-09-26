@@ -14,7 +14,10 @@ import {
 } from "../src/design/components";
 import { useTheme } from "../src/design/ThemeProvider";
 import { useAppStore } from "../src/state/appStore";
-import { getProfile } from "../src/db/repositories";
+import { getProfile, getCategories } from "../src/db/repositories";
+import { snapshotFromProfile } from "../src/domain/activation";
+import { checkedForLines } from "../src/domain/filterSet";
+import { FilterPill } from "../src/design/FilterPill";
 import { commitScanStats, commitScanStatsForAll } from "../src/domain/scanService";
 import { onScanCompleted } from "../src/review/reviewTriggers";
 import type { Match } from "../src/matching/matcher";
@@ -45,6 +48,17 @@ export default function Results() {
   // not re-derived from the current active profile, which may have changed
   // since this scan ran.
   const scannedFor = lastScan?.scannedFor ?? "";
+
+  // What this scan checked for (the clean result's "What we checked for" card): the red flags the
+  // scanned profile(s) had switched on. Derived from the profile(s) as they are now — the same ones the
+  // scan just ran against.
+  const checkedFor = useMemo(() => {
+    const snapshots = (lastScan?.profileIds ?? [])
+      .map(getProfile)
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map(snapshotFromProfile);
+    return checkedForLines(snapshots, getCategories());
+  }, [lastScan]);
 
   useEffect(() => {
     if (!lastScan) return;
@@ -130,6 +144,37 @@ export default function Results() {
           }
           subtitle={scannedFor ? `for ${scannedFor}` : undefined}
         />
+
+        {/* "What we checked for" (owner's mockup, 2026-09-25): context for a clean result — which red
+            flags were actually looked for. Plain pills, no checkmarks: a check beside "Big-9 Allergens"
+            would read as "verified free of allergens", which a scan can't promise. Always shown on a
+            clean result (no invisible sections): with nothing switched on it says so. */}
+        {clean && (
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <View style={{ padding: t.spacing.md }}>
+              <Text variant="caption" bold tone="muted" style={{ letterSpacing: 1 }}>WHAT WE CHECKED FOR</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: t.colors.canvas }} />
+            <View style={{ padding: t.spacing.md, gap: t.spacing.md }}>
+              {checkedFor.length > 0 ? (
+                <>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+                    {checkedFor.map((line, i) => (
+                      <FilterPill key={i} label={line} />
+                    ))}
+                  </View>
+                  <Text tone="muted" variant="subheadline">
+                    None of these red flags were found in the ingredient list that was scanned.
+                  </Text>
+                </>
+              ) : (
+                <Text tone="muted" variant="subheadline">
+                  No red flags were switched on, so nothing was checked for. Turn some on from Home.
+                </Text>
+              )}
+            </View>
+          </Card>
+        )}
 
         {!clean &&
           groups.map((g) => (

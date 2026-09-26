@@ -1,4 +1,5 @@
 import type { RecognizedBlock } from "./stitch";
+import { similarity } from "../matching/levenshtein";
 import type { VisionOcrResult } from "vision-ocr";
 
 /**
@@ -182,6 +183,100 @@ function isEdgeClipped(block: SpatialBlock, imageHeight: number): boolean {
 }
 
 /**
+ * Text that sits in a different COLUMN from the ingredient paragraph — a recipe printed down the side of
+ * a tin, a second panel — isn't part of the ingredient list and must not be matched (owner, 2026-09-25).
+ * Real capture that caused this: a bread-crumb tin whose right-hand strip read "Dip fish, …"; it sat at
+ * x ≈ 1440–1740 while every ingredient line ran x ≈ 240–1450, and "fish" was flagged as a NEW red flag.
+ * Nothing checked position, so it was matched like everything else.
+ *
+ * How: the "body" lines are the long ones (≥ 60% of the widest block's width) — the ingredient
+ * paragraph, any repeat of it in another language, footnotes. (Position only — nothing here depends on a
+ * label having French, or any second language, on it.) Their combined left–right span is the main column. A block
+ * with less than half of its own width inside that span is off to the side and is dropped. Deliberately
+ * cautious, so it does nothing rather than guess: with fewer than 3 body lines (a tiny capture, or one
+ * huge block skewing the widths) every block is kept. Multi-column ingredient lists are safe — each
+ * column's lines are "long" too, so the span covers them all. Horizontal only; text above/below the
+ * paragraph is a separate problem.
+ */
+const BODY_LINE_MIN_WIDTH_FRACTION = 0.6;
+const MIN_BODY_LINES = 3;
+const MIN_INSIDE_COLUMN_FRACTION = 0.5;
+
+export function splitOffColumnBlocks<T extends SpatialBlock>(blocks: T[]): { kept: T[]; dropped: T[] } {
+  if (blocks.length === 0) return { kept: blocks, dropped: [] };
+  const widest = Math.max(...blocks.map((b) => b.width));
+  const body = blocks.filter((b) => b.width >= widest * BODY_LINE_MIN_WIDTH_FRACTION);
+  if (body.length < MIN_BODY_LINES) return { kept: blocks, dropped: [] };
+  const left = Math.min(...body.map((b) => b.x));
+  const right = Math.max(...body.map((b) => b.x + b.width));
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const b of blocks) {
+    const inside = Math.min(b.x + b.width, right) - Math.max(b.x, left);
+    (b.width > 0 && inside / b.width < MIN_INSIDE_COLUMN_FRACTION ? dropped : kept).push(b);
+  }
+  return { kept, dropped };
+}
+
+/**
+ * Text up high, above the ingredient list, isn't part of it (owner, 2026-09-25): once the OCR has found
+ * the list's header, anything sitting well above it — a nutrition panel in the corner, a headline — is
+ * dropped. The real tin capture had "Sodium 210mg", "Potassium 60mg", "9%" … well above the header and
+ * they ended up inside the scanned ingredient text.
+ *
+ * The anchor is the TOPMOST block whose first word looks like "ingredient(s)" (fuzzy, colon not
+ * required — OCR garbles it); only if there is none, the topmost block starting with "contains" — the
+ * owner's rule: a list starts with "ingredient", "ingredients" or "contains", and "ingredient(s)" is
+ * preferred because a trailing "Contains:" allergen line would otherwise cut off the list above it. A
+ * block is "well above" when the gap between its bottom and the header's top is bigger than the
+ * header's own height, so lines directly above (a footnote) stay. Position only, and cautious: no
+ * anchor found → nothing is dropped. It never touches matching or the extraction rules.
+ */
+const HEADER_WORD_MIN_SIMILARITY = 0.7;
+
+function firstWord(text: string): string {
+  return (text.trim().split(/[\s:;]+/)[0] ?? "").toLowerCase().replace(/[^a-zà-ÿ]/g, "");
+}
+
+function findListAnchor<T extends SpatialBlock>(blocks: T[]): T | null {
+  const topmost = (matches: T[]) => matches.reduce<T | null>((top, b) => (top === null || b.y < top.y ? b : top), null);
+  const isHeader = (b: T, word: string) => {
+    const w = firstWord(b.text);
+    return w.length >= 6 && similarity(w, word) >= HEADER_WORD_MIN_SIMILARITY;
+  };
+  return (
+    topmost(blocks.filter((b) => isHeader(b, "ingredients") || isHeader(b, "ingredient"))) ??
+    topmost(blocks.filter((b) => isHeader(b, "contains")))
+  );
+}
+
+/**
+ * Two safeguards so this can never eat part of the list itself (owner, 2026-09-25):
+ *  1. Only SHORT blocks are dropped (under 60% of the widest block's width). Nutrition rows, "9%",
+ *     corner text are short; the ingredient paragraph's lines are long. So if the anchor turns out to
+ *     be a header BELOW some of the list (a second-language header, or the header of a capture that
+ *     starts mid-list), the list lines above it — long — are kept.
+ *  2. The caller applies it to the FIRST photo of a scan only. A second photo ("Scan More", for a list
+ *     too wide for one photo) has no reason to contain the header, and its continuation lines must not
+ *     be judged against some later header. Stitching joins only text, and pixel positions can't be
+ *     compared between two photos (the phone moved), so nothing positional is carried over: on later
+ *     photos this filter is simply off.
+ */
+export function splitAboveListBlocks<T extends SpatialBlock>(blocks: T[]): { kept: T[]; dropped: T[] } {
+  const anchor = findListAnchor(blocks);
+  if (!anchor) return { kept: blocks, dropped: [] };
+  const widest = Math.max(...blocks.map((b) => b.width));
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const b of blocks) {
+    const gapAbove = anchor.y - (b.y + b.height);
+    const isShort = b.width < widest * BODY_LINE_MIN_WIDTH_FRACTION;
+    (gapAbove > anchor.height && isShort ? dropped : kept).push(b);
+  }
+  return { kept, dropped };
+}
+
+/**
  * Convert a still-photo Vision result into a paragraph string. Used by the
  * "Choose Photo" path and the crop-confirm scanner (docs/06/14). Built from
  * position-sorted blocks (see sortByPosition) rather than the plugin's own
@@ -193,10 +288,21 @@ function isEdgeClipped(block: SpatialBlock, imageHeight: number): boolean {
  * where a real line legitimately sitting at the edge of the FRAME (not a
  * crop) is common and must not be dropped.
  */
-export function photoResultToParagraph(result: VisionOcrResult, options?: { dropEdgeClippedText?: boolean }): string {
+export function photoResultToParagraph(
+  result: VisionOcrResult,
+  options?: { dropEdgeClippedText?: boolean; dropOffColumnText?: boolean; dropTextAboveList?: boolean }
+): string {
   let blocks = toSpatialBlocks(result);
   if (options?.dropEdgeClippedText) {
     blocks = blocks.filter((b) => !isEdgeClipped(b, result.imageHeight));
+  }
+  // Only for a guide-box capture (aimed at the ingredient paragraph). "Choose Photo" is a whole,
+  // uncropped label where several columns can legitimately hold wanted text, so it's left alone.
+  if (options?.dropOffColumnText) {
+    blocks = splitOffColumnBlocks(blocks).kept;
+  }
+  if (options?.dropTextAboveList) {
+    blocks = splitAboveListBlocks(blocks).kept;
   }
   if (blocks.length > 0) {
     return sortByPosition(blocks)

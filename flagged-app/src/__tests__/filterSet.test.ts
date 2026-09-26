@@ -1,4 +1,4 @@
-import { sameFilterSet, filterSetLines } from "../domain/filterSet";
+import { sameFilterSet, filterSetLines, checkedForLines } from "../domain/filterSet";
 import type { Category, ProfileSnapshot } from "../domain/types";
 
 // The clean recheck screen's "Profile at time of each scan" card (docs/07 §7.1): it must say the
@@ -33,6 +33,31 @@ describe("sameFilterSet", () => {
   it("compares custom red flags case-insensitively, and notices a different one", () => {
     expect(sameFilterSet(snap({ customIngredients: ["Shellac"] }), snap({ customIngredients: ["shellac"] }))).toBe(true);
     expect(sameFilterSet(snap({ customIngredients: ["shellac"] }), snap({ customIngredients: ["carmine"] }))).toBe(false);
+  });
+});
+
+// The scan result's "What we checked for" card.
+describe("checkedForLines", () => {
+  it("lists a single profile's categories, custom red flags and the turned-off count", () => {
+    expect(
+      checkedForLines([snap({ customIngredients: ["shellac"], excludedIngredientIds: ["a", "b"] })], categories)
+    ).toEqual(["Big-9 Allergens", "Artificial Dyes", "Custom: shellac", "2 ingredients turned off"]);
+  });
+
+  it("is the union across several profiles (an 'All' scan), with no turned-off count", () => {
+    const lines = checkedForLines(
+      [
+        snap({ activeCategoryIds: ["cat-big9"], customIngredients: ["Shellac"], excludedIngredientIds: ["a"] }),
+        snap({ activeCategoryIds: ["cat-sugars", "cat-big9"], customIngredients: ["shellac", "carmine"] }),
+      ],
+      categories
+    );
+    expect(lines).toEqual(["Big-9 Allergens", "Hidden sugars", "Custom: Shellac", "Custom: carmine"]);
+  });
+
+  it("is empty — not a placeholder — when nothing was switched on", () => {
+    expect(checkedForLines([snap({ activeCategoryIds: [], excludedIngredientIds: ["a"] })], categories)).toEqual([]);
+    expect(checkedForLines([], categories)).toEqual([]);
   });
 });
 

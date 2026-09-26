@@ -4,7 +4,7 @@ import { Camera, useCameraDevice, useCameraPermission } from "react-native-visio
 import { recognizeText, getImageSize, correctPerspective } from "vision-ocr";
 import { Text, Button } from "../design/components";
 import { useTheme } from "../design/ThemeProvider";
-import { photoResultToParagraph } from "./recognition";
+import { photoResultToParagraph, splitAboveListBlocks, splitOffColumnBlocks, toSpatialBlocks } from "./recognition";
 import { stitch } from "./stitch";
 import { registerTempPhoto } from "../domain/tempPhotos";
 import { GUIDE_WIDTH_FRACTION, GUIDE_HEIGHT_FRACTION, guideBoxToPhotoCorners } from "./guideBox";
@@ -152,7 +152,32 @@ export function useCameraCapture({
       // sliced through (recognition.ts) rather than letting a Nutrition
       // Facts footnote or second-language repeat bleed in from just outside
       // the dashed lines.
-      const text = photoResultToParagraph(result, { dropEdgeClippedText: true });
+      // Also drop text in a different column from the ingredient paragraph — e.g. a recipe printed down
+      // the side of a tin — so it can't cause a false red flag (recognition.ts, `splitOffColumnBlocks`).
+      // The "text above the ingredient header" rule applies to the FIRST photo of a scan only: a second
+      // photo ("Scan More", a list too wide for one photo) has no reason to contain the header, and its
+      // continuation lines must never be judged against some later header. Stitching is text-only, and
+      // pixel positions can't be compared between two photos, so nothing positional carries over —
+      // on later photos that rule is simply off (recognition.ts, `splitAboveListBlocks`).
+      const firstPhoto = accumulatedRef.current === "";
+      if (__DEV__) {
+        const spatial = toSpatialBlocks(result);
+        const offColumn = splitOffColumnBlocks(spatial);
+        const dropped = [
+          ...offColumn.dropped,
+          ...(firstPhoto ? splitAboveListBlocks(offColumn.kept).dropped : []),
+        ];
+        // eslint-disable-next-line no-console
+        console.log(
+          `▓▓▓ OFF-COLUMN TEXT DROPPED (${dropped.length}) ▓▓▓` +
+            dropped.map((b) => `\n  x=${Math.round(b.x)} y=${Math.round(b.y)} :: ${JSON.stringify(b.text)}`).join("")
+        );
+      }
+      const text = photoResultToParagraph(result, {
+        dropEdgeClippedText: true,
+        dropOffColumnText: true,
+        dropTextAboveList: firstPhoto,
+      });
       accumulatedRef.current = stitch(accumulatedRef.current, text);
       setPhase("shotDone");
     } catch {

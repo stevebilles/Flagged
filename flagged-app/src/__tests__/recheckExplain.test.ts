@@ -1,4 +1,11 @@
-import { explainMatch, flaggedFooter, flagSource, formatDateTime, formatDayOrToday } from "../domain/recheckExplain";
+import {
+  cleanRescanFooter,
+  explainMatch,
+  flaggedFooter,
+  flagSource,
+  formatDateTime,
+  formatDayOrToday,
+} from "../domain/recheckExplain";
 import type { AttributedMatch } from "../domain/recheckEngine";
 
 // The explanation a user reads when a rescan flags something (docs/07 §7.1): it must say WHEN they
@@ -38,6 +45,33 @@ describe("flaggedFooter (the 'Why is this flagging now?' card's one-line footer)
     expect(text).toContain("filters you already had");
     expect(text).toContain("likely a product reformulation");
     expect(text).not.toContain("Probably not");
+  });
+});
+
+describe("cleanRescanFooter (a rescan where no red flags were found)", () => {
+  it("never says 'no NEW red flags' — that implies there were some before", () => {
+    for (const same of [true, false]) {
+      for (const last of [true, false]) {
+        expect(cleanRescanFooter(same, last)).not.toMatch(/no new red flags/i);
+      }
+    }
+  });
+
+  it("same profile, last scan also had none: no red flags either time", () => {
+    expect(cleanRescanFooter(true, false)).toBe(
+      "Same red flag profile as your last scan — no red flags were found either time."
+    );
+  });
+
+  it("same profile, but the last scan HAD red flags: does not claim 'either time'", () => {
+    expect(cleanRescanFooter(true, true)).toBe(
+      "Same red flag profile as your last scan — this time, no red flags were found."
+    );
+  });
+
+  it("changed profile: says so, and never claims 'same'", () => {
+    expect(cleanRescanFooter(false, false)).toMatch(/has changed/);
+    expect(cleanRescanFooter(false, false)).not.toMatch(/^Same/);
   });
 });
 

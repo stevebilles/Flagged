@@ -11,6 +11,16 @@ After the engine (`06`) produces matches, route to a Results Screen. Two outcome
   that profile's color (same as the flagged result). **Nothing else describes the scan — in particular
   no ingredient list and no explanatory sentence** (2026-09-24): the raw OCR text is often messy
   (nutrition-panel debris, bilingual duplicates) and isn't something to proofread on the result.
+- **"What we checked for" card** (owner's mockup, 2026-09-25 — added because the compact hero left the
+  clean screen top-heavy and empty): under the hero, a card headed `WHAT WE CHECKED FOR` with the red
+  flags the scanned profile(s) had switched on as plain pills (category names, custom red flags, and for a
+  single profile "N ingredients turned off"; an "All profiles" scan shows the union —
+  `checkedForLines`, `src/domain/filterSet.ts`), then "None of these red flags were found in the
+  ingredient list that was scanned." With nothing switched on it says so instead ("No red flags were switched on, so
+  nothing was checked for…") — never hidden. **No checkmarks on the pills** (the mockup has them): a ✓
+  beside "Big-9 Allergens" reads as "verified free of allergens", which a scan can't promise (legal
+  wording rule, `CLAUDE.md`); the mockup's "TRY FLAGGED" pill is a mockup-only label and isn't built, and
+  the disclaimer stays at the very bottom, below the buttons (the mockup has it above them).
 - **Required actions — the clean screen must always offer all three:** `[ Save to Pantry ]`
   (clean results only), `[ Scan Another Item ]`, and `[ Return to Home ]`.
 - **Primary action:** `[ Save to Pantry ]`
@@ -126,18 +136,25 @@ they're rescanning. No photo → nothing extra. It only displays the existing sa
 - Layout from the owner's mockup (`docs/screenshots/recheck_result_clean_v2.png`, 2026-09-25): a
   header (back arrow · product photo · brand / product — **no `CLEAN` pill/tag**, owner 2026-09-25:
   a status tag can be read as a safety claim and works against the disclaimer; the mockup's tag was
-  removed), a compact teal hero card (small check in a circle beside the headline,
-  **"No red flags found"**, "No new red flags found for **[Profile]'s** current profile."), a
+  removed), a compact teal hero card (small check in a circle beside ONE bold sentence,
+  **"No new red flags found for [Profile]'s current profile"** — no second line; saying it twice as
+  "No red flags found / No new red flags found for…" was a bug, owner 2026-09-25), a
   **PROFILE AT TIME OF EACH SCAN** card, and a **Back to Pantry** button. The back arrow and the
   button both accept the result.
-- **The "Profile at time of each scan" card** is a side-by-side comparison of what was being scanned
-  for: left = the date the item's red flags were recorded (`snapshotAt`) over **SCANNING FOR** + the
-  categories in its saved `profileSnapshot` (plus custom red flags, and "N ingredients turned off"
-  when any); right = "Today" (the rescan date) over the profile's filters now. Footer, italic:
-  **"Same filter set — no new red flags detected."** when the two sets are identical
-  (`sameFilterSet`, `src/domain/filterSet.ts`). If the user changed their filters since saving but
-  the rescan is still clean, the footer instead says **"Your filters changed since you saved this —
-  no red flags detected with the current set."** — the card never claims "same" when it isn't.
+- **The "Profile at time of each scan" card** is the same pill-style card as the flagged screen's
+  "Why is this flagging now?" (owner, 2026-09-25 — the old side-by-side bullet columns are **gone from
+  every rescan screen**; `WhyFlaggingCard` in `app/recheck-result.tsx`): **Profile of last scan · [date]**
+  (the date the item's red flags were recorded, `snapshotAt`) with the categories in its saved
+  `profileSnapshot` as pills (plus custom red flags, and "N ingredients turned off" when any), a down
+  arrow, then **Profile of today's scan** with the profile's filters now — any filter added since is
+  cyan with a "+". Footer, italic (`cleanRescanFooter`, `src/domain/recheckExplain.ts`, tested) — it
+  **never says "no NEW red flags"** (owner, 2026-09-25: that implies flags existed before; here none
+  did) and instead summarises what was found in each scan and whether the red flag profile matched:
+  **"Same red flag profile as your last scan — no red flags were found either time."** when the two
+  sets are identical (`sameFilterSet`, `src/domain/filterSet.ts`) and the last scan was also clean; if
+  the last scan HAD red flags (the user kept the product) it says **"…— this time, no red flags were
+  found."**; if the filters changed: **"Your red flag profile has changed since your last scan — no red
+  flags were found with the current one."** The card never claims "same" when it isn't.
 - This means only that nothing matched the current filters this time — not that nothing about the
   product changed, and not a safety claim; see above. Exact times are still stored (`03` §3.2b).
 - **A clean rescan becomes the item's new baseline** (owner, 2026-09-25), recorded the moment the
@@ -163,8 +180,8 @@ they're rescanning. No photo → nothing extra. It only displays the existing sa
   separate "Nothing new since your last scan" line removed as a repeat, and didn't want half the
   sentence bold). It is deliberately *not* "No red flags
   found" (the flags are still on the label) and uses a flag icon, not a checkmark. The
-  PROFILE AT TIME OF EACH SCAN card follows (footer: "Same filter set — no new red flags detected.", or
-  "Your filters changed since your last scan — no new red flags detected."), then a **SAME RED FLAGS AS
+  PROFILE AT TIME OF EACH SCAN card follows (footer: "Same red flag profile as your last scan — the same red flags were found again.", or
+  "Your red flag profile has changed since your last scan — no new red flags were found."), then a **SAME RED FLAGS AS
   YOUR LAST SCAN** caption and the flagged-filter cards, so the flags are never hidden. Two buttons:
   **Back to Pantry** (primary, filled, on top) and **Remove from Pantry** (plain secondary, not red —
   owner, 2026-09-25: no new red flags were found, so nothing is pushing the user to remove it, but the

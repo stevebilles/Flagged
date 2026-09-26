@@ -56,6 +56,22 @@ export function flaggedFooter(sameFilters: boolean, source: FlagSource = "produc
   return "Your profile was updated, but these flags come from filters you already had — likely a product reformulation.";
 }
 
+/**
+ * The footer of the profile card on a rescan where NO red flags were found (owner, 2026-09-25). It must
+ * not say "no NEW red flags" — that implies there were some before; here there were none this time. It
+ * summarises what was found in each scan and whether the red flag profile was the same both times.
+ * `lastScanFlagged` matters: the previous scan may have had red flags (the user kept the product), in
+ * which case "none either time" would be false.
+ */
+export function cleanRescanFooter(sameFilters: boolean, lastScanFlagged: boolean): string {
+  if (sameFilters) {
+    return lastScanFlagged
+      ? "Same red flag profile as your last scan — this time, no red flags were found."
+      : "Same red flag profile as your last scan — no red flags were found either time.";
+  }
+  return "Your red flag profile has changed since your last scan — no red flags were found with the current one.";
+}
+
 /** Where a flagged rescan's flags come from, judged from each match's attribution: all from filters
  * the user ADDED since the item was last checked ("profile"), none of them ("product" — the flag is
  * from a filter that was already on), or a mix. Decides which footer is honest when the profile changed. */

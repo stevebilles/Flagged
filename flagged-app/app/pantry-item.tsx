@@ -69,8 +69,11 @@ export default function PantryItemScreen() {
               {showImage ? (
                 <Image
                   source={{ uri: item.imageFilePath }}
-                  style={{ width: 160, height: 160, borderRadius: t.radius.md }}
-                  resizeMode="cover"
+                  // The WHOLE photo, never cropped (owner, 2026-09-25: a square crop cut the brand name
+                  // off a tall shot). "contain" fits it inside the box; the leftover space is the card's
+                  // own color, so it just looks like a taller photo.
+                  style={{ width: "100%", height: 300, borderRadius: t.radius.md }}
+                  resizeMode="contain"
                   onError={() => setImageFailed(true)}
                 />
               ) : (

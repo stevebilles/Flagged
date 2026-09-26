@@ -13,7 +13,7 @@ import { looksLikeNonEnglish } from "../src/matching/language";
 import { LanguageWarning } from "../src/design/LanguageWarning";
 import { evaluateScan } from "../src/domain/scanService";
 import { evaluateRecheck } from "../src/domain/recheckEngine";
-import { logScanDebug } from "../src/domain/scanDebug";
+import { logScanDebug, describeMatches } from "../src/domain/scanDebug";
 import { useCameraCapture } from "../src/ocr/CameraScanner";
 
 /**
@@ -94,7 +94,13 @@ export default function RecheckCapture() {
       // What the last scan already flagged: flags that turn up again aren't new.
       lastFlaggedTerms(getScanHistory(item.itemId))
     );
-    logScanDebug("recheck", rawParagraph, paragraph, `recheck → ${outcome.kind}`);
+    logScanDebug(
+      "recheck",
+      rawParagraph,
+      paragraph,
+      `recheck → ${outcome.kind}` +
+        (outcome.kind === "identical" ? "" : describeMatches(paragraph, outcome.matches))
+    );
 
     setLastRecheck({
       itemId: item.itemId,
@@ -164,8 +170,8 @@ export default function RecheckCapture() {
             {item?.imageFilePath && !imageFailed ? (
               <Image
                 source={{ uri: item.imageFilePath }}
-                style={{ width: 120, height: 120, borderRadius: t.radius.md }}
-                resizeMode="cover"
+                style={{ width: "100%", height: 180, borderRadius: t.radius.md }}
+                resizeMode="contain"
                 onError={() => setImageFailed(true)}
               />
             ) : (

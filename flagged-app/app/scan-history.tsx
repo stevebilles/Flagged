@@ -61,8 +61,8 @@ export default function ScanHistoryScreen() {
             {showImage && (
               <Image
                 source={{ uri: item.imageFilePath }}
-                style={{ width: 120, height: 120, borderRadius: t.radius.md }}
-                resizeMode="cover"
+                style={{ width: "100%", height: 200, borderRadius: t.radius.md }}
+                resizeMode="contain"
                 onError={() => setImageFailed(true)}
               />
             )}

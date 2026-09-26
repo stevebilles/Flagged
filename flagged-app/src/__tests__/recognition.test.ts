@@ -1,4 +1,9 @@
-import { toSpatialBlocks, photoResultToParagraph } from "../ocr/recognition";
+import {
+  toSpatialBlocks,
+  photoResultToParagraph,
+  splitOffColumnBlocks,
+  splitAboveListBlocks,
+} from "../ocr/recognition";
 import type { VisionOcrResult } from "vision-ocr";
 
 /**
@@ -20,6 +25,188 @@ function result(
 ): VisionOcrResult {
   return { text, blocks, ...imageSize };
 }
+
+// A REAL guide-box capture (Metro log, 2026-09-25, a bread-crumb tin): the ingredient column runs
+// x ≈ 240–1450, and a recipe printed down the tin's right side ("Dip fish, …") sits at x ≈ 1440–1740.
+// "fish" was matched and flagged as a new red flag. y/h/x/w are exactly as logged.
+const TIN_CAPTURE = [
+  block("Sodium 210mg", 235, -2, 443, 83),
+  block("Potassium 60mg", 246, 111, 469, 97),
+  block("Calcium 50mg", 248, 218, 398, 98),
+  block("Iron / Fer 1.25mg", 251, 327, 479, 92),
+  block("9%", 1353, 0, 97, 65),
+  block("1%", 1353, 124, 87, 60),
+  block("4%", 1345, 229, 90, 60),
+  block("7%", 1343, 328, 87, 62),
+  block("*5% or less is a little, 15% or more is a lot", 256, 433, 959, 122),
+  block("*5% ou moins c'est peu, 15% ou plus c'est beaucoup", 257, 493, 1162, 123),
+  block("Ingredients: Enriched wheat flour • Sugars (glucose-fructose,", 240, 623, 1208, 111),
+  block("sugar, dextrose, fancy molasses, honey) • Yeast • Salt•", 251, 703, 1194, 103),
+  block("Soybean oil, Cottonseed and/or canola oil• Wheat gluten • Soy", 253, 762, 1183, 107),
+  block("flour • Malted barley flour • Whey • Soy lecithin • Whole wheat", 253, 827, 1185, 119),
+  block("flour • Corn flour • Corn meal • Citric acid• Grain vinegar•", 258, 897, 1180, 111),
+  block("Potato flour • Rice flour • Wheat bran • Oat bran • Rye flour •", 263, 961, 1175, 115),
+  block("Skim milk powder • Calcium propionate • Sesame seeds •", 265, 1031, 1168, 122),
+  block("Caraway seeds • Egg.", 262, 1090, 401, 127),
+  block("Contains: Wheat • Milk • Soy • Barley • Rye • Oats • Egg • Sesame.", 271, 1157, 1111, 141),
+  block("Ingrédients: Farine de blé enrichie • Sucres (glucose-fructose,", 269, 1252, 1149, 131),
+  block("sucre, dextrose, melasse de fantaisie, miel) • Levure • Sel •", 278, 1324, 1142, 125),
+  block("Bread", 1582, 65, 127, 87),
+  block("Dip fish,", 1522, 209, 187, 114),
+  block("beaten i", 1517, 328, 191, 82),
+  block("Bread Cr", 1501, 401, 218, 119),
+  block("desired. H", 1488, 489, 239, 138),
+  block("few minut", 1491, 614, 223, 102),
+  block("Poiso", 1555, 803, 158, 113),
+  block("Tremper le", 1470, 922, 268, 183),
+  block("dans lauf", 1458, 1019, 267, 177),
+  block("dans la chu", 1453, 1115, 271, 176),
+  block("une panun", 1460, 1214, 260, 192),
+  block("lentement.", 1448, 1315, 248, 166),
+  block("couleur do", 1442, 1381, 265, 208),
+];
+
+describe("splitOffColumnBlocks (text in a different column from the ingredient paragraph)", () => {
+  it("drops the recipe strip down the side of the tin — the block that caused the false 'fish' flag", () => {
+    const { dropped } = splitOffColumnBlocks(toSpatialBlocks(result(TIN_CAPTURE, "", { imageWidth: 1800, imageHeight: 1700 })));
+    expect(dropped.map((b) => b.text)).toEqual([
+      "Bread", "Dip fish,", "beaten i", "Bread Cr", "desired. H", "few minut",
+      "Poiso", "Tremper le", "dans lauf", "dans la chu", "une panun", "lentement.", "couleur do",
+    ]);
+  });
+
+  it("keeps the whole ingredient list, the Contains line, the French repeat and the nutrition % values", () => {
+    const text = photoResultToParagraph(result(TIN_CAPTURE, "", { imageWidth: 1800, imageHeight: 1700 }), {
+      dropOffColumnText: true,
+    });
+    for (const kept of ["Ingredients:", "Enriched wheat flour", "Sesame seeds", "Contains: Wheat", "Ingrédients:", "9%", "Sodium 210mg"]) {
+      expect(text).toContain(kept);
+    }
+    expect(text).not.toMatch(/fish|Bread|desired|Poiso/i);
+  });
+
+  it("without the option nothing is dropped (the Choose Photo path is unchanged)", () => {
+    const text = photoResultToParagraph(result(TIN_CAPTURE, "", { imageWidth: 1800, imageHeight: 1700 }));
+    expect(text).toContain("Dip fish,");
+  });
+
+  it("does nothing when there are too few long lines to define a column", () => {
+    const few = [block("water", 0, 0, 100), block("salt", 500, 40, 100), block("sugar", 900, 80, 100)];
+    expect(splitOffColumnBlocks(toSpatialBlocks(result(few))).dropped).toEqual([]);
+    expect(splitOffColumnBlocks([]).dropped).toEqual([]);
+  });
+
+  it("keeps a two-column ingredient list — both columns' lines are long, so both are in the main span", () => {
+    const twoCol = [
+      block("water, sugar, salt", 0, 0, 400), block("flour, yeast, oil", 0, 40, 400), block("milk, egg, soy", 0, 80, 400),
+      block("corn, rice, oat", 450, 0, 400), block("barley, rye, malt", 450, 40, 400), block("honey, butter", 450, 80, 400),
+    ];
+    expect(splitOffColumnBlocks(toSpatialBlocks(result(twoCol))).dropped).toEqual([]);
+  });
+
+  it("keeps a line that is mostly inside the column even if it pokes past the edge", () => {
+    const lines = [0, 40, 80, 120].map((y) => block("a long ingredient line goes here", 100, y, 800));
+    const poking = block("water, salt, sugar", 700, 160, 400); // 200 of 400 inside = exactly half
+    const out = splitOffColumnBlocks(toSpatialBlocks(result([...lines, poking])));
+    expect(out.dropped).toEqual([]);
+  });
+});
+
+describe("splitAboveListBlocks (text up high, above the ingredient list)", () => {
+  const tin = () => toSpatialBlocks(result(TIN_CAPTURE, "", { imageWidth: 1800, imageHeight: 1700 }));
+
+  it("drops the nutrition panel well above the header, keeps the footnotes right above it and everything below", () => {
+    const { dropped } = splitAboveListBlocks(tin());
+    expect(dropped.map((b) => b.text)).toEqual([
+      "Sodium 210mg", "Potassium 60mg", "Calcium 50mg", "Iron / Fer 1.25mg", "9%", "1%", "4%", "7%",
+      // The recipe strip's upper lines sit well above the header too — including "Dip fish," itself, so
+      // this rule alone would also have prevented the false flag (the column filter drops the rest).
+      "Bread", "Dip fish,", "beaten i",
+    ]);
+  });
+
+  it("with both filters on, the real capture yields just the list area — no fish, no nutrition panel", () => {
+    const text = photoResultToParagraph(result(TIN_CAPTURE, "", { imageWidth: 1800, imageHeight: 1700 }), {
+      dropOffColumnText: true,
+      dropTextAboveList: true,
+    });
+    expect(text).toContain("Ingredients: Enriched wheat flour");
+    expect(text).toContain("Sesame seeds");
+    expect(text).toContain("*5% or less is a little"); // directly above the header — kept
+    expect(text).not.toMatch(/fish|Bread|Sodium|Potassium|Calcium 50|Iron \/ Fer|9%/i);
+  });
+
+  it("finds the header without a colon, and with OCR garble", () => {
+    const list = (header: string) => [
+      block("Sodium 210mg", 0, 0, 300, 40), // well above
+      block(`${header} water, sugar, salt`, 0, 300, 800, 40),
+      block("flour, yeast, oil", 0, 350, 800, 40),
+    ];
+    for (const header of ["Ingredients", "Ingredient", "INGREDIENTS:", "Ingredlents:", "Ingrédients :"]) {
+      const { dropped } = splitAboveListBlocks(toSpatialBlocks(result(list(header))));
+      expect(dropped.map((b) => b.text)).toEqual(["Sodium 210mg"]);
+    }
+  });
+
+  it("uses a 'Contains' start only when there is no ingredient header — and prefers the ingredient header", () => {
+    const onlyContains = [
+      block("Sodium 210mg", 0, 0, 300, 40),
+      block("Contains: milk, wheat, soy", 0, 300, 800, 40),
+    ];
+    expect(splitAboveListBlocks(toSpatialBlocks(result(onlyContains))).dropped.map((b) => b.text)).toEqual([
+      "Sodium 210mg",
+    ]);
+    // "Contains:" lower down must NOT become the start when an ingredient header exists above it.
+    const both = [
+      block("Sodium 210mg", 0, 0, 300, 40),
+      block("Ingredients: water, sugar", 0, 300, 800, 40),
+      block("flour, yeast", 0, 350, 800, 40),
+      block("Contains: wheat", 0, 400, 800, 40),
+    ];
+    expect(splitAboveListBlocks(toSpatialBlocks(result(both))).dropped.map((b) => b.text)).toEqual(["Sodium 210mg"]);
+  });
+
+  it("does nothing when no ingredient header can be found", () => {
+    const noHeader = [block("Sodium 210mg", 0, 0, 300, 40), block("water, sugar, salt, flour", 0, 300, 800, 40)];
+    expect(splitAboveListBlocks(toSpatialBlocks(result(noHeader))).dropped).toEqual([]);
+    expect(splitAboveListBlocks([]).dropped).toEqual([]);
+  });
+
+  // A second photo ("Scan More") of a list too wide for one photo: the English continuation, its short
+  // last line, then a LATER header (a second-language "Ingrédients:") and its list. Realistic geometry:
+  // block height ≈ 110, line spacing ≈ 65 (boxes overlap). Nothing of the English list may be dropped,
+  // even if this filter were applied to it.
+  const SECOND_PHOTO = [
+    block("Potato flour • Rice flour • Wheat bran • Oat bran • Rye flour •", 260, 0, 1170, 110),
+    block("Skim milk powder • Calcium propionate • Sesame seeds •", 262, 65, 1160, 110),
+    block("Caraway seeds • Egg.", 262, 130, 401, 110), // short last line of the English list
+    block("Contains: Wheat • Milk • Soy • Barley • Rye • Oats • Egg • Sesame.", 270, 400, 1110, 110),
+    block("Ingrédients: Farine de blé enrichie • Sucres (glucose-fructose,", 268, 560, 1149, 110),
+    block("sucre, dextrose, melasse de fantaisie, miel) • Levure • Sel •", 278, 625, 1142, 110),
+  ];
+
+  it("never eats the continuation of the list on a second photo, even when a later header is in frame", () => {
+    const { dropped } = splitAboveListBlocks(toSpatialBlocks(result(SECOND_PHOTO)));
+    // The anchor here is the LATER header at y=560 — the long lines above it are kept (rule 1). Only the
+    // short last line, far above that header, is a candidate; it must not be lost either, so the
+    // caller never applies this filter to a second photo (CameraScanner: first photo only).
+    expect(dropped.map((b) => b.text)).not.toContain("Skim milk powder • Calcium propionate • Sesame seeds •");
+    expect(dropped.map((b) => b.text)).not.toContain("Potato flour • Rice flour • Wheat bran • Oat bran • Rye flour •");
+  });
+
+  it("with the filter off (a second photo) every line of the continuation is kept and stitched text is complete", () => {
+    const text = photoResultToParagraph(result(SECOND_PHOTO), { dropOffColumnText: true, dropTextAboveList: false });
+    for (const part of ["Potato flour", "Skim milk powder", "Caraway seeds • Egg.", "Contains: Wheat", "Ingrédients:"]) {
+      expect(text).toContain(part);
+    }
+  });
+
+  it("never drops anything below the header", () => {
+    const { kept } = splitAboveListBlocks(tin());
+    const headerY = 623;
+    expect(kept.filter((b) => b.y >= headerY).length).toBe(TIN_CAPTURE.filter((b) => b.y >= headerY).length);
+  });
+});
 
 describe("toSpatialBlocks", () => {
   it("maps blocks to {id,text,x,y,width,height} and passes coordinates through unchanged", () => {

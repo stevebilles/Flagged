@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,15 +22,18 @@ import {
   softDeletePantryItem,
   logScan,
   getCategories,
+  getScanHistory,
 } from "../src/db/repositories";
 import { commitRecheckStats } from "../src/domain/scanService";
 import type { AttributedMatch } from "../src/domain/recheckEngine";
 import { snapshotFromProfile } from "../src/domain/activation";
-import { flaggedFooter, flagSource, formatDate, formatDayOrToday } from "../src/domain/recheckExplain";
+import { cleanRescanFooter, flaggedFooter, flagSource, formatDate } from "../src/domain/recheckExplain";
+import { lastFlaggedTerms } from "../src/domain/scanHistory";
 import { filterSetLines, sameFilterSet } from "../src/domain/filterSet";
 import { displayName } from "../src/domain/types";
 import { displayTerm } from "../src/domain/displayTerm";
 import { HeroCard } from "../src/design/HeroCard";
+import { FilterPill } from "../src/design/FilterPill";
 
 /** Header shared by both results (owner's mockups, 2026-09-25): back arrow + the screen's title
  * ("Rescan Result"), then the product's photo (carried through every recheck screen) and brand /
@@ -77,76 +80,6 @@ function ResultHeader({
           <Text tone="muted" variant="subheadline" numberOfLines={1}>{productName}</Text>
         </View>
       </View>
-    </View>
-  );
-}
-
-/** One column of the "Profile at time of each scan" card: a date over the red flags the profile was
- * scanning for on that date. */
-function FilterColumn({ date, lines }: { date: string; lines: string[] }) {
-  const t = useTheme();
-  return (
-    <View style={{ flex: 1, gap: t.spacing.xs }}>
-      <Text variant="subheadline" bold>{date}</Text>
-      <Text variant="caption" bold tone="muted" style={{ letterSpacing: 1 }}>SCANNING FOR</Text>
-      {lines.map((line, i) => (
-        <Text key={i} variant="subheadline" tone="muted">• {line}</Text>
-      ))}
-    </View>
-  );
-}
-
-/** The side-by-side of what the profile was scanning for when the item was last checked vs. today,
- * with a one-line footer saying what that means. Shared by the clean and flagged results. */
-function ProfileAtScanCard({
-  thenDate,
-  thenLines,
-  nowDate,
-  nowLines,
-  footer,
-}: {
-  thenDate: string;
-  thenLines: string[];
-  nowDate: string;
-  nowLines: string[];
-  footer: string;
-}) {
-  const t = useTheme();
-  return (
-    <Card style={{ gap: t.spacing.md }}>
-      <Text variant="caption" bold tone="muted" style={{ letterSpacing: 1 }}>
-        PROFILE AT TIME OF EACH SCAN
-      </Text>
-      <View style={{ flexDirection: "row" }}>
-        <FilterColumn date={thenDate} lines={thenLines} />
-        <View style={{ width: 1, backgroundColor: t.colors.canvas, marginHorizontal: t.spacing.md }} />
-        <FilterColumn date={nowDate} lines={nowLines} />
-      </View>
-      <View style={{ height: 1, backgroundColor: t.colors.canvas }} />
-      <Text tone="muted" variant="subheadline" style={{ fontFamily: t.fontFamily.italic }}>{footer}</Text>
-    </Card>
-  );
-}
-
-/** A red-flag filter as a small pill (used in the "Why is this flagging now?" card): neutral, or —
- * for a filter the user ADDED since the last check — highlighted in cyan and prefixed with "+". */
-function FilterPill({ label, added }: { label: string; added?: boolean }) {
-  const t = useTheme();
-  const tint = added ? t.colors.cyan : t.colors.textMuted;
-  return (
-    <View
-      style={{
-        borderWidth: 1,
-        borderColor: withAlpha(tint, added ? 0.6 : 0.4),
-        backgroundColor: withAlpha(tint, 0.12),
-        borderRadius: t.radius.pill,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-      }}
-    >
-      <Text variant="subheadline" bold={added} tone={added ? "cyan" : "muted"}>
-        {added ? `+ ${label}` : label}
-      </Text>
     </View>
   );
 }
@@ -267,6 +200,11 @@ export default function RecheckResult() {
   const router = useRouter();
   const handoff = useAppStore((s) => s.lastRecheck);
   const item = useMemo(() => (handoff ? getPantryItem(handoff.itemId) : null), [handoff]);
+  // Did the item's PREVIOUS scan find red flags? Read once, on the first render — before the effect
+  // below logs THIS scan — so the clean footer can say "no red flags either time" only when true.
+  const [lastScanFlagged] = useState(() =>
+    handoff ? lastFlaggedTerms(getScanHistory(handoff.itemId)).length > 0 : false
+  );
 
   useEffect(() => {
     const profile = item ? getProfile(item.profileId) : null;
@@ -336,7 +274,6 @@ export default function RecheckResult() {
   const nowFilters = profile ? snapshotFromProfile(profile) : item.profileSnapshot;
   const sameFilters = sameFilterSet(item.profileSnapshot, nowFilters);
   const thenDate = formatDate(item.snapshotAt);
-  const nowDate = formatDayOrToday(scannedAt);
   const thenLines = filterSetLines(item.profileSnapshot, categories);
   const nowLines = filterSetLines(nowFilters, categories);
 
@@ -365,44 +302,34 @@ export default function RecheckResult() {
             onBack={done}
           />
 
+          {/* ONE bold sentence, no second line (owner, 2026-09-25) — the same for a clean rescan and
+              "nothing new"; only the icon differs (checkmark: nothing found; flag: the known flags are
+              listed below). Saying it twice ("No red flags found / No new red flags found…") was the bug. */}
           <HeroCard
             tone="cyan"
             icon={known ? "flag" : "checkmark"}
-            // "Nothing new": ONE sentence, all bold, no second line (owner, 2026-09-25).
-            title={known ? `No new red flags found for ${whose} current profile` : "No red flags found"}
-            subtitle={known ? undefined : `No new red flags found for ${whose} current profile.`}
+            title={`No new red flags found for ${whose} current profile`}
           />
 
-          {/* Only claims "same" when the two sets truly are the same; if the user changed their
-              filters since the item was last checked, it says so instead. */}
-          {known ? (
-            // Flags were found, so this is a flagged rescan: it gets the flagged screen's pill-style
-            // card (not the clean screen's side-by-side bullets), titled for what it is.
-            <WhyFlaggingCard
-              title="PROFILE AT TIME OF EACH SCAN"
-              thenDate={thenDate}
-              thenLines={thenLines}
-              nowLines={nowLines}
-              footer={
-                sameFilters
-                  ? "Same filter set — no new red flags detected."
-                  : "Your filters changed since your last scan — no new red flags detected."
-              }
-              updated={!sameFilters}
-            />
-          ) : (
-            <ProfileAtScanCard
-              thenDate={thenDate}
-              thenLines={thenLines}
-              nowDate={nowDate}
-              nowLines={nowLines}
-              footer={
-                sameFilters
-                  ? "Same filter set — no new red flags detected."
-                  : "Your filters changed since you saved this — no red flags detected with the current set."
-              }
-            />
-          )}
+          {/* The pill-style card, same as the flagged screen (the old side-by-side bullet columns are
+              gone from every rescan screen). Only claims "same" when the two sets truly are the same;
+              if the user changed their filters since the item was last checked, it says so instead. */}
+          <WhyFlaggingCard
+            title="PROFILE AT TIME OF EACH SCAN"
+            thenDate={thenDate}
+            thenLines={thenLines}
+            nowLines={nowLines}
+            footer={
+              known
+                ? // Flags WERE found, all already found last time — "no new" is accurate here.
+                  sameFilters
+                  ? "Same red flag profile as your last scan — the same red flags were found again."
+                  : "Your red flag profile has changed since your last scan — no new red flags were found."
+                : // Nothing found: never "no NEW red flags" (that implies some existed).
+                  cleanRescanFooter(sameFilters, lastScanFlagged)
+            }
+            updated={!sameFilters}
+          />
 
           {outcome.kind === "known_flags" && (
             <>
